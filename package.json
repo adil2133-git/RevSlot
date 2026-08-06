@@ -1,22 +1,31 @@
 {
-  "name": "Review-Tracker",
+  "name": "revslot",
   "version": "1.0.0",
-  "description": "",
+  "description": "Academic project review scheduling platform",
   "main": "index.js",
+  "private": true,
   "scripts": {
     "client": "pnpm --filter client dev",
     "server": "pnpm --filter server dev",
-    "dev": "pnpm --parallel --filter client --filter server dev"
+    "dev": "pnpm --parallel --filter client --filter server dev",
+    "build": "pnpm --parallel --filter client --filter server build",
+    "build:client": "pnpm --filter client build",
+    "build:server": "pnpm --filter server build",
+    "test": "pnpm --parallel --filter client --filter server test",
+    "test:watch": "pnpm --parallel --filter client --filter server test:watch",
+    "lint": "pnpm --parallel --filter client --filter server lint",
+    "db:migrate": "pnpm --filter server db:migrate",
+    "db:seed": "pnpm --filter server db:seed",
+    "db:reset": "pnpm --filter server db:reset",
+    "type-check": "pnpm --parallel --filter client --filter server type-check"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "devEngines": {
-    "packageManager": {
-      "name": "pnpm",
-      "version": "^11.20.0",
-      "onFail": "download"
-    }
+  "keywords": ["scheduling", "review", "academic", "mern"],
+  "author": "Abdul Rahman Adil",
+  "license": "MIT",
+  "packageManager": "pnpm@11.20.0",
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=11.20.0"
   },
   "type": "module"
 }

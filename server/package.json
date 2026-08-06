@@ -1,0 +1,53 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "description": "Academic project review scheduling platform - API server",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch server.ts",
+    "build": "tsc",
+    "start": "node server.js",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint . --ext .ts",
+    "db:migrate": "drizzle-kit migrate",
+    "db:seed": "tsx db/seed.ts",
+    "db:reset": "drizzle-kit drop"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "^11.20.0",
+      "onFail": "download"
+    }
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dayjs": "^1.11.21",
+    "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.45.2",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.6.2",
+    "jsonwebtoken": "^9.0.3",
+    "otp-generator": "^4.0.1",
+    "pg": "^8.22.0",
+    "resend": "^6.18.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^3.0.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^26.1.2",
+    "@types/pg": "^8.20.4",
+    "drizzle-kit": "^0.31.10",
+    "eslint": "^9",
+    "tsx": "^4.19.2",
+    "typescript": "^7.0.2"
+  }
+}
