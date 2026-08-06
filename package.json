@@ -1,0 +1,22 @@
+{
+  "name": "Review-Tracker",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "client": "pnpm --filter client dev",
+    "server": "pnpm --filter server dev",
+    "dev": "pnpm --parallel --filter client --filter server dev"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "^11.20.0",
+      "onFail": "download"
+    }
+  },
+  "type": "module"
+}
