@@ -1,5 +1,5 @@
 import { pgTable, serial, integer, date, time, text, timestamp, unique, index } from 'drizzle-orm/pg-core';
-import { eq } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import { eventTypes } from './eventTypes.js';
 import { reviewers } from './reviewers.js';
 import { slotStatus } from './enums.js';
@@ -24,6 +24,6 @@ export const slots = pgTable(
     index('idx_slots_event_type_date').on(table.eventTypeId, table.slotDate),
     index('idx_slots_reviewer_date').on(table.reviewerId, table.slotDate),
     index('idx_slots_status').on(table.status),
-    index('idx_slots_hold_expiry').on(table.holdExpiresAt).where(eq(table.status, 'held')),
+    index('idx_slots_hold_expiry').on(table.holdExpiresAt).where(sql`${table.status} = 'held'`),
   ]
 );
