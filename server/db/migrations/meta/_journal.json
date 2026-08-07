@@ -15,6 +15,13 @@
       "when": 1786032193276,
       "tag": "0001_bright_juggernaut",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786094388792,
+      "tag": "0002_oval_adam_destine",
+      "breakpoints": true
     }
   ]
 }
