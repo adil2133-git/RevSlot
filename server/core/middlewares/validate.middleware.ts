@@ -8,8 +8,8 @@ export const validate = (schema: ZodType) => {
 
     if (!result.success) {
       const message = result.error.issues
-        .map((issue) => issue.message)
-        .join(', ');
+      .map((issue) => issue.message).join(', ');
+
       return next(new AppError(message, 400));
     }
 
@@ -17,3 +17,18 @@ export const validate = (schema: ZodType) => {
     next();
   };
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
