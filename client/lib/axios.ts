@@ -22,8 +22,10 @@ export function onSessionExpired(handler: () => void) {
 
 // Don't attempt refresh-and-retry for the auth endpoints themselves —
 // a 401 from /login or /refresh means "wrong credentials" or "truly
-// expired," not "needs a refresh."
-const SKIP_REFRESH_FOR = ["/auth/reviewer/login", "/auth/admin/login", "/auth/refresh", "/auth/logout"];
+// expired," not "needs a refresh." Logout IS allowed to retry, since an
+// expired accessToken shouldn't block a successful logout when the
+// refresh token is still valid.
+const SKIP_REFRESH_FOR = ["/auth/reviewer/login", "/auth/admin/login", "/auth/refresh"];
 
 let pendingRefresh: Promise<void> | null = null;
 

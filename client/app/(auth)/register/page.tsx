@@ -1,4 +1,5 @@
 import RegisterForm from "@/features/auth/components/RegisterForm";
+import Link from "next/link";
 
 export default function RegisterPage() {
   return (
@@ -6,7 +7,9 @@ export default function RegisterPage() {
       {/* Left branding panel */}
       <div className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-primary px-12 py-14 text-on-primary lg:flex">
         <div>
-          <span className="text-lg font-semibold tracking-tight">RevSlot</span>
+          <Link href="/" className="text-lg font-semibold tracking-tight hover:opacity-80">
+            RevSlot
+          </Link>
         </div>
 
         <div className="max-w-sm">
@@ -40,9 +43,9 @@ export default function RegisterPage() {
       <div className="flex w-full items-center justify-center bg-surface px-6 py-14 lg:w-1/2">
         <div className="w-full max-w-md">
           <div className="mb-8 lg:hidden">
-            <span className="text-lg font-semibold tracking-tight text-primary">
+            <Link href="/" className="text-lg font-semibold tracking-tight text-primary hover:opacity-80">
               RevSlot
-            </span>
+            </Link>
           </div>
 
           <h2 className="mb-1.5 text-2xl font-semibold tracking-tight text-on-surface">

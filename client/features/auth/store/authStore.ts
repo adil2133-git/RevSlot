@@ -66,9 +66,14 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
+  // Always clears local state, even if the network call fails (e.g. the
+  // session was already dead). We don't want a failed /auth/logout to
+  // surface as an unhandled error — the user is logged out either way.
   logout: async () => {
     try {
       await logoutApi();
+    } catch {
+      // ignore — local state still clears below
     } finally {
       set({ user: null });
     }
