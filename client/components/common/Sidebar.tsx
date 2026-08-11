@@ -62,15 +62,15 @@ export default function Sidebar() {
   const { user, logout } = useAuthStore();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     router.push("/login/reviewer");
   };
 
   return (
     <aside className="flex h-screen w-64 flex-col border-r border-slate-100 bg-surface-card">
       <div className="flex h-16 items-center px-6">
-        <Link href="/dashboard" className="text-lg font-semibold tracking-tight text-primary">
+        <Link href="/" className="text-lg font-semibold tracking-tight text-primary">
           RevSlot
         </Link>
       </div>

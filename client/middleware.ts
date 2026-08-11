@@ -9,14 +9,12 @@ import type { NextRequest } from "next/server";
 // verification happens via requireAuth on every protected API call.
 const AUTH_COOKIE_NAME = "accessToken";
 
-const AUTH_ROUTES = ["/login/reviewer", "/login/admin", "/register"];
-
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const hasSession = request.cookies.has(AUTH_COOKIE_NAME);
 
   const isDashboardRoute = pathname.startsWith("/dashboard");
-  const isAuthRoute = AUTH_ROUTES.some((route) => pathname.startsWith(route));
+  const isAuthRoute = pathname.startsWith("/login") || pathname.startsWith("/register");
 
   if (isDashboardRoute && !hasSession) {
     const loginUrl = new URL("/login/reviewer", request.url);
@@ -32,5 +30,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/login/:path*", "/register"],
+  matcher: ["/dashboard/:path*", "/login/:path*", "/login", "/register"],
 };

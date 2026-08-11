@@ -51,9 +51,9 @@ export default function LandingPage() {
       {/* Nav */}
       <header className="border-b border-slate-100">
         <div className="container-page flex h-16 items-center justify-between">
-          <span className="text-lg font-semibold tracking-tight text-primary">
+          <Link href="/" className="text-lg font-semibold tracking-tight text-primary hover:opacity-80">
             RevSlot
-          </span>
+          </Link>
           <nav className="hidden items-center gap-8 text-sm font-medium text-on-surface md:flex">
             <a href="#features" className="hover:text-primary">Features</a>
             <a href="#how-it-works" className="hover:text-primary">How it works</a>
@@ -209,7 +209,7 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="border-t border-slate-100">
         <div className="container-page flex flex-col items-center justify-between gap-4 py-8 text-sm text-slate-600 md:flex-row">
-          <span className="font-medium text-primary">RevSlot</span>
+          <Link href="/" className="font-medium text-primary hover:opacity-80">RevSlot</Link>
           <span>© {new Date().getFullYear()} RevSlot. Academic review scheduling, simplified.</span>
         </div>
       </footer>
