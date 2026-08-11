@@ -5,7 +5,7 @@ import type { NextRequest } from "next/server";
 // Middleware only checks for presence — it can't verify the JWT signature here
 // (Edge runtime, no access to the signing secret without adding `jose`). Actual
 // verification happens on the API side; this is just a fast redirect for UX.
-const AUTH_COOKIE_NAME = "revslot_token";
+const AUTH_COOKIE_NAME = "accessToken";
 
 const AUTH_ROUTES = ["/login/reviewer", "/login/admin", "/register"];
 
