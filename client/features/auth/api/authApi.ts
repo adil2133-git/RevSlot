@@ -1,30 +1,36 @@
 import api from "@/lib/axios";
 import type {
+  AuthResponse,
   LoginPayload,
-  LoginResponse,
-  LoginResult,
+  MessageResponse,
   RegisterPayload,
-  RegisterResponse,
 } from "../types";
 
-export async function loginReviewer(payload: LoginPayload): Promise<LoginResult> {
-  const { data } = await api.post<LoginResponse>("/auth/reviewer/login", payload);
-  return data.data;
+export async function loginReviewer(payload: LoginPayload) {
+  const { data } = await api.post<AuthResponse>("/auth/reviewer/login", payload);
+  return data.data.user;
 }
 
-export async function loginAdmin(payload: LoginPayload): Promise<LoginResult> {
-  const { data } = await api.post<LoginResponse>("/auth/admin/login", payload);
-  return data.data;
+export async function loginAdmin(payload: LoginPayload) {
+  const { data } = await api.post<AuthResponse>("/auth/admin/login", payload);
+  return data.data.user;
 }
 
-// Backend does not return tokens/user here — just a confirmation message.
-// Caller must redirect to login, not dashboard, after this resolves.
-export async function registerReviewer(payload: RegisterPayload): Promise<string> {
-  const { data } = await api.post<RegisterResponse>("/auth/reviewer/register", payload);
-  return data.message;
+// Backend now logs the reviewer in on register — cookies are set and the
+// user is returned, same as login. No separate "go log in" step needed.
+export async function registerReviewer(payload: RegisterPayload) {
+  const { data } = await api.post<AuthResponse>("/auth/reviewer/register", payload);
+  return data.data.user;
 }
 
-// NOTE: no POST /auth/logout or GET /auth/me exist on the backend yet.
-// Logout and session-restore are handled client-side only for now (see
-// authStore.ts) — ask Shibin to add /auth/me if you want server-verified
-// session hydration instead of trusting whatever's in localStorage.
+export async function logout() {
+  await api.post<MessageResponse>("/auth/logout");
+}
+
+// Server-verified session check — used on app load instead of trusting
+// anything client-side, since the token itself is httpOnly and invisible
+// to JS anyway.
+export async function fetchCurrentUser() {
+  const { data } = await api.get<AuthResponse>("/auth/me");
+  return data.data.user;
+}

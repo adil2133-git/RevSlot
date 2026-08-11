@@ -1,7 +1,7 @@
 export type UserRole = "reviewer" | "admin";
 
-// auth.service.ts createAuthResponse() only returns these fields for
-// both roles — no whatsappNumber, even for reviewers.
+// getMe() / createAuthResponse() on the backend — identical shape for
+// both roles, no whatsappNumber returned even for reviewers.
 export type AuthUser = {
   id: number;
   role: UserRole;
@@ -16,29 +16,21 @@ export type LoginPayload = {
   password: string;
 };
 
-// RegisterSchema on the backend requires confirmPassword in the body —
-// it's validated server-side too, not just client-side.
+// Network payload only — no confirmPassword. RegisterSchema on the
+// backend dropped that field; it's now purely client-side validation
+// (see authSchema.ts), stripped before the request is sent.
 export type RegisterPayload = {
   name: string;
   email: string;
   whatsappNumber: string;
   password: string;
-  confirmPassword: string;
 };
 
 // ---- Raw backend envelopes ----
-// Every response is wrapped in { success, ... } per auth.controller.ts.
+// Every response is wrapped in { success, ... }. accessToken/refreshToken
+// are NEVER in the body — they're set as httpOnly cookies server-side.
 type ApiDataEnvelope<T> = { success: true; data: T };
 type ApiMessageEnvelope = { success: true; message: string };
 
-// POST /reviewer/login, POST /admin/login → { success, data: { accessToken, refreshToken, user } }
-export type LoginResult = {
-  accessToken: string;
-  refreshToken: string;
-  user: AuthUser;
-};
-export type LoginResponse = ApiDataEnvelope<LoginResult>;
-
-// POST /reviewer/register → { success, message } — no tokens, no user.
-// Backend does not log the reviewer in on registration.
-export type RegisterResponse = ApiMessageEnvelope;
+export type AuthResponse = ApiDataEnvelope<{ user: AuthUser }>;
+export type MessageResponse = ApiMessageEnvelope;
