@@ -19,7 +19,12 @@
     "db:reset": "pnpm --filter server db:reset",
     "type-check": "pnpm --parallel --filter client --filter server type-check"
   },
-  "keywords": ["scheduling", "review", "academic", "mern"],
+  "keywords": [
+    "scheduling",
+    "review",
+    "academic",
+    "mern"
+  ],
   "author": "Abdul Rahman Adil",
   "license": "MIT",
   "packageManager": "pnpm@11.20.0",
@@ -27,5 +32,8 @@
     "node": ">=18.0.0",
     "pnpm": ">=11.20.0"
   },
-  "type": "module"
+  "type": "module",
+  "devDependencies": {
+    "@types/node": "^26.2.0"
+  }
 }
