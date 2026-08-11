@@ -9,7 +9,7 @@ export const notFound = (req: Request, res: Response, next: NextFunction) => {
 export const errorMiddleware = ( err: Error | AppError, req: Request, res: Response, next: NextFunction) => {
   const isAppError = err instanceof AppError;
 
-  const statusCode = isAppError ? err.statusCode: res.statusCode !== 200? res.statusCode: 500;
+  const statusCode = isAppError ? err.statusCode : res.statusCode !== 200? res.statusCode: 500;
 
   if (!isAppError) {
     console.error('[UNEXPECTED ERROR]', err);
