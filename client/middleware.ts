@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-// TODO: confirm exact cookie name + shape with Shibin once backend auth is wired.
-// Middleware only checks for presence — it can't verify the JWT signature here
-// (Edge runtime, no access to the signing secret without adding `jose`). Actual
-// verification happens on the API side; this is just a fast redirect for UX.
+// The backend sets `accessToken` as an httpOnly cookie (auth.controller.ts
+// setAuthCookies). httpOnly only blocks *browser JS* (document.cookie) —
+// Next.js middleware runs server-side and can read it fine via
+// request.cookies. This is a presence/expiry check only, not signature
+// verification (Edge runtime, no access to the JWT secret) — real
+// verification happens via requireAuth on every protected API call.
 const AUTH_COOKIE_NAME = "accessToken";
 
 const AUTH_ROUTES = ["/login/reviewer", "/login/admin", "/register"];
