@@ -1,13 +1,11 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-// Backend uses Bearer-token auth, not cookies (see auth.middleware.ts) — so
-// this cookie is NOT the real session token. It's a presence flag written
-// by authStore.ts purely so this Edge middleware has something to check,
-// since it can't read localStorage. The actual Authorization header is
-// attached client-side via lib/axios.ts's setAuthToken(). If someone
-// forges this cookie, every real API call still 401s server-side.
-const AUTH_COOKIE_NAME = "revslot_access_token";
+// TODO: confirm exact cookie name + shape with Shibin once backend auth is wired.
+// Middleware only checks for presence — it can't verify the JWT signature here
+// (Edge runtime, no access to the signing secret without adding `jose`). Actual
+// verification happens on the API side; this is just a fast redirect for UX.
+const AUTH_COOKIE_NAME = "accessToken";
 
 const AUTH_ROUTES = ["/login/reviewer", "/login/admin", "/register"];
 

@@ -11,6 +11,9 @@ const router = Router();
 router.post("/reviewer/register", validate(RegisterSchema), catchAsync(authController.registerReviewer));
 router.post("/reviewer/login", validate(LoginSchema), catchAsync(authController.loginReviewer));
 router.post("/admin/login", validate(LoginSchema), catchAsync(authController.loginAdmin))
+router.post("/refresh", catchAsync(authController.refreshToken));
+router.post("/logout", requireAuth, catchAsync(authController.logout));
+router.get("/me", requireAuth, catchAsync(authController.getMe))
 
 // for testing only
 router.get("/admin/test", requireAuth, requireRole("admin"),(req, res) => {
