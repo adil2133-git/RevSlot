@@ -1,28 +1,30 @@
 import api from "@/lib/axios";
-import type { AuthResponse, LoginPayload, RegisterPayload } from "../types";
+import type {
+  LoginPayload,
+  LoginResponse,
+  LoginResult,
+  RegisterPayload,
+  RegisterResponse,
+} from "../types";
 
-export async function loginReviewer(payload: LoginPayload) {
-  const { data } = await api.post<AuthResponse>("/auth/reviewer/login", payload);
-  return data;
+export async function loginReviewer(payload: LoginPayload): Promise<LoginResult> {
+  const { data } = await api.post<LoginResponse>("/auth/reviewer/login", payload);
+  return data.data;
 }
 
-export async function loginAdmin(payload: LoginPayload) {
-  const { data } = await api.post<AuthResponse>("/auth/admin/login", payload);
-  return data;
+export async function loginAdmin(payload: LoginPayload): Promise<LoginResult> {
+  const { data } = await api.post<LoginResponse>("/auth/admin/login", payload);
+  return data.data;
 }
 
-export async function registerReviewer(payload: RegisterPayload) {
-  const { data } = await api.post<AuthResponse>("/auth/reviewer/register", payload);
-  return data;
+// Backend does not return tokens/user here — just a confirmation message.
+// Caller must redirect to login, not dashboard, after this resolves.
+export async function registerReviewer(payload: RegisterPayload): Promise<string> {
+  const { data } = await api.post<RegisterResponse>("/auth/reviewer/register", payload);
+  return data.message;
 }
 
-export async function logout() {
-  await api.post("/auth/logout");
-}
-
-// Called on app load to hydrate the store from the httpOnly cookie,
-// since the token itself is never readable client-side.
-export async function fetchCurrentUser() {
-  const { data } = await api.get<AuthResponse>("/auth/me");
-  return data;
-}
+// NOTE: no POST /auth/logout or GET /auth/me exist on the backend yet.
+// Logout and session-restore are handled client-side only for now (see
+// authStore.ts) — ask Shibin to add /auth/me if you want server-verified
+// session hydration instead of trusting whatever's in localStorage.

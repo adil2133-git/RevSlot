@@ -11,21 +11,18 @@ const AUTH_ROUTES = ["/login/reviewer", "/login/admin", "/register"];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
+  const hasSession = request.cookies.has(AUTH_COOKIE_NAME);
 
   const isDashboardRoute = pathname.startsWith("/dashboard");
   const isAuthRoute = AUTH_ROUTES.some((route) => pathname.startsWith(route));
 
-  // Not logged in, trying to hit a protected route → bounce to login,
-  // preserving where they were headed.
-  if (isDashboardRoute && !token) {
+  if (isDashboardRoute && !hasSession) {
     const loginUrl = new URL("/login/reviewer", request.url);
     loginUrl.searchParams.set("redirectTo", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // Already logged in, trying to hit login/register → send to dashboard.
-  if (isAuthRoute && token) {
+  if (isAuthRoute && hasSession) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
