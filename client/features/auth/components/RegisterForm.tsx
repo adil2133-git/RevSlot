@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,6 +11,7 @@ import { useAuthStore } from "../store/authStore";
 export default function RegisterForm() {
   const router = useRouter();
   const { register: registerReviewer, isLoading, error } = useAuthStore();
+  const [success, setSuccess] = useState(false);
 
   const {
     register,
@@ -21,14 +23,25 @@ export default function RegisterForm() {
 
   const onSubmit = async (values: RegisterFormValues) => {
     try {
-      const { confirmPassword, ...payload } = values;
-      void confirmPassword;
-      await registerReviewer(payload);
-      router.push("/dashboard");
+      // Backend's RegisterSchema requires confirmPassword too, so send it
+      // as-is — don't strip it like we used to.
+      await registerReviewer(values);
+      // No token is issued on register (see auth.service.ts), so there's
+      // no session to land in a dashboard with — send them to log in.
+      setSuccess(true);
+      setTimeout(() => router.push("/login/reviewer"), 1500);
     } catch {
       // error already captured in store; surfaced below
     }
   };
+
+  if (success) {
+    return (
+      <div className="rounded-lg bg-secondary px-4 py-3 text-sm font-medium text-primary">
+        Account created — redirecting you to log in…
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
@@ -68,6 +81,7 @@ export default function RegisterForm() {
           id="whatsappNumber"
           type="tel"
           placeholder="+91 98765 43210"
+          maxLength={15}
           {...register("whatsappNumber")}
           className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm outline-none transition-shadow focus:border-primary focus:ring-4 focus:ring-secondary"
         />

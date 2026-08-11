@@ -11,8 +11,9 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     hydrate();
   }, [hydrate]);
 
-  // Prevents a flash of logged-out UI while the /auth/me check is in flight.
-  // Swap this for a proper skeleton/spinner once you have one in components/ui.
+  // hydrate() reads localStorage synchronously (no backend /auth/me call
+  // exists yet), so this only prevents a one-frame flash of logged-out UI.
+  // Swap for a proper skeleton once you have one in components/ui.
   if (!isHydrated) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-surface">
