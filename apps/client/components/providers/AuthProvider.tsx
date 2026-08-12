@@ -18,8 +18,6 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   }, [pathname]);
 
   useEffect(() => {
-    // If a silent token refresh ever fails (refresh token itself expired),
-    // axios's interceptor calls this — clear state and bounce to login.
     onSessionExpired(() => {
       logoutLocal();
       if (pathnameRef.current.startsWith("/dashboard")) {
@@ -27,11 +25,8 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       }
     });
     hydrate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // hydrate() calls GET /auth/me — a real network round trip now, since
-  // the token is httpOnly and can't be read client-side to skip the check.
   if (!isHydrated) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-surface">
