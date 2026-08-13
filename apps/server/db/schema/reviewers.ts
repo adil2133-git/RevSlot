@@ -12,6 +12,7 @@ export const reviewers = pgTable(
     avatarUrl: text('avatar_url'),
     bio: text('bio'),
     isActive: boolean('is_active').default(true),
+    emailVerified: boolean('email_verified').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   },
