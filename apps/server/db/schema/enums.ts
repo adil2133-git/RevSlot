@@ -10,4 +10,8 @@ export const bookingStatus = pgEnum('booking_status', [
   'confirmed', 'cancelled', 'completed', 'no_show', 'rescheduled',
 ]);
 
-export const otpPurpose = pgEnum('otp_purpose', ['check_bookings']);
+export const otpPurposeEnum = pgEnum('otp_purpose', [
+  'check_bookings',
+  'forgot_password',      
+  'email_verification',   
+]);
