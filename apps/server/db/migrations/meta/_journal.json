@@ -43,6 +43,13 @@
       "when": 1786615379824,
       "tag": "0005_rainy_mongoose",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786615934292,
+      "tag": "0006_dashing_excalibur",
+      "breakpoints": true
     }
   ]
 }
