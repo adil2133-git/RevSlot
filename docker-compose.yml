@@ -3,27 +3,42 @@ services:
     image: postgres:16
     container_name: revslot-postgres
     restart: unless-stopped
+
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
+
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
     networks:
       - revslot-network
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   server:
     build:
       context: .
       dockerfile: Dockerfile
+
     container_name: revslot-server
     restart: unless-stopped
+
     env_file:
       - .env
+
     ports:
       - "5000:5000"
+
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+
     networks:
       - revslot-network
 
