@@ -50,6 +50,20 @@
       "when": 1786615934292,
       "tag": "0006_dashing_excalibur",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786860360656,
+      "tag": "0007_keen_hammerhead",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786861273466,
+      "tag": "0008_spotty_baron_zemo",
+      "breakpoints": true
     }
   ]
 }

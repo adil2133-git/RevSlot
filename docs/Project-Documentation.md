@@ -1,4 +1,4 @@
-RevSlot — Full Project Documentation (Final, Updated)
+RevSlot — Full Project Documentation (Complete, Updated)
 1. Overview
 
 RevSlot is a full-stack platform with two modules — Reviewer and Super Admin — built to replace a manual, WhatsApp-driven process for coordinating academic project reviews between external reviewers and advisors.
@@ -50,11 +50,7 @@ A single toggle lets reviewers block out date ranges (holidays, exams, leave) �
 
 Reviewers can create multiple independent Question Banks with custom names:
 
-"React"
-"JavaScript"
-"Node.js"
-"SQL"
-etc.
+"React", "JavaScript", "Node.js", "SQL", etc.
 
 Each bank contains as many questions as the reviewer wants.
 
@@ -69,264 +65,198 @@ Reviewers can create multiple custom feedback forms:
 
 One default form provided by system
 Can create additional forms with custom names
-Each form has fixed base fields:
-Review Mark (1–10, with decimals like 6.5, 8.5)
-Task Mark (1–10, with decimals)
-Comments/Remarks
+Each form has fixed base fields: Review Mark (1–10, decimals), Task Mark (1–10, decimals), Comments/Remarks
 Reviewers can add custom fields to any form
 When submitting feedback for a session, reviewer selects which form to use
 3.6 Reviewer Dashboard sections
-Event Types — create, edit, delete booking links with their durations/availability templates
-My Availability — create, edit, manage availability templates with multiple time blocks per day
-Question Banks — create, organize, reference questions by topic
-Feedback Forms — create and customize feedback form templates
-Upcoming Sessions — bookings coming up
-Shows intern name & batch, advisor email, current week/project stage
-Intern Review History suggestion — if this intern (name+batch) has been reviewed before, shows: "This might be someone you've reviewed before: [Name] [Batch] — X past reviews. View history?"
-Shows WhatsApp contact info attached to booking
-Pending Feedback — sessions completed but feedback not yet submitted
-History — past sessions with feedback already submitted
+Event Types — create, edit, delete booking links
+My Availability — create/edit availability templates
+Question Banks — organize reference questions
+Feedback Forms — create/customize form templates
+Upcoming Sessions — includes Intern Review History suggestion, WhatsApp contact
+Pending Feedback — completed sessions awaiting feedback
+History — sessions with feedback already submitted
 3.7 Intern Review History
-
-Triggering:
-
-System matches new sessions by Intern Name + Batch
-If a match exists in reviewer's past feedback, shows suggestion in both:
-"Upcoming Sessions" dashboard
-While filling new feedback form
-
-What's shown:
-
-Full timeline of all past reviews for that intern
-Previous marks (review + task)
-Previous remarks/comments from feedback
-No learning/dismissal — keeps suggesting on future bookings
-
-Behavior:
-
-Exact name+batch match only, no fuzzy matching
-Suggestions appear in both places (upcoming session view + feedback form sidebar)
-Reviewer can click to view, but interaction is optional
+Matches new sessions by Intern Name + Batch (exact match, no fuzzy matching)
+If matched, shows suggestion in both Upcoming Sessions and the feedback form
+Suggestion shows full timeline of all past reviews for that intern (marks + remarks)
+Keeps suggesting every time — no dismissal/learning behavior
 3.8 After a Session
-Reviewer fills a form:
-Selects which feedback form to use
-Enters marks (review + task) with decimals
-Enters remarks/comments
-Fills custom form fields
-Review/confirmation screen summarizes entered data before final submission
-Must explicitly confirm before submission (catches typos/mistakes)
-OR "Mark as No-show" if intern/advisor never joined
+Reviewer selects a feedback form, enters marks + remarks + custom fields
+Review/confirmation screen before final submit
+OR "Mark as No-show"
 3.9 Required Reviewer Profile Fields
-Name, email
-WhatsApp number (mandatory) — fallback if reviewer doesn't show on Meet
+Name, email, WhatsApp number (mandatory)
 Avatar, bio (optional)
+3.10 Authentication Methods
 
-(Tech stacks / stack tagging removed — not part of current scope)
+RevSlot supports two authentication paths for reviewers, and one for admins.
 
+Reviewers — Method A: Email/Password registration (OTP-verified)
+
+Reviewer fills registration form (name, email, password, WhatsApp number)
+On submit, an OTP is generated (email_verification purpose) and emailed — account is NOT created yet
+Reviewer enters the OTP code
+Only on successful verification is the account created, with email_verified = true from the start
+A reviewer can never exist in an unverified state — verification is a precondition of account creation, not a follow-up
+
+Reviewers — Method B: Google OAuth
+
+Reviewer signs up/logs in via Google
+Account created immediately, email_verified = true (Google already verified ownership — no OTP step)
+password_hash remains null
+WhatsApp number is not collected by Google — triggers a Profile Completion prompt (see 3.11)
+
+Admins — email/password only
+
+No Google OAuth for admins under any circumstance
+Admin accounts are seeded manually (no public admin-registration endpoint)
+3.11 Profile Completion Prompt (Google-registered reviewers only)
+Google-registered reviewers land on the dashboard immediately (not blocked from logging in)
+If whatsapp_number is missing, dashboard shows a profile completion popup/banner: "Complete your profile — add your WhatsApp number to start creating booking links."
+(Open decision: soft reminder vs. hard block on creating Event Types — to be decided before UI build)
+3.12 Forgot Password
+Available only for email/password accounts (password_hash IS NOT NULL)
+Not available for Google-only accounts — shown "This account uses Google Sign-In" instead
+Flow: enter email → OTP (forgot_password purpose) sent → verified → set new password
 4. Super Admin module
 4.1 Reviewer Management
-Add/edit/deactivate reviewer accounts
-View reviewer profiles and contact info
-Monitor reviewer activity
+Add/edit/deactivate reviewer accounts, view profiles, monitor activity
 4.2 Oversight Views
-Availability grid — read-only view of all reviewers' availability across all event types
-Feedback history — browse all submitted marks/feedback across reviewers
-Search & filter — by reviewer, date range, feedback status
+Read-only availability grid across all reviewers
+Full feedback/marks history, search & filter by reviewer/date/status
 4.3 Analytics Dashboard
-Bookings per reviewer / per week
-No-show rate (overall + per reviewer)
-Average turnaround time from session completion to feedback submission
-Most-booked reviewers / busiest event types
+Bookings per reviewer/week, no-show rate, feedback turnaround, most-booked reviewers/event types
 4.4 Export
-CSV/PDF export of feedback and marks history for institutional records
+CSV/PDF export of feedback and marks history
 4.5 Audit/Activity Log
-Timestamped record of: bookings, cancellations, reschedules, no-shows, form updates
+Timestamped record of bookings, cancellations, reschedules, no-shows, form updates
 Search & filter by action type, reviewer, date range
 5. Advisor Flow (via Reviewer's Booking Links)
 5.1 Booking Flow
-Advisor receives a booking link (e.g. revslot.com/individual-review)
-Opens link → sees event details:
-Event Name
-Duration (fixed, not selectable)
-Reviewer timezone
-Selects a date
-System generates available time slots based on:
-Reviewer's availability template for that event type
-Fixed meeting duration
-Existing bookings (no overlap allowed)
-Timezone conversion
-Selects a time slot → temporary hold (few minutes)
-Fills booking form:
-Intern Name & Batch
-Advisor Email (auto-filled if returning)
-Current Week / Project Stage
-Intern Email(s) — optional
+Advisor opens booking link (e.g. revslot.com/individual-review)
+Sees event name, fixed duration, reviewer timezone
+Selects date → system generates valid time slots (availability template + duration + no overlap)
+Selects slot → temporary hold (few minutes)
+Fills form: Intern Name & Batch, Advisor Email, Current Week/Project Stage, Intern Email(s) optional
 Confirms → slot locked immediately
-On-screen confirmation (date, time, reviewer name, timezone)
-Confirmation email sent (via Resend, React Email template, branded)
+On-screen confirmation + email sent (Resend/React Email)
 5.2 Time Slot Generation Example
 
-Availability Template: 9:00 AM – 12:00 PM (Asia/Kolkata)
-Meeting Duration: 50 minutes
+Availability: 9:00 AM – 12:00 PM · Duration: 50 min
+Generated: 9:00, 9:50, 10:40
+With existing 9:00–9:50 booking: 9:00 ❌, 9:50 ✅, 10:40 ✅
 
-Generated slots (in advisor's timezone):
-
-9:00 AM
-9:50 AM
-10:40 AM
-
-With existing booking (9:00–9:50 AM):
-
-9:00 AM ❌ (conflicts)
-9:50 AM ✅ (valid)
-10:40 AM ✅ (valid)
 5.3 Cancellation & Rescheduling
-
-Cancel:
-
-Usable up to 3–4 hours before session
-After cutoff: in-app message directs advisor to contact reviewer via WhatsApp
-On cancellation: slot reopens immediately, reviewer notified
-
-Reschedule:
-
-From confirmation email or "Check My Bookings" page
-Advisor picks new date/time (same or different event type)
-Old slot reopens automatically once new slot confirmed
-5.4 Check My Bookings (OTP now via Redis)
-Separate page for advisors to manage bookings without login
-Flow:
-Advisor enters their email
-OTP generated, stored in Redis (TTL-based, ~10 min expiry), and emailed via Resend
-Advisor enters code → verified against Redis
-On success, all bookings (past + upcoming) fetched from Postgres for that email
-If no bookings for that email: "No bookings found"
-Rate limiting on OTP requests handled in Redis (e.g. max 3 requests per email per 15 min)
-No cleanup job needed for expired OTPs — Redis TTL handles it automatically
+Cancel: up to 3–4 hours before session; after cutoff, directed to WhatsApp
+Reschedule: pick new slot (same/different event type), old slot auto-releases
+5.4 Check My Bookings
+Advisor enters email → OTP generated in Redis (check_bookings purpose, ~10 min TTL) → emailed → verified → bookings fetched from Postgres for that email (past + upcoming, across all event types)
+No bookings found → "No bookings found"
+Rate limiting on OTP requests handled in Redis
 6. Email Service (Resend + React Email)
 
-All emails sent via Resend using React Email templates with brand styling.
+All emails sent via Resend using React Email templates, branded, send-only (noreply@revslot.com).
 
-#	Trigger	Recipient(s)	Content	Timing
-1	Booking confirmed	Advisor, Intern (if given)	Event name, date, time, reviewer name, WhatsApp link — no Meet link yet	Immediately
-2	OTP requested	Advisor	OTP code for "Check My Bookings"	Immediately
-3	Availability reminder	Reviewer	"Confirm or edit next week's availability"	Weekly Thu/Fri
-4	Session reminder + Meet link	Reviewer, Advisor, Intern (if given)	Event details, Meet link, reviewer's WhatsApp link	~24 hours before
-5	Final reminder	Reviewer, Advisor, Intern (if given)	Same Meet link, WhatsApp link, "starting soon"	~30 minutes before
-6	Booking cancelled	Reviewer	Which session cancelled, slot reopened	Immediately
-7	Reviewer marked unavailable (mid-booking)	Advisor	Session cancelled by reviewer, fallback options	Immediately
-8	Booking rescheduled	Reviewer, Advisor, Intern (if given)	Old slot released, new date/time confirmed	Immediately
+#	Trigger	Recipient(s)	Timing
+1	Booking confirmed	Advisor, Intern (if given)	Immediately
+2	OTP — check bookings	Advisor	Immediately
+3	OTP — email verification	Reviewer (during registration)	Immediately
+4	OTP — forgot password	Reviewer/Admin	Immediately
+5	Availability reminder	Reviewer	Weekly Thu/Fri
+6	Session reminder + Meet link	Reviewer, Advisor, Intern	~24h before
+7	Final reminder	Reviewer, Advisor, Intern	~30min before
+8	Booking cancelled	Reviewer	Immediately
+9	Reviewer marked unavailable (mid-booking)	Advisor	Immediately
+10	Booking rescheduled	Reviewer, Advisor, Intern	Immediately
 
-Key design:
+Meet link generated ~24h before session (not at booking), stays fresh.
 
-Meet link generated ~24 hours before (not at booking), stays fresh
-Emails are send-only from noreply@revslot.com (no reply management)
-All emails branded with RevSlot logo and colors
-React Email templates for maintainability and customization
 7. Booking Conflict Prevention
 
-All booking links for a reviewer share the same calendar:
+All event types for a reviewer share one calendar — a booking in any event type blocks that time slot across all others. No two bookings can overlap.
 
-When an advisor books a slot in "Individual Review" (50 min), it blocks that time across all other event types
-System generates time slots dynamically, filtering out any that overlap with any existing booking
-No two bookings can overlap, regardless of event type or duration
 8. Reliability & Protection
-Rate limiting on booking submissions
-Temporary slot hold during form fill (few minutes)
-Timezone-aware slot display and calculations (using dayjs)
-No-show marking keeps feedback data clean
-Meet link generated close to session time, not at booking
-Audit log for every action (booking, cancel, reschedule, no-show, form edit)
-OTP verification for advisor self-service access (Redis-backed, auto-expiring)
+Rate limiting on booking submissions and OTP requests
+Temporary slot hold during form fill
+Timezone-aware slot calculations (dayjs)
+No-show marking
+Meet link generated close to session time
+Audit log for every action
+OTP verification (Redis-backed, auto-expiring) for advisor self-service, registration, and password reset
 9. Tech Stack
-Frontend + API: Next.js 16 (React 19, TypeScript) — full-stack framework; API routes handle most request logic
-State: Zustand
+Frontend: Next.js 16 (React 19, TypeScript) — deployed on Vercel (revslot.com)
+Backend: Separate Express + TypeScript API — deployed on AWS EC2 (Ubuntu 24.04 LTS, api.revslot.com)
+State: Zustand (holds user + role only — no token storage, since JWT lives in httpOnly cookies)
 Forms: React Hook Form + Zod
 Styling: Tailwind CSS 4
-HTTP Client: Axios
-Dates: dayjs (timezone handling, slot calculations)
-Database: PostgreSQL (Drizzle ORM, drizzle-orm/node-postgres + pg Pool)
-Cache / OTP Store: Redis — used exclusively for OTP generation/verification (auto-expiring TTL, no manual cleanup)
-Package Manager: pnpm (monorepo workspace: client, server, shared)
+HTTP Client: Axios (shared instance with refresh-token interceptor, request deduplication)
+Dates: dayjs
+Database: PostgreSQL, installed directly on EC2 (not publicly accessible), Drizzle ORM
+Cache / OTP Store: Redis — used exclusively for OTP (generation, verification, rate limiting); to be set up post-MVP, before OTP features go live
+Package Manager: pnpm monorepo (client, server)
 Emails: Resend + React Email
-Background jobs / services: Node.js service layer (server/) — handles scheduled jobs (slot generation, reminders, expired hold cleanup) and logic not suited to Next.js API routes
-Authentication: JWT for reviewers/admins (separate reviewers and admins tables — role implied by table, no shared user_role enum needed); OTP-to-email via Redis for advisors
-
-Server folder structure: organized by module/domain (modules/booking/, modules/feedback/, modules/otp/, etc.) rather than by technical layer — each module bundles its own controller, service, routes, schema, types, and DB/Redis access together.
-
-10. Planned Feature Roadmap
+Authentication: JWT via httpOnly cookies (reviewers/admins); Google OAuth for reviewers only; Redis-backed OTP for check-bookings, email verification, and forgot password
+Process management: PM2 + Nginx (reverse proxy, HTTPS) on EC2
+Region: AWS ap-south-1 (Mumbai)
+Server folder structure: organized by module/domain (modules/booking/, modules/feedback/, modules/otp/, modules/auth/, etc.) — each module bundles its own controller, service, routes, schema, types, and DB/Redis access
+10. Authentication Summary
+reviewers and admins are separate tables — role implied by table, no shared user_role enum
+password_hash is nullable on both tables (Google-authenticated reviewers have none)
+google_id — nullable, unique — populated only for Google-signed-up reviewers; exists on admins for schema symmetry but is never used (admins are email/password only)
+email_verified: always true at creation for both reviewer auth paths (OTP blocks non-Google account creation until verified; Google accounts are pre-verified)
+OTP lives entirely in Redis (otp:{purpose}:{email}, TTL-based) — no Postgres otp_codes table
+otp_purpose values: check_bookings, email_verification, forgot_password
+11. Removed / Out of Scope
+❌ Tech Stacks / stack tagging
+❌ In-platform messaging (reviewer ↔ advisor)
+❌ Multi-language support
+❌ SMS reminders
+❌ Super Admin–owned public link (ownership moved to reviewers via Event Types)
+❌ OTP storage in Postgres (moved to Redis)
+❌ Google OAuth for admins
+12. Deployment Plan
+Frontend: Vercel, revslot.com
+Backend: AWS EC2, Ubuntu 24.04 LTS, Node.js + Express + TypeScript, PM2, Nginx, HTTPS, api.revslot.com
+Database: PostgreSQL on the same EC2 instance, not publicly accessible (bound to localhost/private security group), Drizzle ORM
+Redis: to be provisioned later, before OTP-dependent features (registration, forgot password, check-bookings) go live
+Region: ap-south-1 (Mumbai)
+Security group: ports 22 (SSH, IP-restricted), 80/443 only — 5432 never exposed
+Backups: daily pg_dump to S3 (must be set up at deployment, not deferred)
+Cookies: httpOnly, secure: true, sameSite: 'none', domain: '.revslot.com' for cross-subdomain auth between frontend and API
+13. Planned Feature Roadmap
 
 Phase 1 — Core features (MVP)
 
-Availability Templates (multiple time blocks, named templates, timezone-aware)
-Event Types (booking links) with fixed durations
-Booking flow with overlap prevention
-Feedback forms (default + customization)
-Check My Bookings (Redis-backed OTP)
-Question Banks
+Availability Templates, Event Types, booking flow with overlap prevention
+Feedback forms (default + customization), Question Banks
+Check My Bookings (Redis OTP)
+Reviewer auth: email/password (OTP-verified) + Google OAuth
 Intern Review History
 
 Phase 2 — Admin/Ops visibility
 
-Analytics dashboard
-Export (CSV/PDF)
-Audit log with search/filter
+Analytics dashboard, Export (CSV/PDF), Audit log with search/filter
 
 Phase 3 — Polish
 
-Dark mode
-Mobile-responsive booking page
-11. Authentication Notes
-reviewers and admins are separate tables — role is implied by which table a user belongs to, so no shared users table or user_role enum is required
-Each table has email (unique), password_hash, is_active — sufficient for standard JWT login
-OTP flow lives entirely in Redis — used only for advisor "Check My Bookings"; reviewers/admins never need OTP since they authenticate via normal login
-No otp_codes Postgres table — removed in favor of Redis TTL keys
-Optional future additions (not required for MVP): refresh token rotation table, failed-login lockout columns, email verification flag, password reset tokens table
-12. Removed / Out of Scope
-❌ Tech Stacks / stack tagging (reviewers no longer categorized by tech stack; advisors don't filter by stack)
-❌ In-platform messaging (reviewer ↔ advisor)
-❌ Multi-language support
-❌ SMS reminders
-❌ Super Admin–owned public link (link ownership moved to reviewers via Event Types)
-❌ OTP storage in Postgres (moved to Redis)
-13. PostgreSQL Data Model
-
-16 tables:
-admins, reviewers, availability_templates, template_time_blocks, event_types, vacation_blocks, slots, bookings, feedback_forms, feedback_form_fields, feedback, question_banks, questions, audit_logs, settings
-
-Key points reflected in the schema:
-
-No user_role enum (roles implied by table)
-No stacks / reviewer_stacks tables
-No otp_codes table — OTP lives in Redis
-event_types links to availability_templates (one template can serve multiple event types)
-slots unique per (event_type_id, slot_date, start_time)
-bookings.slot_id is unique — one booking per slot
-feedback.custom_field_values stored as JSONB for flexible custom form fields
-template_time_blocks supports multiple time ranges per day (Cal.com-style availability UI)
-
-(Full DDL maintained separately in docs/DATABASE-SCHEMA.md / server/src/db/migrations/)
-
-14. Redis Design (OTP)
-
-Key structure:
-
-otp:check_bookings:{email} → { code, attempts }
-TTL: 600 seconds (10 min, configurable via otp_expiry_minutes setting)
-One-time use — key deleted immediately on successful verification
-Attempt counter stored alongside code for lightweight brute-force protection
-No cron cleanup needed — Redis TTL handles expiry automatically
+Dark mode, mobile-responsive booking page
+14. Open Questions / Flagged for Follow-up
+Profile Completion prompt: soft reminder vs. hard block on Event Type creation until WhatsApp number is added — needs a decision before UI build
+Admin email_verified handling — currently not gated by any self-serve flow since admins are seeded, not registered
 15. Summary of Key Features
 
 ✅ Reviewer-owned booking links with independent event types
-✅ Flexible, named, timezone-aware availability templates (multiple blocks/day)
+✅ Flexible, named, timezone-aware availability templates
 ✅ Atomic slot booking with conflict prevention across all event types
 ✅ Customizable feedback forms with default + custom fields
 ✅ Question banks for reviewer reference
 ✅ Intern review history with continuity suggestions
-✅ Redis-backed OTP for advisor self-service (Check My Bookings)
+✅ Dual reviewer auth: OTP-verified email/password + Google OAuth
+✅ Profile completion flow for Google-registered reviewers
+✅ Redis-backed OTP for check-bookings, email verification, and password reset
 ✅ Branded transactional email via Resend + React Email
 ✅ Full audit trail
 ✅ Super Admin oversight, analytics, and exports
-✅ Next.js full-stack architecture with modular server-side business logic
+✅ Split Next.js (Vercel) frontend + Express (EC2) backend architecture
 ✅ No stacks/tags, no messaging, no multi-language — lean, focused MVP scope

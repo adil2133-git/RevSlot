@@ -6,3 +6,6 @@ export * from './schema/templateTimeBlocks.js';
 export * from './schema/eventTypes.js';
 export * from './schema/vacationBlocks.js';
 export * from './schema/slots.js';
+export * from './schema/bookings.js';
+export * from './schema/questionBanks.js';
+export * from './schema/questions.js';
