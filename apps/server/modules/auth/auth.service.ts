@@ -8,12 +8,16 @@ import { admins } from "../../db/schema/admins.js";
 
 import { AppError } from "../../core/errors/AppError.js";
 
-import type { LoginInput, RegisterInput } from "./auth.schema.js";
+import type { LoginInput, RegisterInput, ForgotPasswordInput, ResetPasswordInput } from "./auth.schema.js";
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from "../../core/utils/jwt.js";
+
+import { otpService } from "../otp/otp.service.js";
+import { emailService } from "../../services/email.service.js";
+import { forgotPasswordTemplate } from "../../emails/templates/forgotPassword.js";
 
 
 // Common fields required for authentication
-type AuthUser = Pick<
+type AuthUser = Pick <
   InferSelectModel<typeof reviewers>,
   "id" |
   "name" |
@@ -193,5 +197,76 @@ export const authService = {
       avatarUrl: user.avatarUrl,
       bio: user.bio,
     };
+  },
+
+  // Request a password reset — sends an OTP if the email is registered.
+  // Always returns the same generic message regardless of whether the
+  // email exists, so this endpoint can't be used to enumerate accounts.
+  forgotPassword: async (data: ForgotPasswordInput) => {
+    const [reviewer] = await db
+      .select()
+      .from(reviewers)
+      .where(eq(reviewers.email, data.email))
+      .limit(1);
+
+    const [admin] = await db
+      .select()
+      .from(admins)
+      .where(eq(admins.email, data.email))
+      .limit(1);
+
+    const user = reviewer ?? admin;
+
+    if (!user) {
+      return { message: "If that email is registered, a reset code has been sent." };
+    }
+
+    const otpCode = await otpService.generateOtp(data.email, "forgot_password");
+    const { subject, html } = forgotPasswordTemplate({ name: user.name, otpCode });
+    await emailService.sendEmail({ to: data.email, subject, html });
+
+    return { message: "If that email is registered, a reset code has been sent." };
+  },
+
+  // Verify the OTP and set a new password, for whichever table (reviewer
+  // or admin) the email belongs to.
+  resetPassword: async (data: ResetPasswordInput) => {
+    const isValid = await otpService.verifyOtp(data.email, "forgot_password", data.otp);
+
+    if (!isValid) {
+      throw new AppError("Invalid or expired OTP", 400);
+    }
+
+    const passwordHash = await bcrypt.hash(data.newPassword, 12);
+
+    const [reviewer] = await db
+      .select()
+      .from(reviewers)
+      .where(eq(reviewers.email, data.email))
+      .limit(1);
+
+    if (reviewer) {
+      await db
+        .update(reviewers)
+        .set({ passwordHash })
+        .where(eq(reviewers.id, reviewer.id));
+      return { message: "Password reset successful" };
+    }
+
+    const [admin] = await db
+      .select()
+      .from(admins)
+      .where(eq(admins.email, data.email))
+      .limit(1);
+
+    if (admin) {
+      await db
+        .update(admins)
+        .set({ passwordHash })
+        .where(eq(admins.id, admin.id));
+      return { message: "Password reset successful" };
+    }
+
+    throw new AppError("User not found", 404);
   },
 };
