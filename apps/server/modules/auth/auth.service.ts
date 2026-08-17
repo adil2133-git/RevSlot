@@ -31,6 +31,10 @@ const createAuthResponse = async (user: AuthUser, password: string, role: "revie
     throw new AppError("Account is inactive", 403);
   }
 
+  if (!user.passwordHash) {
+    throw new AppError("Please sign in with Google", 400);
+  }
+
   // Compare password
   const isPasswordValid = await bcrypt.compare(
     password,

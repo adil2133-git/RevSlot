@@ -1,10 +1,5 @@
 import api from "@/lib/axios";
-import type {
-  AuthResponse,
-  LoginPayload,
-  MessageResponse,
-  RegisterPayload,
-} from "../types";
+import type {AuthResponse, LoginPayload, MessageResponse, RegisterPayload} from "../types";
 
 export async function loginReviewer(payload: LoginPayload) {
   const { data } = await api.post<AuthResponse>("/auth/reviewer/login", payload);

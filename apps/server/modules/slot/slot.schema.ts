@@ -18,3 +18,10 @@ export const GenerateSlotsSchema = z.object({
   );
 
 export type GenerateSlotsInput = z.infer<typeof GenerateSlotsSchema>;
+
+// Used to hold a slot while the advisor fills out the booking form
+export const HoldSlotParamsSchema = z.object({
+  id: z.coerce.number().int().positive(),
+});
+
+export type HoldSlotParamsInput = z.infer<typeof HoldSlotParamsSchema>;

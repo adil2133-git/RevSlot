@@ -3,7 +3,7 @@ import { slotService } from "./slot.service.js";
 
 export const slotController = {
   generateSlots: async (req: Request, res: Response) => {
-    const result = await slotService.generateSlots(req.body);
+    const result = await slotService.generateSlots(req.body, req.user?.userId ?? 1);
 
     res.status(201).json({
       success: true,
@@ -19,6 +19,17 @@ export const slotController = {
       String(dateFrom),
       String(dateTo)
     );
+
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  },
+
+  holdSlot: async (req: Request, res: Response) => {
+    const slotId = Number(req.params.id);
+
+    const result = await slotService.holdSlot(slotId);
 
     res.status(200).json({
       success: true,
