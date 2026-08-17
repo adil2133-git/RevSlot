@@ -1,7 +1,7 @@
 import { Router } from "express";
 
 import { validate } from "../../core/middlewares/validate.middleware.js";
-import { LoginSchema, RegisterSchema } from "./auth.schema.js";
+import { LoginSchema, RegisterSchema, ForgotPasswordSchema, ResetPasswordSchema } from "./auth.schema.js";
 import { catchAsync } from "../../core/utils/catchAsync.js";
 import { authController } from "./auth.controller.js";
 import { requireAuth, requireRole } from "../../core/middlewares/auth.middleware.js";
@@ -14,6 +14,9 @@ router.post("/admin/login", validate(LoginSchema), catchAsync(authController.log
 router.post("/refresh", catchAsync(authController.refreshToken));
 router.post("/logout", requireAuth, catchAsync(authController.logout));
 router.get("/me", requireAuth, catchAsync(authController.getMe))
+
+router.post("/forgot-password", validate(ForgotPasswordSchema), catchAsync(authController.forgotPassword));
+router.post("/reset-password", validate(ResetPasswordSchema), catchAsync(authController.resetPassword));
 
 // for testing only
 router.get("/admin/test", requireAuth, requireRole("admin"),(req, res) => {
