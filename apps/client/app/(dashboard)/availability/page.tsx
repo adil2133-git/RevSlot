@@ -30,7 +30,7 @@ export default function AvailabilityPage() {
       <div className="mb-8 flex items-center justify-between">
         <h1 className="text-2xl font-semibold tracking-tight text-on-surface">Availability</h1>
         <button
-          onClick={() => router.push("/dashboard/availability/new")}
+          onClick={() => router.push("/availability/new")}
           className="flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-on-primary shadow-surface transition-opacity hover:opacity-90"
         >
           <PlusIcon />
@@ -58,7 +58,7 @@ export default function AvailabilityPage() {
             <AvailabilityCard
               key={template.id}
               template={template}
-              onEdit={(id) => router.push(`/dashboard/availability/${id}/edit`)}
+              onEdit={(id) => router.push(`/availability/${id}/edit`)}
               onDelete={handleDelete}
             />
           ))}
