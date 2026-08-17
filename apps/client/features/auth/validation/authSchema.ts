@@ -7,6 +7,7 @@ export const registerSchema = z
     whatsappNumber: z
       .string()
       .min(10, "Enter a valid WhatsApp number")
+      .max(15, "Number is too long")
       .regex(/^\+?[0-9\s-]+$/, "Numbers only"),
     password: z.string().min(8, "At least 8 characters"),
     confirmPassword: z.string(),
@@ -24,3 +25,34 @@ export const loginSchema = z.object({
 });
 
 export type LoginFormValues = z.infer<typeof loginSchema>;
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().email("Enter a valid email address"),
+});
+
+export type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
+
+export const resetPasswordSchema = z
+  .object({
+    otp: z.string().length(6, "Enter the 6-digit code"),
+    newPassword: z.string().min(8, "At least 8 characters"),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ["confirmPassword"],
+  });
+
+export type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
+
+// Only asked for when the backend tells us this is a brand-new Google
+// user (422 response) — not part of the normal Google sign-in click.
+export const googleWhatsappSchema = z.object({
+  whatsappNumber: z
+    .string()
+    .min(10, "Enter a valid WhatsApp number")
+    .max(15, "Number is too long")
+    .regex(/^\+?[0-9\s-]+$/, "Numbers only"),
+});
+
+export type GoogleWhatsappFormValues = z.infer<typeof googleWhatsappSchema>;

@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { registerSchema, type RegisterFormValues } from "../validation/authSchema";
 import { useAuthStore } from "../store/authStore";
+import GoogleSignInButton from "./GoogleSignInButton";
 
 export default function RegisterForm() {
   const router = useRouter();
@@ -35,7 +36,15 @@ export default function RegisterForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+    <div>
+      <GoogleSignInButton />
+      <div className="my-6 flex items-center gap-3">
+        <div className="h-px flex-1 bg-slate-200" />
+        <span className="text-xs font-medium text-slate-400">OR</span>
+        <div className="h-px flex-1 bg-slate-200" />
+      </div>
+
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
       <div>
         <label htmlFor="name" className="mb-1.5 block text-sm font-medium text-on-surface">
           Full Name
@@ -135,6 +144,7 @@ export default function RegisterForm() {
           Log in
         </Link>
       </p>
-    </form>
+      </form>
+    </div>
   );
 }
