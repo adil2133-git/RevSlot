@@ -6,6 +6,12 @@ import { templateTimeBlocks } from "../../db/schema/templateTimeBlocks.js";
 
 import { AppError } from "../../core/errors/AppError.js";
 
+import type {
+  CreateTemplateInput,
+  UpdateTemplateInput,
+  ReplaceTimeBlocksInput,
+} from "./availability.schema.js";
+
 // Fetches a template only if it belongs to the given reviewer, else throws 404
 const getOwnedTemplateOrThrow = async (reviewerId: number, templateId: number) => {
   const [template] = await db
@@ -28,12 +34,7 @@ const getOwnedTemplateOrThrow = async (reviewerId: number, templateId: number) =
 
 export const availabilityService = {
   // Creates a new availability template for the reviewer, rejecting duplicate names
-  createTemplate: async (reviewerId: number, data: {
-    name: string;
-    description?: string;
-    timezone?: string;
-    isDefault?: boolean;
-  }) => {
+  createTemplate: async (reviewerId: number, data: CreateTemplateInput) => {
     const [existing] = await db
       .select()
       .from(availabilityTemplates)
@@ -55,8 +56,8 @@ export const availabilityService = {
         reviewerId,
         name: data.name,
         description: data.description,
-        timezone: data.timezone ?? "UTC",
-        isDefault: data.isDefault ?? false,
+        timezone: data.timezone,
+        isDefault: data.isDefault,
       })
       .returning();
 
@@ -105,12 +106,7 @@ export const availabilityService = {
   },
 
   // Updates template metadata (name, description, timezone, isDefault), rejecting duplicate names
-  updateTemplate: async (reviewerId: number, templateId: number, data: {
-    name?: string;
-    description?: string;
-    timezone?: string;
-    isDefault?: boolean;
-  }) => {
+  updateTemplate: async (reviewerId: number, templateId: number, data: UpdateTemplateInput) => {
     await getOwnedTemplateOrThrow(reviewerId, templateId);
 
     if (data.name) {
@@ -154,12 +150,7 @@ export const availabilityService = {
   replaceTimeBlocks: async (
     reviewerId: number,
     templateId: number,
-    blocks: Array<{
-      dayOfWeek: number;
-      startTime: string;
-      endTime: string;
-      displayOrder?: number;
-    }>
+    data: ReplaceTimeBlocksInput
   ) => {
     await getOwnedTemplateOrThrow(reviewerId, templateId);
 
@@ -168,14 +159,14 @@ export const availabilityService = {
         .delete(templateTimeBlocks)
         .where(eq(templateTimeBlocks.templateId, templateId));
 
-      if (blocks.length === 0) {
+      if (data.blocks.length === 0) {
         return [];
       }
 
       return tx
         .insert(templateTimeBlocks)
         .values(
-          blocks.map((block) => ({
+          data.blocks.map((block) => ({
             templateId,
             dayOfWeek: block.dayOfWeek,
             startTime: block.startTime,
