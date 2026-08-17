@@ -17,13 +17,34 @@ export type LoginPayload = {
 };
 
 // Network payload only — no confirmPassword. RegisterSchema on the
-// backend dropped that field; it's now purely client-side validation
-// (see authSchema.ts), stripped before the request is sent.
+// backend doesn't accept/require it; that's client-only validation.
 export type RegisterPayload = {
   name: string;
   email: string;
   whatsappNumber: string;
   password: string;
+};
+
+export type ForgotPasswordPayload = {
+  email: string;
+};
+
+export type ResetPasswordPayload = {
+  email: string;
+  otp: string;
+  newPassword: string;
+};
+
+export type VerifyEmailPayload = {
+  token: string;
+};
+
+// whatsappNumber is only required the first time a brand-new Google user
+// signs up (backend returns 422 GoogleWhatsappRequiredError if omitted
+// and no matching account exists yet).
+export type GoogleAuthPayload = {
+  idToken: string;
+  whatsappNumber?: string;
 };
 
 // ---- Raw backend envelopes ----
