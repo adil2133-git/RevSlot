@@ -1,0 +1,191 @@
+import { eq, and, asc, inArray } from "drizzle-orm";
+import { db } from "../../config/db.js";
+
+import { availabilityTemplates } from "../../db/schema/availabilityTemplates.js";
+import { templateTimeBlocks } from "../../db/schema/templateTimeBlocks.js";
+
+import { AppError } from "../../core/errors/AppError.js";
+
+// Fetches a template only if it belongs to the given reviewer, else throws 404
+const getOwnedTemplateOrThrow = async (reviewerId: number, templateId: number) => {
+  const [template] = await db
+    .select()
+    .from(availabilityTemplates)
+    .where(
+      and(
+        eq(availabilityTemplates.id, templateId),
+        eq(availabilityTemplates.reviewerId, reviewerId)
+      )
+    )
+    .limit(1);
+
+  if (!template) {
+    throw new AppError("Availability template not found", 404);
+  }
+
+  return template;
+};
+
+export const availabilityService = {
+  // Creates a new availability template for the reviewer, rejecting duplicate names
+  createTemplate: async (reviewerId: number, data: {
+    name: string;
+    description?: string;
+    timezone?: string;
+    isDefault?: boolean;
+  }) => {
+    const [existing] = await db
+      .select()
+      .from(availabilityTemplates)
+      .where(
+        and(
+          eq(availabilityTemplates.reviewerId, reviewerId),
+          eq(availabilityTemplates.name, data.name)
+        )
+      )
+      .limit(1);
+
+    if (existing) {
+      throw new AppError("A template with this name already exists", 409);
+    }
+
+    const [template] = await db
+      .insert(availabilityTemplates)
+      .values({
+        reviewerId,
+        name: data.name,
+        description: data.description,
+        timezone: data.timezone ?? "UTC",
+        isDefault: data.isDefault ?? false,
+      })
+      .returning();
+
+    if (!template) {
+      throw new AppError("Failed to create availability template", 500);
+    }
+
+    return { ...template, timeBlocks: [] };
+  },
+
+  // Lists all templates for a reviewer, each with its attached time blocks
+  listTemplates: async (reviewerId: number) => {
+    const templates = await db
+      .select()
+      .from(availabilityTemplates)
+      .where(eq(availabilityTemplates.reviewerId, reviewerId))
+      .orderBy(asc(availabilityTemplates.createdAt));
+
+    if (templates.length === 0) return [];
+
+    const templateIds = templates.map((t) => t.id);
+
+    const blocks = await db
+      .select()
+      .from(templateTimeBlocks)
+      .where(inArray(templateTimeBlocks.templateId, templateIds))
+      .orderBy(asc(templateTimeBlocks.dayOfWeek), asc(templateTimeBlocks.displayOrder));
+
+    return templates.map((template) => ({
+      ...template,
+      timeBlocks: blocks.filter((b) => b.templateId === template.id),
+    }));
+  },
+
+  // Fetches a single template (owned by the reviewer) with its time blocks
+  getTemplateById: async (reviewerId: number, templateId: number) => {
+    const template = await getOwnedTemplateOrThrow(reviewerId, templateId);
+
+    const blocks = await db
+      .select()
+      .from(templateTimeBlocks)
+      .where(eq(templateTimeBlocks.templateId, template.id))
+      .orderBy(asc(templateTimeBlocks.dayOfWeek), asc(templateTimeBlocks.displayOrder));
+
+    return { ...template, timeBlocks: blocks };
+  },
+
+  // Updates template metadata (name, description, timezone, isDefault), rejecting duplicate names
+  updateTemplate: async (reviewerId: number, templateId: number, data: {
+    name?: string;
+    description?: string;
+    timezone?: string;
+    isDefault?: boolean;
+  }) => {
+    await getOwnedTemplateOrThrow(reviewerId, templateId);
+
+    if (data.name) {
+      const [existing] = await db
+        .select()
+        .from(availabilityTemplates)
+        .where(
+          and(
+            eq(availabilityTemplates.reviewerId, reviewerId),
+            eq(availabilityTemplates.name, data.name)
+          )
+        )
+        .limit(1);
+
+      if (existing && existing.id !== templateId) {
+        throw new AppError("A template with this name already exists", 409);
+      }
+    }
+
+    const [updated] = await db
+      .update(availabilityTemplates)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(availabilityTemplates.id, templateId))
+      .returning();
+
+    return updated;
+  },
+
+  // Deletes a template owned by the reviewer (time blocks cascade-delete via FK)
+  deleteTemplate: async (reviewerId: number, templateId: number) => {
+    await getOwnedTemplateOrThrow(reviewerId, templateId);
+
+    await db
+      .delete(availabilityTemplates)
+      .where(eq(availabilityTemplates.id, templateId));
+
+    return { id: templateId };
+  },
+
+  // Atomically replaces all time blocks for a template with the given list
+  replaceTimeBlocks: async (
+    reviewerId: number,
+    templateId: number,
+    blocks: Array<{
+      dayOfWeek: number;
+      startTime: string;
+      endTime: string;
+      displayOrder?: number;
+    }>
+  ) => {
+    await getOwnedTemplateOrThrow(reviewerId, templateId);
+
+    const result = await db.transaction(async (tx) => {
+      await tx
+        .delete(templateTimeBlocks)
+        .where(eq(templateTimeBlocks.templateId, templateId));
+
+      if (blocks.length === 0) {
+        return [];
+      }
+
+      return tx
+        .insert(templateTimeBlocks)
+        .values(
+          blocks.map((block) => ({
+            templateId,
+            dayOfWeek: block.dayOfWeek,
+            startTime: block.startTime,
+            endTime: block.endTime,
+            displayOrder: block.displayOrder,
+          }))
+        )
+        .returning();
+    });
+
+    return result;
+  },
+};
