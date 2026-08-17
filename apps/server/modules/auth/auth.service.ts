@@ -8,12 +8,25 @@ import { admins } from "../../db/schema/admins.js";
 
 import { AppError } from "../../core/errors/AppError.js";
 
-import type { LoginInput, RegisterInput, ForgotPasswordInput, ResetPasswordInput } from "./auth.schema.js";
-import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from "../../core/utils/jwt.js";
+import type { LoginInput, RegisterInput, ForgotPasswordInput, ResetPasswordInput, VerifyEmailInput } from "./auth.schema.js";
+import {
+  generateAccessToken,
+  generateRefreshToken,
+  verifyRefreshToken,
+  generateEmailVerificationToken,
+  verifyEmailVerificationToken,
+} from "../../core/utils/jwt.js";
 
 import { otpService } from "../otp/otp.service.js";
 import { emailService } from "../../services/email.service.js";
 import { forgotPasswordTemplate } from "../../emails/templates/forgotPassword.js";
+import { verifyEmailTemplate } from "../../emails/templates/verifyEmail.js";
+
+const CLIENT_URL = process.env.CLIENT_URL as string;
+
+if (!CLIENT_URL) {
+  throw new Error("CLIENT_URL is not set in environment variables");
+}
 
 
 // Common fields required for authentication
@@ -33,6 +46,11 @@ const createAuthResponse = async (user: AuthUser, password: string, role: "revie
   // Check whether account is active
   if (!user.isActive) {
     throw new AppError("Account is inactive", 403);
+  }
+
+  // Accounts created via Google have no password set — block normal login for them
+  if (!user.passwordHash) {
+    throw new AppError("This account uses Google Sign-In. Please log in with Google.", 400);
   }
 
   // Compare password
@@ -98,6 +116,19 @@ export const authService = {
 
        if (!newReviewer) {
       throw new AppError("Failed to create reviewer account", 500);
+    }
+
+    // Fire the verification email — registration still succeeds even if this fails,
+    // so a temporary email outage doesn't block sign-up entirely.
+    try {
+      const verificationToken = generateEmailVerificationToken({ userId: newReviewer.id, role: "reviewer" });
+      const { subject, html } = verifyEmailTemplate({
+        name: newReviewer.name,
+        verificationUrl: `${CLIENT_URL}/verify-email?token=${verificationToken}`,
+      });
+      await emailService.sendEmail({ to: newReviewer.email, subject, html });
+    } catch (err) {
+      console.error("Failed to send verification email:", err);
     }
 
     return createAuthResponse(newReviewer, data.password, "reviewer");
@@ -264,5 +295,38 @@ export const authService = {
     }
 
     throw new AppError("User not found", 404);
+  },
+
+  // Verify a user's email using the token from the verification link.
+  verifyEmail: async (data: VerifyEmailInput) => {
+    let payload;
+    try {
+      payload = verifyEmailVerificationToken(data.token);
+    } catch {
+      throw new AppError("Invalid or expired verification link", 400);
+    }
+
+    const table = payload.role === "admin" ? admins : reviewers;
+
+    const [user] = await db
+      .select()
+      .from(table)
+      .where(eq(table.id, payload.userId))
+      .limit(1);
+
+    if (!user) {
+      throw new AppError("User not found", 404);
+    }
+
+    if (user.emailVerified) {
+      return { message: "Email already verified" };
+    }
+
+    await db
+      .update(table)
+      .set({ emailVerified: true })
+      .where(eq(table.id, payload.userId));
+
+    return { message: "Email verified successfully" };
   },
 };
