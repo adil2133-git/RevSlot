@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { OAuth2Client } from "google-auth-library";
 
 import { eq, type InferSelectModel } from "drizzle-orm";
 import { db } from "../../config/db.js";
@@ -8,7 +9,7 @@ import { admins } from "../../db/schema/admins.js";
 
 import { AppError } from "../../core/errors/AppError.js";
 
-import type { LoginInput, RegisterInput, ForgotPasswordInput, ResetPasswordInput, VerifyEmailInput } from "./auth.schema.js";
+import type { LoginInput, RegisterInput, ForgotPasswordInput, ResetPasswordInput, VerifyEmailInput, GoogleAuthInput } from "./auth.schema.js";
 import {
   generateAccessToken,
   generateRefreshToken,
@@ -27,6 +28,14 @@ const CLIENT_URL = process.env.CLIENT_URL as string;
 if (!CLIENT_URL) {
   throw new Error("CLIENT_URL is not set in environment variables");
 }
+
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID as string;
+
+if (!GOOGLE_CLIENT_ID) {
+  throw new Error("GOOGLE_CLIENT_ID is not set in environment variables");
+}
+
+const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 
 // Common fields required for authentication
@@ -328,5 +337,88 @@ export const authService = {
       .where(eq(table.id, payload.userId));
 
     return { message: "Email verified successfully" };
+  },
+
+  // Sign in or sign up a reviewer using a Google-issued ID token.
+  googleAuth: async (data: GoogleAuthInput) => {
+    // Verify the token actually came from Google and is meant for our app
+    const ticket = await googleClient.verifyIdToken({
+      idToken: data.idToken,
+      audience: GOOGLE_CLIENT_ID,
+    });
+
+    const googlePayload = ticket.getPayload();
+    if (!googlePayload || !googlePayload.email) {
+      throw new AppError("Invalid Google token", 401);
+    }
+
+    const { email, name, sub: googleId, picture } = googlePayload;
+
+    // Check if this Google account is already linked
+    let [reviewer] = await db
+      .select()
+      .from(reviewers)
+      .where(eq(reviewers.googleId, googleId))
+      .limit(1);
+
+    if (!reviewer) {
+      // Check if the email is already registered a different way (password signup)
+      const [existingByEmail] = await db
+        .select()
+        .from(reviewers)
+        .where(eq(reviewers.email, email))
+        .limit(1);
+
+      if (existingByEmail) {
+        // Link this Google account to their existing password-based account
+        [reviewer] = await db
+          .update(reviewers)
+          .set({ googleId, emailVerified: true })
+          .where(eq(reviewers.id, existingByEmail.id))
+          .returning();
+      } else {
+        // Genuinely new user — need a WhatsApp number to create the account
+        if (!data.whatsappNumber) {
+          throw new AppError("WhatsApp number is required for new account registration", 422);
+        }
+
+        [reviewer] = await db
+          .insert(reviewers)
+          .values({
+            name: name ?? "Reviewer",
+            email,
+            googleId,
+            avatarUrl: picture,
+            whatsappNumber: data.whatsappNumber,
+            emailVerified: true, // Google already verified this email
+          })
+          .returning();
+      }
+    }
+
+    if (!reviewer) {
+      throw new AppError("Failed to authenticate with Google", 500);
+    }
+
+    if (!reviewer.isActive) {
+      throw new AppError("Account is inactive", 403);
+    }
+
+    const payload = { userId: reviewer.id, role: "reviewer" as const };
+    const accessToken = generateAccessToken(payload);
+    const refreshToken = generateRefreshToken(payload);
+
+    return {
+      accessToken,
+      refreshToken,
+      user: {
+        id: reviewer.id,
+        name: reviewer.name,
+        email: reviewer.email,
+        role: "reviewer" as const,
+        avatarUrl: reviewer.avatarUrl,
+        bio: reviewer.bio,
+      },
+    };
   },
 };
