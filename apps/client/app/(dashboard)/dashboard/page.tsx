@@ -17,7 +17,7 @@ const QUICK_LINKS = [
     ),
   },
   {
-    href: "/event-types",
+    href: "dashboard/event-types",
     title: "Create a booking link",
     desc: "Turn a template into a shareable link advisors can book directly.",
     icon: (
@@ -28,7 +28,7 @@ const QUICK_LINKS = [
     ),
   },
   {
-    href: "/vacation",
+    href: "dashboard/vacation",
     title: "Going away?",
     desc: "Block out dates so no one can book you while you're out.",
     icon: (
