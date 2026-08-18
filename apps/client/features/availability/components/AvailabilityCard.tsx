@@ -30,10 +30,19 @@ export default function AvailabilityCard({ template, onEdit, onDelete }: Availab
   const groups = groupTimeBlocks(template.timeBlocks);
 
   return (
-    <div className="rounded-xl border border-slate-100 bg-surface-card p-5 shadow-surface">
+    <div
+      onDoubleClick={() => onEdit(template.id)}
+      className="group rounded-xl border border-slate-100 bg-surface-card p-5 shadow-surface transition-shadow hover:shadow-md"
+    >
       <div className="mb-3 flex items-start justify-between gap-2">
         <div>
-          <h3 className="text-lg font-semibold leading-snug text-on-surface">{template.name}</h3>
+          <h3
+            onClick={() => onEdit(template.id)}
+            className="cursor-pointer text-lg font-semibold leading-snug text-on-surface hover:text-primary hover:underline"
+            title="Click to edit schedule"
+          >
+            {template.name}
+          </h3>
           {template.isDefault && (
             <span className="mt-2 inline-block rounded-md bg-slate-400 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-white">
               Default
@@ -41,7 +50,11 @@ export default function AvailabilityCard({ template, onEdit, onDelete }: Availab
           )}
         </div>
 
-        <div className="relative shrink-0">
+        <div
+          className="relative shrink-0"
+          onClick={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
+        >
           <button
             onClick={() => setMenuOpen((v) => !v)}
             className="rounded-md p-1 text-slate-400 hover:bg-surface-hover hover:text-on-surface"
