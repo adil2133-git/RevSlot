@@ -36,3 +36,25 @@ export interface TemplatePayload {
   timezone: string;
   isDefault: boolean;
 }
+
+export interface OverrideBlock {
+  id: number;
+  overrideId: number;
+  startTime: string;
+  endTime: string;
+  displayOrder: number | null;
+}
+
+export interface DateOverride {
+  id: number;
+  templateId: number;
+  date: string; // "YYYY-MM-DD"
+  isUnavailable: boolean;
+  blocks: OverrideBlock[];
+}
+
+export interface CreateOverridePayload {
+  date: string;
+  isUnavailable: boolean;
+  blocks: { startTime: string; endTime: string; displayOrder: number }[];
+}
