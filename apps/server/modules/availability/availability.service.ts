@@ -1,4 +1,4 @@
-import { eq, and, asc, inArray } from "drizzle-orm";
+import { eq, and, asc, inArray, ne } from "drizzle-orm";
 import { db } from "../../config/db.js";
 
 import { availabilityTemplates } from "../../db/schema/availabilityTemplates.js";
@@ -96,6 +96,13 @@ export const availabilityService = {
       throw new AppError("A template with this name already exists", 409);
     }
 
+    if (data.isDefault) {
+      await db
+        .update(availabilityTemplates)
+        .set({ isDefault: false, updatedAt: new Date() })
+        .where(eq(availabilityTemplates.reviewerId, reviewerId));
+    }
+
     const [template] = await db
       .insert(availabilityTemplates)
       .values({
@@ -170,6 +177,18 @@ export const availabilityService = {
       if (existing && existing.id !== templateId) {
         throw new AppError("A template with this name already exists", 409);
       }
+    }
+
+    if (data.isDefault) {
+      await db
+        .update(availabilityTemplates)
+        .set({ isDefault: false, updatedAt: new Date() })
+        .where(
+          and(
+            eq(availabilityTemplates.reviewerId, reviewerId),
+            ne(availabilityTemplates.id, templateId)
+          )
+        );
     }
 
     const [updated] = await db
