@@ -67,8 +67,13 @@ export const authController = {
   },
 
   logout: async (req: Request, res: Response) => {
-    res.clearCookie('accessToken');
-    res.clearCookie('refreshToken');
+    const clearOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax' as const,
+    }
+    res.clearCookie('accessToken', clearOptions);
+    res.clearCookie('refreshToken', clearOptions);
 
     res.status(200).json({
       success: true,
@@ -82,6 +87,44 @@ export const authController = {
     res.status(200).json({
       success: true,
       data: { user: result },
+    });
+  },
+
+  forgotPassword: async (req: Request, res: Response) => {
+    const result = await authService.forgotPassword(req.body);
+
+    res.status(200).json({
+      success: true,
+      message: result.message,
+    });
+  },
+
+  resetPassword: async (req: Request, res: Response) => {
+    const result = await authService.resetPassword(req.body);
+
+    res.status(200).json({
+      success: true,
+      message: result.message,
+    });
+  },
+
+  verifyEmail: async (req: Request, res: Response) => {
+    const result = await authService.verifyEmail(req.body);
+
+    res.status(200).json({
+      success: true,
+      message: result.message,
+    });
+  },
+
+  googleAuth: async (req: Request, res: Response) => {
+    const result = await authService.googleAuth(req.body);
+
+    setAuthCookies(res, result.accessToken, result.refreshToken);
+
+    res.status(200).json({
+      success: true,
+      data: { user: result.user },
     });
   },
 };

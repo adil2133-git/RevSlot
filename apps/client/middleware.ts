@@ -7,11 +7,11 @@ import type { NextRequest } from "next/server";
 // request.cookies. This is a presence/expiry check only, not signature
 // verification (Edge runtime, no access to the JWT secret) — real
 // verification happens via requireAuth on every protected API call.
-const AUTH_COOKIE_NAME = "accessToken";
+// const AUTH_COOKIE_NAME = "accessToken";
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const hasSession = request.cookies.has(AUTH_COOKIE_NAME);
+  const hasSession = request.cookies.has("accessToken") || request.cookies.has("refreshToken");
 
   const isDashboardRoute = pathname.startsWith("/dashboard");
   const isAuthRoute = pathname.startsWith("/login") || pathname.startsWith("/register");
