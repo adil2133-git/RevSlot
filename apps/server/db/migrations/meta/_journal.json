@@ -64,6 +64,13 @@
       "when": 1786861273466,
       "tag": "0008_spotty_baron_zemo",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1787039981352,
+      "tag": "0009_steep_cable",
+      "breakpoints": true
     }
   ]
 }
