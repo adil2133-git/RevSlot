@@ -1,4 +1,6 @@
 import Link from "next/link";
+import Navbar from "@/components/common/Navbar";
+import Footer from "@/components/common/Footer";
 
 const FEATURES = [
   {
@@ -49,31 +51,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-surface">
       {/* Nav */}
-      <header className="border-b border-slate-100">
-        <div className="container-page flex h-16 items-center justify-between">
-          <Link href="/" className="text-lg font-semibold tracking-tight text-primary hover:opacity-80">
-            RevSlot
-          </Link>
-          <nav className="hidden items-center gap-8 text-sm font-medium text-on-surface md:flex">
-            <a href="#features" className="hover:text-primary">Features</a>
-            <a href="#how-it-works" className="hover:text-primary">How it works</a>
-          </nav>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/login/reviewer"
-              className="text-sm font-medium text-on-surface hover:text-primary"
-            >
-              Log in
-            </Link>
-            <Link
-              href="/register"
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary shadow-surface transition-shadow hover:shadow-raised"
-            >
-              Get Started
-            </Link>
-          </div>
-        </div>
-      </header>
+      <Navbar />
 
       {/* Hero */}
       <section className="container-page py-24 text-center">
@@ -207,12 +185,7 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-slate-100">
-        <div className="container-page flex flex-col items-center justify-between gap-4 py-8 text-sm text-slate-600 md:flex-row">
-          <Link href="/" className="font-medium text-primary hover:opacity-80">RevSlot</Link>
-          <span>© {new Date().getFullYear()} RevSlot. Academic review scheduling, simplified.</span>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

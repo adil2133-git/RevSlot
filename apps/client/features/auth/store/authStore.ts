@@ -1,4 +1,5 @@
 import { create } from "zustand";
+
 import type {
   AuthUser,
   ForgotPasswordPayload,
@@ -25,7 +26,7 @@ type AuthState = {
   isLoading: boolean;
   isHydrated: boolean;
   error: string | null;
-
+  
   loginAsReviewer: (payload: LoginPayload) => Promise<void>;
   loginAsAdmin: (payload: LoginPayload) => Promise<void>;
   register: (payload: RegisterPayload) => Promise<void>;
