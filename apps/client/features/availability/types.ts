@@ -7,6 +7,22 @@ export interface TimeBlock {
   displayOrder: number | null;
 }
 
+export interface OverrideBlock {
+  id: number;
+  overrideId: number;
+  startTime: string;
+  endTime: string;
+  displayOrder: number | null;
+}
+
+export interface DateOverride {
+  id: number;
+  templateId: number;
+  date: string; // "YYYY-MM-DD"
+  isUnavailable: boolean;
+  blocks: OverrideBlock[];
+}
+
 export interface AvailabilityTemplate {
   id: number;
   reviewerId: number;
@@ -16,6 +32,13 @@ export interface AvailabilityTemplate {
   isDefault: boolean;
   createdAt: string;
   timeBlocks: TimeBlock[];
+  dateOverrides?: DateOverride[];
+}
+
+export interface CreateOverridePayload {
+  date: string;
+  isUnavailable: boolean;
+  blocks: { startTime: string; endTime: string; displayOrder: number }[];
 }
 
 export interface ListTemplatesResponse {
@@ -35,26 +58,4 @@ export interface TemplatePayload {
   description?: string;
   timezone: string;
   isDefault: boolean;
-}
-
-export interface OverrideBlock {
-  id: number;
-  overrideId: number;
-  startTime: string;
-  endTime: string;
-  displayOrder: number | null;
-}
-
-export interface DateOverride {
-  id: number;
-  templateId: number;
-  date: string; // "YYYY-MM-DD"
-  isUnavailable: boolean;
-  blocks: OverrideBlock[];
-}
-
-export interface CreateOverridePayload {
-  date: string;
-  isUnavailable: boolean;
-  blocks: { startTime: string; endTime: string; displayOrder: number }[];
 }

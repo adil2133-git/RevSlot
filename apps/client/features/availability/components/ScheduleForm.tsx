@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import Switch from "@/components/common/Switch";
 import DayRow, { DayBlock } from "./DayRow";
 import TimezoneSelect from "./TimezoneSelect";
-import DateOverridesSection, { OverrideEntry } from "./DateOverridesSection";
+import DateOverridesSection from "./DateOverridesSection";
+import type { DateOverride } from "../types";
 import {
     createTemplateRequest,
     updateTemplateRequest,
@@ -53,7 +54,8 @@ export default function ScheduleForm({ mode, templateId }: ScheduleFormProps) {
     const [tz, setTz] = useState(guessTimezone());
     const [isDefault, setIsDefault] = useState(false);
     const [days, setDays] = useState<DaysState>(defaultDaysState());
-    const [overrides, setOverrides] = useState<OverrideEntry[]>([]);
+    const [overrides, setOverrides] = useState<DateOverride[]>([]);
+    const [savedTemplateId, setSavedTemplateId] = useState<number | null>(templateId ?? null);
 
     const [loading, setLoading] = useState(mode === "edit");
     const [saving, setSaving] = useState(false);
@@ -67,6 +69,7 @@ export default function ScheduleForm({ mode, templateId }: ScheduleFormProps) {
                 setName(template.name);
                 setTz(template.timezone);
                 setIsDefault(template.isDefault);
+                setOverrides(template.dateOverrides ?? []);
 
                 const grouped = defaultDaysState();
                 DAYS_ORDER.forEach(({ dayOfWeek }) => {
@@ -180,6 +183,7 @@ export default function ScheduleForm({ mode, templateId }: ScheduleFormProps) {
             if (mode === "create") {
                 const template = await createTemplateRequest({ name: name.trim(), timezone: tz, isDefault });
                 id = template.id;
+                setSavedTemplateId(id);
             } else if (id) {
                 await updateTemplateRequest(id, { name: name.trim(), timezone: tz, isDefault });
             }
@@ -260,9 +264,9 @@ export default function ScheduleForm({ mode, templateId }: ScheduleFormProps) {
             </div>
 
             <DateOverridesSection
+                templateId={savedTemplateId}
                 overrides={overrides}
-                onAdd={(entry: OverrideEntry) => setOverrides((prev) => [...prev, entry])}
-                onRemove={(localId: string) => setOverrides((prev) => prev.filter((o) => o.localId !== localId))}
+                onOverridesChange={setOverrides}
             />
 
             <div className="mt-6 flex items-center gap-3 border-t border-slate-100 pt-5">
