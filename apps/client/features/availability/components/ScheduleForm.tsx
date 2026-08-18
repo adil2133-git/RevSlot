@@ -122,13 +122,18 @@ export default function ScheduleForm({ mode, templateId }: ScheduleFormProps) {
     }
 
     function removeBlock(dayOfWeek: number, localId: string) {
-        setDays((prev) => ({
-            ...prev,
-            [dayOfWeek]: {
-                ...prev[dayOfWeek],
-                blocks: prev[dayOfWeek].blocks.filter((b) => b.localId !== localId),
-            },
-        }));
+        setDays((prev) => {
+            const current = prev[dayOfWeek];
+            const remaining = current.blocks.filter((b) => b.localId !== localId);
+            return {
+                ...prev,
+                [dayOfWeek]: {
+                    ...current,
+                    blocks: remaining,
+                    enabled: remaining.length > 0 ? current.enabled : false,
+                },
+            };
+        });
     }
 
     function changeBlock(dayOfWeek: number, localId: string, field: "startTime" | "endTime", value: string) {
