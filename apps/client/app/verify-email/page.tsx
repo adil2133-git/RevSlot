@@ -15,6 +15,7 @@ function VerifyEmailContent() {
 
   useEffect(() => {
     const token = searchParams.get("token");
+    //hehheh
     if (!token) {
       setStatus("error");
       setMessage("This verification link is missing its token.");
