@@ -12,6 +12,41 @@ import type {
   ReplaceTimeBlocksInput,
 } from "./availability.schema.js";
 
+let cachedTimezones: { value: string; label: string }[] | null = null;
+
+function buildTimezoneOptions() {
+  const zones = typeof Intl.supportedValuesOf === "function" ? Intl.supportedValuesOf("timeZone") : [];
+  return zones
+    .map((zone) => {
+      const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: zone,
+        timeZoneName: "longOffset",
+      }).formatToParts(new Date());
+      const offsetRaw = parts.find((p) => p.type === "timeZoneName")?.value ?? "GMT+00:00";
+      const match = offsetRaw.match(/GMT([+-])(\d{2}):(\d{2})/);
+      const offsetMinutes = match
+        ? (match[1] === "-" ? -1 : 1) * (parseInt(match[2] ?? "0", 10) * 60 + parseInt(match[3] ?? "0", 10))
+        : 0;
+      return { value: zone, label: `${zone} (${offsetRaw})`, offsetMinutes };
+    })
+    .sort((a, b) => a.offsetMinutes - b.offsetMinutes)
+    .map(({ value, label }) => ({ value, label }));
+}
+
+function buildTimeOptions() {
+  const options: { value: string; label: string }[] = [];
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m += 30) {
+      const hour12 = h % 12 === 0 ? 12 : h % 12;
+      const period = h >= 12 ? "PM" : "AM";
+      const value = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+      const label = `${String(hour12).padStart(2, "0")}:${String(m).padStart(2, "0")} ${period}`;
+      options.push({ value, label });
+    }
+  }
+  return options;
+}
+
 // Fetches a template only if it belongs to the given reviewer, else throws 404
 const getOwnedTemplateOrThrow = async (reviewerId: number, templateId: number) => {
   const [template] = await db
@@ -33,6 +68,17 @@ const getOwnedTemplateOrThrow = async (reviewerId: number, templateId: number) =
 };
 
 export const availabilityService = {
+  // Returns the cached list of timezone options with GMT offset labels
+  getTimezoneOptions: async () => {
+    cachedTimezones ??= buildTimezoneOptions();
+    return cachedTimezones;
+  },
+
+  // Returns the list of 30-minute time-of-day options for the time picker
+  getTimeOptions: async () => {
+    return buildTimeOptions();
+  },
+
   // Creates a new availability template for the reviewer, rejecting duplicate names
   createTemplate: async (reviewerId: number, data: CreateTemplateInput) => {
     const [existing] = await db

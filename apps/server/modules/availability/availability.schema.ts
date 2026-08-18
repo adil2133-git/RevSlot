@@ -1,5 +1,18 @@
 import { z } from "zod";
 
+const VALID_TIMEZONES = new Set(
+  typeof Intl.supportedValuesOf === "function" ? Intl.supportedValuesOf("timeZone") : []
+);
+
+const timezoneField = z
+  .string()
+  .trim()
+  .min(1)
+  .max(50)
+  .refine((tz) => VALID_TIMEZONES.size === 0 || VALID_TIMEZONES.has(tz), {
+    message: "Invalid timezone",
+  });
+
 // Validates a single time block (day, start/end time, optional order)
 const TimeBlockSchema = z.object({
   dayOfWeek: z.number().int().min(0).max(6),
@@ -15,7 +28,7 @@ const TimeBlockSchema = z.object({
 export const CreateTemplateSchema = z.object({
   name: z.string().trim().min(2).max(100),
   description: z.string().trim().max(500).optional(),
-  timezone: z.string().trim().min(1).max(50).default("UTC"),
+  timezone: timezoneField.default("UTC"),
   isDefault: z.boolean().optional().default(false),
 });
 
@@ -23,7 +36,7 @@ export const CreateTemplateSchema = z.object({
 export const UpdateTemplateSchema = z.object({
   name: z.string().trim().min(2).max(100).optional(),
   description: z.string().trim().max(500).optional(),
-  timezone: z.string().trim().min(1).max(50).optional(),
+  timezone: timezoneField.optional(),
   isDefault: z.boolean().optional(),
 });
 

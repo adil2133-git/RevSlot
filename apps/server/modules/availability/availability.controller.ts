@@ -28,6 +28,18 @@ export const availabilityController = {
     res.status(200).json({ success: true, data: { templates } });
   },
 
+  // Handles GET /meta/timezones — returns available timezone options
+  getTimezoneOptions: async (req: Request, res: Response) => {
+    const timezones = await availabilityService.getTimezoneOptions();
+    res.status(200).json({ success: true, data: { timezones } });
+  },
+
+  // Handles GET /meta/time-options — returns 30-min time-of-day options
+  getTimeOptions: async (req: Request, res: Response) => {
+    const timeOptions = await availabilityService.getTimeOptions();
+    res.status(200).json({ success: true, data: { timeOptions } });
+  },
+
   // Handles GET /:id — fetches a single template with its time blocks
   getTemplateById: async (req: Request, res: Response) => {
     const templateId = parseTemplateId(req.params.id);
