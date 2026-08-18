@@ -12,11 +12,7 @@ export default function RegisterForm() {
   const router = useRouter();
   const { register: registerReviewer, isLoading, error } = useAuthStore();
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<RegisterFormValues>({
+  const { register, handleSubmit, formState: { errors },} = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
   });
 

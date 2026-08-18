@@ -6,9 +6,7 @@ export const metadata: Metadata = {
   description: "Academic project review scheduling",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
+export default function RootLayout({children}: Readonly<{
   children: React.ReactNode;
 }>) {
   return (

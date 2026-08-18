@@ -67,8 +67,13 @@ export const authController = {
   },
 
   logout: async (req: Request, res: Response) => {
-    res.clearCookie('accessToken');
-    res.clearCookie('refreshToken');
+    const clearOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax' as const,
+    }
+    res.clearCookie('accessToken', clearOptions);
+    res.clearCookie('refreshToken', clearOptions);
 
     res.status(200).json({
       success: true,

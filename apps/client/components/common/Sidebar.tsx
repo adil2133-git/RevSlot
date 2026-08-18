@@ -19,7 +19,7 @@ const NAV_ITEMS = [
     ),
   },
   {
-    href: "/dashboard/availability",
+    href: "/availability",
     label: "Availability",
     icon: (
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -30,7 +30,7 @@ const NAV_ITEMS = [
     ),
   },
   {
-    href: "/dashboard/event-types",
+    href: "/event-types",
     label: "Event Types",
     icon: (
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -49,7 +49,7 @@ const NAV_ITEMS = [
     ),
   },
   {
-    href: "/dashboard/vacation",
+    href: "/vacation",
     label: "Vacation Mode",
     icon: (
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">

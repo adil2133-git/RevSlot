@@ -5,15 +5,18 @@ import { LoginSchema, RegisterSchema, ForgotPasswordSchema, ResetPasswordSchema,
 import { catchAsync } from "../../core/utils/catchAsync.js";
 import { authController } from "./auth.controller.js";
 import { requireAuth, requireRole } from "../../core/middlewares/auth.middleware.js";
+import { loginLimiter, registerLimiter, refreshLimiter } from "../../core/middlewares/rateLimit.middleware.js";
 
 const router = Router();
 
-router.post("/reviewer/register", validate(RegisterSchema), catchAsync(authController.registerReviewer));
-router.post("/reviewer/login", validate(LoginSchema), catchAsync(authController.loginReviewer));
-router.post("/admin/login", validate(LoginSchema), catchAsync(authController.loginAdmin))
-router.post("/refresh", catchAsync(authController.refreshToken));
+router.post("/reviewer/register", registerLimiter, validate(RegisterSchema), catchAsync(authController.registerReviewer));
+router.post("/reviewer/login", loginLimiter, validate(LoginSchema), catchAsync(authController.loginReviewer));
+router.post("/admin/login", loginLimiter, validate(LoginSchema), catchAsync(authController.loginAdmin))
+router.post("/refresh", refreshLimiter, catchAsync(authController.refreshToken));
 router.post("/logout", requireAuth, catchAsync(authController.logout));
-router.get("/me", requireAuth, catchAsync(authController.getMe))
+
+router.get("/me", requireAuth, catchAsync(authController.getMe));
+
 
 router.post("/forgot-password", validate(ForgotPasswordSchema), catchAsync(authController.forgotPassword));
 router.post("/reset-password", validate(ResetPasswordSchema), catchAsync(authController.resetPassword));
@@ -29,5 +32,6 @@ router.get("/admin/test", requireAuth, requireRole("admin"),(req, res) => {
     });
   }
 );
+
 
 export default router;
