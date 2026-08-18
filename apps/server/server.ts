@@ -4,8 +4,9 @@ import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
 
 import authRoutes from "./modules/auth/auth.routes.js";
+import availabilityRoutes from "./modules/availability/availability.routes.js";
+
 import questionBankRoutes from "./modules/questionBank/questionBank.routes.js";
-=======
 import slotRoutes from "./modules/slot/slot.routes.js";
 import bookingRoutes from "./modules/booking/booking.routes.js"
 import eventTypeRoutes from "./modules/eventType/eventType.routes.js"
@@ -23,6 +24,7 @@ app.use(express.json({limit: '10kb'}));
 app.use(cookieParser());
 
 app.use("/api/auth", authRoutes);
+app.use("/api/availability-templates", availabilityRoutes);
 app.use("/api/question-banks", questionBankRoutes);
 app.use("/api/slots", slotRoutes);
 app.use("/api/bookings", bookingRoutes);
