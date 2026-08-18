@@ -40,6 +40,15 @@ const NAV_ITEMS = [
     ),
   },
   {
+    href: "/dashboard/question-banks",
+    label: "Question Banks",
+    icon: (
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+      </svg>
+    ),
+  },
+  {
     href: "/dashboard/vacation",
     label: "Vacation Mode",
     icon: (
@@ -70,7 +79,7 @@ export default function Sidebar() {
   return (
     <aside className="flex h-screen w-64 flex-col border-r border-slate-100 bg-surface-card">
       <div className="flex h-16 items-center px-6">
-        <Link href="/" className="text-lg font-semibold tracking-tight text-primary">
+        <Link href="/dashboard" className="text-lg font-semibold tracking-tight text-primary">
           RevSlot
         </Link>
       </div>

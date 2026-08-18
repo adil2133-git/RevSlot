@@ -1,4 +1,3 @@
-
 // server.ts
 import express from 'express';
 import cors from 'cors';
@@ -6,6 +5,7 @@ import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
 
 import authRoutes from "./modules/auth/auth.routes.js";
+import questionBankRoutes from "./modules/questionBank/questionBank.routes.js";
 import { notFound, errorMiddleware } from './core/middlewares/error.middleware.js';
 import { pool } from "./config/db.js"
 
@@ -20,6 +20,7 @@ app.use(express.json());
 app.use(cookieParser());
 
 app.use("/api/auth", authRoutes);
+app.use("/api/question-banks", questionBankRoutes);
 
 app.get('/', (req, res) => {
   res.send('Server is running');

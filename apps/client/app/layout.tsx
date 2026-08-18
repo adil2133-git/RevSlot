@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
-import Script from "next/script";
 import "./globals.css";
-import AuthProvider from "@/components/providers/AuthProvider";
 
 export const metadata: Metadata = {
   title: "RevSlot",
@@ -16,12 +14,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        {/* Outfit loaded via plain <link>, not next/font/google — sidesteps
+        {/* Outfit loaded via plain <link>, not next/font/google — avoids
             a Turbopack bug in next@16.3.0 where the internal font-fetch
-            package (@vercel/turbopack-next/internal/font/google/font)
-            fails to resolve at dev-server startup. Slightly worse perf
-            characteristics (no self-hosting/subsetting) but zero
-            dependency on Turbopack's font machinery. */}
+            package fails to resolve at dev-server startup. */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link
@@ -29,13 +24,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="bg-surface text-on-surface antialiased">
-        <Script
-          src="https://accounts.google.com/gsi/client"
-          strategy="beforeInteractive"
-        />
-        <AuthProvider>{children}</AuthProvider>
-      </body>
+      <body className="bg-surface text-on-surface antialiased">{children}</body>
     </html>
   );
 }
