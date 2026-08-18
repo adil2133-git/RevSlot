@@ -8,6 +8,7 @@ import {
   CreateTemplateSchema,
   UpdateTemplateSchema,
   ReplaceTimeBlocksSchema,
+  CreateDateOverrideSchema
 } from "./availability.schema.js";
 import { availabilityController } from "./availability.controller.js";
 
@@ -23,5 +24,8 @@ router.get("/:id", catchAsync(availabilityController.getTemplateById));
 router.patch("/:id", validate(UpdateTemplateSchema), catchAsync(availabilityController.updateTemplate));
 router.delete("/:id", catchAsync(availabilityController.deleteTemplate));
 router.put("/:id/time-blocks", validate(ReplaceTimeBlocksSchema), catchAsync(availabilityController.replaceTimeBlocks));
+router.post("/:id/date-overrides", validate(CreateDateOverrideSchema), catchAsync(availabilityController.createDateOverride));
+router.get("/:id/date-overrides", catchAsync(availabilityController.listDateOverrides));
+router.delete("/:id/date-overrides/:overrideId", catchAsync(availabilityController.deleteDateOverride));
 
 export default router;

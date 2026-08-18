@@ -4,6 +4,10 @@ import { db } from "../../config/db.js";
 import { availabilityTemplates } from "../../db/schema/availabilityTemplates.js";
 import { templateTimeBlocks } from "../../db/schema/templateTimeBlocks.js";
 
+import { templateDateOverrides } from "../../db/schema/templateDateOverrides.js";
+import { templateOverrideBlocks } from "../../db/schema/templateDateOverrideBlocks.js";
+import type { CreateDateOverrideInput } from "./availability.schema.js";
+
 import { AppError } from "../../core/errors/AppError.js";
 
 import type {
@@ -155,7 +159,9 @@ export const availabilityService = {
       .where(eq(templateTimeBlocks.templateId, template.id))
       .orderBy(asc(templateTimeBlocks.dayOfWeek), asc(templateTimeBlocks.displayOrder));
 
-    return { ...template, timeBlocks: blocks };
+    const overrides = await availabilityService.listDateOverrides(reviewerId, templateId);
+
+    return { ...template, timeBlocks: blocks, dateOverrides: overrides };
   },
 
   // Updates template metadata (name, description, timezone, isDefault), rejecting duplicate names
@@ -243,5 +249,97 @@ export const availabilityService = {
     });
 
     return result;
+  },
+
+  createDateOverride: async (reviewerId: number, templateId: number, data: CreateDateOverrideInput) => {
+    await getOwnedTemplateOrThrow(reviewerId, templateId);
+
+    const today = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD", lexically comparable
+    if (data.date < today) {
+      throw new AppError("Cannot add an override for a past date", 400);
+    }
+
+    const [existing] = await db
+      .select()
+      .from(templateDateOverrides)
+      .where(and(eq(templateDateOverrides.templateId, templateId), eq(templateDateOverrides.date, data.date)))
+      .limit(1);
+
+    if (existing) {
+      throw new AppError("An override for this date already exists", 409);
+    }
+
+    const result = await db.transaction(async (tx) => {
+      const [override] = await tx
+        .insert(templateDateOverrides)
+        .values({ templateId, date: data.date, isUnavailable: data.isUnavailable })
+        .returning();
+
+      if (!override) {
+        throw new AppError("Failed to create date override", 500);
+      }
+
+      let blocks: (typeof templateOverrideBlocks.$inferSelect)[] = [];
+      if (!data.isUnavailable && data.blocks.length > 0) {
+        blocks = await tx
+          .insert(templateOverrideBlocks)
+          .values(
+            data.blocks.map((block, idx) => ({
+              overrideId: override.id,
+              startTime: block.startTime,
+              endTime: block.endTime,
+              displayOrder: block.displayOrder ?? idx,
+            }))
+          )
+          .returning();
+      }
+
+      return { ...override, blocks };
+    });
+
+    return result;
+  },
+
+  // Lists all date overrides (with their blocks) for a template
+  listDateOverrides: async (reviewerId: number, templateId: number) => {
+    await getOwnedTemplateOrThrow(reviewerId, templateId);
+
+    const overrides = await db
+      .select()
+      .from(templateDateOverrides)
+      .where(eq(templateDateOverrides.templateId, templateId))
+      .orderBy(asc(templateDateOverrides.date));
+
+    if (overrides.length === 0) return [];
+
+    const overrideIds = overrides.map((o) => o.id);
+    const blocks = await db
+      .select()
+      .from(templateOverrideBlocks)
+      .where(inArray(templateOverrideBlocks.overrideId, overrideIds))
+      .orderBy(asc(templateOverrideBlocks.displayOrder));
+
+    return overrides.map((override) => ({
+      ...override,
+      blocks: blocks.filter((b) => b.overrideId === override.id),
+    }));
+  },
+
+  // Deletes one date override (its blocks cascade-delete via FK)
+  deleteDateOverride: async (reviewerId: number, templateId: number, overrideId: number) => {
+    await getOwnedTemplateOrThrow(reviewerId, templateId);
+
+    const [existing] = await db
+      .select()
+      .from(templateDateOverrides)
+      .where(and(eq(templateDateOverrides.id, overrideId), eq(templateDateOverrides.templateId, templateId)))
+      .limit(1);
+
+    if (!existing) {
+      throw new AppError("Date override not found", 404);
+    }
+
+    await db.delete(templateDateOverrides).where(eq(templateDateOverrides.id, overrideId));
+    return { id: overrideId };
   },
 };

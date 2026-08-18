@@ -15,6 +15,13 @@ const parseTemplateId = (raw: string | string[] | undefined): number => {
   return id;
 };
 
+const parseOverrideId = (raw: string | string[] | undefined): number => {
+  if (Array.isArray(raw)) throw new AppError("Invalid override id", 400);
+  const id = Number(raw);
+  if (!Number.isInteger(id) || id <= 0) throw new AppError("Invalid override id", 400);
+  return id;
+};
+
 export const availabilityController = {
   // Handles POST / — creates a new availability template
   createTemplate: async (req: Request, res: Response) => {
@@ -66,5 +73,27 @@ export const availabilityController = {
     const templateId = parseTemplateId(req.params.id);
     const result = await availabilityService.replaceTimeBlocks(req.user!.userId, templateId, req.body);
     res.status(200).json({ success: true, data: { timeBlocks: result } });
+  },
+
+  // Handles POST /:id/date-overrides — creates a date override with optional blocks
+  createDateOverride: async (req: Request, res: Response) => {
+    const templateId = parseTemplateId(req.params.id);
+    const override = await availabilityService.createDateOverride(req.user!.userId, templateId, req.body);
+    res.status(201).json({ success: true, data: { override } });
+  },
+
+  // Handles GET /:id/date-overrides — lists all overrides for a template
+  listDateOverrides: async (req: Request, res: Response) => {
+    const templateId = parseTemplateId(req.params.id);
+    const overrides = await availabilityService.listDateOverrides(req.user!.userId, templateId);
+    res.status(200).json({ success: true, data: { overrides } });
+  },
+
+  // Handles DELETE /:id/date-overrides/:overrideId — deletes one override
+  deleteDateOverride: async (req: Request, res: Response) => {
+    const templateId = parseTemplateId(req.params.id);
+    const overrideId = parseOverrideId(req.params.overrideId);
+    await availabilityService.deleteDateOverride(req.user!.userId, templateId, overrideId);
+    res.status(200).json({ success: true, message: "Date override deleted" });
   },
 };
