@@ -9,3 +9,5 @@ export * from './schema/slots.js';
 export * from './schema/bookings.js';
 export * from './schema/questionBanks.js';
 export * from './schema/questions.js';
+export * from './schema/templateDateOverrideBlocks.js'
+export * from './schema/templateDateOverrides.js'
