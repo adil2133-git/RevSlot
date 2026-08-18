@@ -22,3 +22,17 @@ export interface ListTemplatesResponse {
   success: boolean;
   data: { templates: AvailabilityTemplate[] };
 }
+
+export interface TimeBlockPayload {
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  displayOrder: number;
+}
+
+export interface TemplatePayload {
+  name: string;
+  description?: string;
+  timezone: string;
+  isDefault: boolean;
+}
