@@ -5,7 +5,7 @@ import { useAuthStore } from "@/features/auth/store/authStore";
 
 const QUICK_LINKS = [
   {
-    href: "/dashboard/availability",
+    href: "/availability",
     title: "Set your availability",
     desc: "Build a reusable weekly template with your open time blocks.",
     icon: (
@@ -17,7 +17,7 @@ const QUICK_LINKS = [
     ),
   },
   {
-    href: "/dashboard/event-types",
+    href: "/event-types",
     title: "Create a booking link",
     desc: "Turn a template into a shareable link advisors can book directly.",
     icon: (
@@ -28,7 +28,7 @@ const QUICK_LINKS = [
     ),
   },
   {
-    href: "/dashboard/vacation",
+    href: "/vacation",
     title: "Going away?",
     desc: "Block out dates so no one can book you while you're out.",
     icon: (
