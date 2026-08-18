@@ -1,6 +1,25 @@
 import { create } from "zustand";
-import type { AuthUser, LoginPayload, RegisterPayload } from "../types";
-import {loginReviewer, loginAdmin, registerReviewer, logout as logoutApi, fetchCurrentUser} from "../api/authApi";
+
+import type {
+  AuthUser,
+  ForgotPasswordPayload,
+  GoogleAuthPayload,
+  LoginPayload,
+  RegisterPayload,
+  ResetPasswordPayload,
+  VerifyEmailPayload,
+} from "../types";
+import {
+  loginReviewer,
+  loginAdmin,
+  registerReviewer,
+  logout as logoutApi,
+  fetchCurrentUser,
+  forgotPassword as forgotPasswordApi,
+  resetPassword as resetPasswordApi,
+  verifyEmail as verifyEmailApi,
+  googleAuth as googleAuthApi,
+} from "../api/authApi";
 
 type AuthState = {
   user: AuthUser | null;
@@ -12,11 +31,16 @@ type AuthState = {
   loginAsAdmin: (payload: LoginPayload) => Promise<void>;
   register: (payload: RegisterPayload) => Promise<void>;
   logout: () => Promise<void>;
-  /** Clears local state only — no network call. Used when axios's
-   *  refresh-retry already determined the session is dead, so calling
-   *  /auth/logout again would just 401 a second time. */
   logoutLocal: () => void;
   hydrate: () => Promise<void>;
+
+  forgotPassword: (payload: ForgotPasswordPayload) => Promise<string>;
+  resetPassword: (payload: ResetPasswordPayload) => Promise<string>;
+  verifyEmail: (payload: VerifyEmailPayload) => Promise<string>;
+  /** Logs the user in on success, same as a normal login. Throws (with
+   *  `.status === 422`) if this is a new Google user and whatsappNumber
+   *  wasn't supplied — caller should catch that and re-call with it. */
+  googleAuth: (payload: GoogleAuthPayload) => Promise<void>;
 };
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -47,8 +71,6 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
-  // Backend logs the reviewer in immediately on register (cookies set,
-  // user returned) — same result shape as login.
   register: async (payload) => {
     set({ isLoading: true, error: null });
     try {
@@ -60,9 +82,6 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
-  // Always clears local state, even if the network call fails (e.g. the
-  // session was already dead). We don't want a failed /auth/logout to
-  // surface as an unhandled error — the user is logged out either way.
   logout: async () => {
     try {
       await logoutApi();
@@ -75,14 +94,59 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   logoutLocal: () => set({ user: null }),
 
-  // Server-verified — calls /auth/me so an expired/invalid token is
-  // caught here on load, not on the first random dashboard request.
   hydrate: async () => {
     try {
       const user = await fetchCurrentUser();
       set({ user, isHydrated: true });
     } catch {
       set({ user: null, isHydrated: true });
+    }
+  },
+
+  forgotPassword: async (payload) => {
+    set({ isLoading: true, error: null });
+    try {
+      const message = await forgotPasswordApi(payload);
+      set({ isLoading: false });
+      return message;
+    } catch (err) {
+      set({ isLoading: false, error: (err as Error).message });
+      throw err;
+    }
+  },
+
+  resetPassword: async (payload) => {
+    set({ isLoading: true, error: null });
+    try {
+      const message = await resetPasswordApi(payload);
+      set({ isLoading: false });
+      return message;
+    } catch (err) {
+      set({ isLoading: false, error: (err as Error).message });
+      throw err;
+    }
+  },
+
+  verifyEmail: async (payload) => {
+    set({ isLoading: true, error: null });
+    try {
+      const message = await verifyEmailApi(payload);
+      set({ isLoading: false });
+      return message;
+    } catch (err) {
+      set({ isLoading: false, error: (err as Error).message });
+      throw err;
+    }
+  },
+
+  googleAuth: async (payload) => {
+    set({ isLoading: true, error: null });
+    try {
+      const user = await googleAuthApi(payload);
+      set({ user, isLoading: false });
+    } catch (err) {
+      set({ isLoading: false, error: (err as Error).message });
+      throw err;
     }
   },
 }));

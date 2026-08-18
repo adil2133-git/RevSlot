@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 @theme {
-  /* Font */
-  --font-sans: var(--font-outfit), "Outfit", sans-serif;
+  /* Font — loaded via <link> in layout.tsx, not next/font/google */
+  --font-sans: "Outfit", sans-serif;
 
   /* Brand colors — from DESIGN.md */
   --color-primary: #003366;
