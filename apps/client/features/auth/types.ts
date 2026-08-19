@@ -35,8 +35,14 @@ export type ResetPasswordPayload = {
   newPassword: string;
 };
 
+// OTP-based now, not a link token — matches ResetPasswordPayload's shape.
 export type VerifyEmailPayload = {
-  token: string;
+  email: string;
+  otp: string;
+};
+
+export type ResendVerificationPayload = {
+  email: string;
 };
 
 // whatsappNumber is only required the first time a brand-new Google user
@@ -55,3 +61,10 @@ type ApiMessageEnvelope = { success: true; message: string };
 
 export type AuthResponse = ApiDataEnvelope<{ user: AuthUser }>;
 export type MessageResponse = ApiMessageEnvelope;
+
+// registerReviewer no longer logs the user in — no session, no cookies,
+// just confirmation that the account exists and an OTP was sent.
+export type RegisterResponse = ApiDataEnvelope<{
+  email: string;
+  requiresVerification: boolean;
+}> & { message: string };

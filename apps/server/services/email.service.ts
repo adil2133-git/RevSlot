@@ -18,17 +18,26 @@ interface SendEmailInput {
 
 export const emailService = {
   sendEmail: async ({ to, subject, html }: SendEmailInput) => {
-    const { data, error } = await resend.emails.send({
-      from: EMAIL_FROM,
-      to,
-      subject,
-      html,
-    });
+    try {
+      const { data, error } = await resend.emails.send({
+        from: EMAIL_FROM,
+        to,
+        subject,
+        html,
+      });
 
-    if (error) {
-      throw new AppError(`Failed to send email: ${error.message}`, 502);
+      if (error) {
+        throw new AppError(`Failed to send email: ${error.message}`, 502);
+      }
+
+      return data;
+    } catch (err: any) {
+      console.error(`[Email Service Error] Failed to send email to ${to} ("${subject}"):`, err.message || err);
+      if (process.env.NODE_ENV === "production") {
+        throw err;
+      }
+      console.warn(`[DEV ONLY] Suppressed email sending error to keep development flow working.`);
+      return null;
     }
-
-    return data;
   },
 };

@@ -23,9 +23,10 @@ export default function RegisterForm() {
       const { confirmPassword, ...payload } = values;
       void confirmPassword;
       await registerReviewer(payload);
-      // Backend sets cookies + returns the user on register now, so
-      // there's a real session immediately — no detour through login.
-      router.push("/dashboard");
+      // No session yet — the store just recorded pendingVerificationEmail.
+      // The user has to enter the OTP we just emailed them before they
+      // get real cookies and can reach the dashboard.
+      router.push("/verify-email");
     } catch {
       // error already captured in store; surfaced below
     }

@@ -1,9 +1,9 @@
 interface VerifyEmailParams {
   name: string;
-  verificationUrl: string;
+  otpCode: string;
 }
 
-export const verifyEmailTemplate = ({ name, verificationUrl }: VerifyEmailParams) => {
+export const verifyEmailTemplate = ({ name, otpCode }: VerifyEmailParams) => {
   const subject = "Verify your RevSlot email address";
 
   const html = `
@@ -13,14 +13,15 @@ export const verifyEmailTemplate = ({ name, verificationUrl }: VerifyEmailParams
         Hi ${name},
       </p>
       <p style="color: #374151; font-size: 15px; line-height: 1.6;">
-        Thanks for signing up for RevSlot. Confirm your email address to activate your reviewer account.
+        Thanks for signing up for RevSlot. Enter the code below to verify your email and activate your reviewer account.
       </p>
-      <a href="${verificationUrl}"
-        style="display: inline-block; margin: 24px 0; padding: 12px 24px; background: #2563eb; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 500;">
-        Verify Email
-      </a>
+      <div style="margin: 24px 0; padding: 16px; background: #f3f4f6; border-radius: 8px; text-align: center;">
+        <span style="font-size: 28px; font-weight: 600; letter-spacing: 6px; color: #111827;">
+          ${otpCode}
+        </span>
+      </div>
       <p style="color: #6b7280; font-size: 13px; line-height: 1.6;">
-        This link expires in 24 hours. If you didn't create a RevSlot account, you can safely ignore this email.
+        This code expires in 10 minutes. If you didn't create a RevSlot account, you can safely ignore this email.
       </p>
     </div>
   `;

@@ -9,25 +9,25 @@ import { admins } from "../../db/schema/admins.js";
 
 import { AppError } from "../../core/errors/AppError.js";
 
-import type { LoginInput, RegisterInput, ForgotPasswordInput, ResetPasswordInput, VerifyEmailInput, GoogleAuthInput } from "./auth.schema.js";
+import type {
+  LoginInput,
+  RegisterInput,
+  ForgotPasswordInput,
+  ResetPasswordInput,
+  VerifyEmailInput,
+  ResendVerificationInput,
+  GoogleAuthInput,
+} from "./auth.schema.js";
 import {
   generateAccessToken,
   generateRefreshToken,
   verifyRefreshToken,
-  generateEmailVerificationToken,
-  verifyEmailVerificationToken,
 } from "../../core/utils/jwt.js";
 
 import { otpService } from "../otp/otp.service.js";
 import { emailService } from "../../services/email.service.js";
 import { forgotPasswordTemplate } from "../../emails/templates/forgotPassword.js";
 import { verifyEmailTemplate } from "../../emails/templates/verifyEmail.js";
-
-const CLIENT_URL = process.env.CLIENT_URL as string;
-
-if (!CLIENT_URL) {
-  throw new Error("CLIENT_URL is not set in environment variables");
-}
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID as string;
 
@@ -39,7 +39,7 @@ const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 
 // Common fields required for authentication
-type AuthUser = Pick <
+type AuthUser = Pick<
   InferSelectModel<typeof reviewers>,
   "id" |
   "name" |
@@ -47,7 +47,8 @@ type AuthUser = Pick <
   "passwordHash" |
   "avatarUrl" |
   "bio" |
-  "isActive"
+  "isActive" |
+  "emailVerified"
 >;
 
 // Common authentication logic
@@ -70,6 +71,11 @@ const createAuthResponse = async (user: AuthUser, password: string, role: "revie
 
   if (!isPasswordValid) {
     throw new AppError("Invalid email or password", 401);
+  }
+
+  // Hard-block login until the email is verified via OTP
+  if (!user.emailVerified) {
+    throw new AppError("Please verify your email before logging in", 403);
   }
 
   // Create JWT payload
@@ -97,9 +103,32 @@ const createAuthResponse = async (user: AuthUser, password: string, role: "revie
   };
 };
 
+// Issues real session cookies without a password check — used after OTP
+// email verification and Google sign-in, where identity is already
+// proven a different way.
+const issueSession = (
+  role: "reviewer" | "admin",
+  userRow: { id: number; name: string; email: string; avatarUrl: string | null; bio: string | null },
+) => {
+  const payload = { userId: userRow.id, role };
+  return {
+    accessToken: generateAccessToken(payload),
+    refreshToken: generateRefreshToken(payload),
+    user: {
+      id: userRow.id,
+      name: userRow.name,
+      email: userRow.email,
+      role,
+      avatarUrl: userRow.avatarUrl,
+      bio: userRow.bio,
+    },
+  };
+};
+
 export const authService = {
 
-  // Reviewer Registration
+  // Reviewer Registration — creates the account but does NOT log the
+  // user in. They must verify their email via OTP (verifyEmail) first.
   registerReviewer: async (data: RegisterInput) => {
     const existingReviewer = await db
       .select()
@@ -123,24 +152,19 @@ export const authService = {
       })
       .returning();
 
-       if (!newReviewer) {
+    if (!newReviewer) {
       throw new AppError("Failed to create reviewer account", 500);
     }
 
-    // Fire the verification email — registration still succeeds even if this fails,
-    // so a temporary email outage doesn't block sign-up entirely.
-    try {
-      const verificationToken = generateEmailVerificationToken({ userId: newReviewer.id, role: "reviewer" });
-      const { subject, html } = verifyEmailTemplate({
-        name: newReviewer.name,
-        verificationUrl: `${CLIENT_URL}/verify-email?token=${verificationToken}`,
-      });
-      await emailService.sendEmail({ to: newReviewer.email, subject, html });
-    } catch (err) {
-      console.error("Failed to send verification email:", err);
-    }
+    const otpCode = await otpService.generateOtp(newReviewer.email, "email_verification");
+    const { subject, html } = verifyEmailTemplate({ name: newReviewer.name, otpCode });
+    await emailService.sendEmail({ to: newReviewer.email, subject, html });
 
-    return createAuthResponse(newReviewer, data.password, "reviewer");
+    return {
+      requiresVerification: true,
+      email: newReviewer.email,
+      message: "Account created. Check your email for a verification code.",
+    };
   },
 
 
@@ -306,40 +330,66 @@ export const authService = {
     throw new AppError("User not found", 404);
   },
 
-  // Verify a user's email using the token from the verification link.
+  // Verify the OTP sent at registration. On success, marks the email
+  // verified AND logs the user in (issues real session cookies) — this
+  // is the first moment a freshly registered reviewer gets a real session.
   verifyEmail: async (data: VerifyEmailInput) => {
-    let payload;
-    try {
-      payload = verifyEmailVerificationToken(data.token);
-    } catch {
-      throw new AppError("Invalid or expired verification link", 400);
+    const isValid = await otpService.verifyOtp(data.email, "email_verification", data.otp);
+
+    if (!isValid) {
+      throw new AppError("Invalid or expired verification code", 400);
     }
 
-    const table = payload.role === "admin" ? admins : reviewers;
-
-    const [user] = await db
+    const [reviewer] = await db
       .select()
-      .from(table)
-      .where(eq(table.id, payload.userId))
+      .from(reviewers)
+      .where(eq(reviewers.email, data.email))
       .limit(1);
 
-    if (!user) {
+    if (!reviewer) {
       throw new AppError("User not found", 404);
     }
 
-    if (user.emailVerified) {
-      return { message: "Email already verified" };
+    const [updated] = await db
+      .update(reviewers)
+      .set({ emailVerified: true })
+      .where(eq(reviewers.id, reviewer.id))
+      .returning();
+
+    if (!updated) {
+      throw new AppError("Failed to verify email", 500);
     }
 
-    await db
-      .update(table)
-      .set({ emailVerified: true })
-      .where(eq(table.id, payload.userId));
+    return issueSession("reviewer", updated);
+  },
 
-    return { message: "Email verified successfully" };
+  // Resend a fresh OTP — for when the first one expired or got lost.
+  // Always returns the same generic message regardless of whether the
+  // email exists or is already verified.
+  resendVerification: async (data: ResendVerificationInput) => {
+    const [reviewer] = await db
+      .select()
+      .from(reviewers)
+      .where(eq(reviewers.email, data.email))
+      .limit(1);
+
+    if (!reviewer) {
+      return { message: "If that email is registered and unverified, a new code has been sent." };
+    }
+
+    if (reviewer.emailVerified) {
+      return { message: "This email is already verified." };
+    }
+
+    const otpCode = await otpService.generateOtp(reviewer.email, "email_verification");
+    const { subject, html } = verifyEmailTemplate({ name: reviewer.name, otpCode });
+    await emailService.sendEmail({ to: reviewer.email, subject, html });
+
+    return { message: "If that email is registered and unverified, a new code has been sent." };
   },
 
   // Sign in or sign up a reviewer using a Google-issued ID token.
+  // Google-verified emails are trusted immediately — no OTP step needed.
   googleAuth: async (data: GoogleAuthInput) => {
     // Verify the token actually came from Google and is meant for our app
     const ticket = await googleClient.verifyIdToken({
@@ -404,21 +454,6 @@ export const authService = {
       throw new AppError("Account is inactive", 403);
     }
 
-    const payload = { userId: reviewer.id, role: "reviewer" as const };
-    const accessToken = generateAccessToken(payload);
-    const refreshToken = generateRefreshToken(payload);
-
-    return {
-      accessToken,
-      refreshToken,
-      user: {
-        id: reviewer.id,
-        name: reviewer.name,
-        email: reviewer.email,
-        role: "reviewer" as const,
-        avatarUrl: reviewer.avatarUrl,
-        bio: reviewer.bio,
-      },
-    };
+    return issueSession("reviewer", reviewer);
   },
 };
