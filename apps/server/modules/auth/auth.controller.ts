@@ -4,17 +4,21 @@ import { authService } from "./auth.service.js";
 const ACCESS_TOKEN_MAX_AGE = 15 * 60 * 1000;          // 15 min
 const REFRESH_TOKEN_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
 
+// secure + sameSite: 'none' are required together for cross-site cookies
+// (Vercel frontend, AWS backend are different origins) — with 'lax' the
+// browser accepts the cookie but never sends it back on XHR/fetch, which
+// silently breaks auth right after deploy while working fine on localhost.
 const setAuthCookies = (res: Response, accessToken: string, refreshToken: string) => {
   res.cookie('accessToken', accessToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    secure: true,
+    sameSite: 'none',
     maxAge: ACCESS_TOKEN_MAX_AGE,
   });
   res.cookie('refreshToken', refreshToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    secure: true,
+    sameSite: 'none',
     maxAge: REFRESH_TOKEN_MAX_AGE,
   });
 };
@@ -71,8 +75,8 @@ export const authController = {
   logout: async (req: Request, res: Response) => {
     const clearOptions = {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax' as const,
+      secure: true,
+      sameSite: 'none' as const,
     }
     res.clearCookie('accessToken', clearOptions);
     res.clearCookie('refreshToken', clearOptions);
