@@ -33,7 +33,9 @@ export default function LoginForm({ role }: LoginFormProps) {
       } else {
         await loginAsReviewer(values);
       }
-      router.push("/dashboard");
+      // replace (not push): already logged in, so Back shouldn't
+      // return to the login form.
+      router.replace("/dashboard");
     } catch {
       // error already captured in store; surfaced below
     }
