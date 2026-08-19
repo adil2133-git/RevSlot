@@ -6,6 +6,7 @@ import type {
   GoogleAuthPayload,
   LoginPayload,
   RegisterPayload,
+  ResendVerificationPayload,
   ResetPasswordPayload,
   VerifyEmailPayload,
 } from "../types";
@@ -18,6 +19,7 @@ import {
   forgotPassword as forgotPasswordApi,
   resetPassword as resetPasswordApi,
   verifyEmail as verifyEmailApi,
+  resendVerification as resendVerificationApi,
   googleAuth as googleAuthApi,
 } from "../api/authApi";
 
@@ -26,9 +28,16 @@ type AuthState = {
   isLoading: boolean;
   isHydrated: boolean;
   error: string | null;
-  
+  // Set right after a successful register — the email awaiting OTP
+  // verification. Read by the verify-email screen so it doesn't need
+  // the email passed through the URL/router state.
+  pendingVerificationEmail: string | null;
+
   loginAsReviewer: (payload: LoginPayload) => Promise<void>;
   loginAsAdmin: (payload: LoginPayload) => Promise<void>;
+  /** No longer logs the user in — creates the account and sends an OTP.
+   *  Sets `pendingVerificationEmail` on success; caller should route to
+   *  the OTP entry screen, not the dashboard. */
   register: (payload: RegisterPayload) => Promise<void>;
   logout: () => Promise<void>;
   logoutLocal: () => void;
@@ -36,7 +45,10 @@ type AuthState = {
 
   forgotPassword: (payload: ForgotPasswordPayload) => Promise<string>;
   resetPassword: (payload: ResetPasswordPayload) => Promise<string>;
-  verifyEmail: (payload: VerifyEmailPayload) => Promise<string>;
+  /** Verifies the OTP from registration and logs the user in — this is
+   *  the first point a freshly registered reviewer gets a real session. */
+  verifyEmail: (payload: VerifyEmailPayload) => Promise<void>;
+  resendVerification: (payload: ResendVerificationPayload) => Promise<string>;
   /** Logs the user in on success, same as a normal login. Throws (with
    *  `.status === 422`) if this is a new Google user and whatsappNumber
    *  wasn't supplied — caller should catch that and re-call with it. */
@@ -48,6 +60,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   isLoading: false,
   isHydrated: false,
   error: null,
+  pendingVerificationEmail: null,
 
   loginAsReviewer: async (payload) => {
     set({ isLoading: true, error: null });
@@ -74,8 +87,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   register: async (payload) => {
     set({ isLoading: true, error: null });
     try {
-      const user = await registerReviewer(payload);
-      set({ user, isLoading: false });
+      const { email } = await registerReviewer(payload);
+      // No `user` set here — no session exists yet. Just remember which
+      // email is pending verification for the next screen.
+      set({ pendingVerificationEmail: email, isLoading: false });
     } catch (err) {
       set({ isLoading: false, error: (err as Error).message });
       throw err;
@@ -130,7 +145,19 @@ export const useAuthStore = create<AuthState>((set) => ({
   verifyEmail: async (payload) => {
     set({ isLoading: true, error: null });
     try {
-      const message = await verifyEmailApi(payload);
+      const user = await verifyEmailApi(payload);
+      // This is where a freshly registered user actually gets a session.
+      set({ user, isLoading: false, pendingVerificationEmail: null });
+    } catch (err) {
+      set({ isLoading: false, error: (err as Error).message });
+      throw err;
+    }
+  },
+
+  resendVerification: async (payload) => {
+    set({ isLoading: true, error: null });
+    try {
+      const message = await resendVerificationApi(payload);
       set({ isLoading: false });
       return message;
     } catch (err) {

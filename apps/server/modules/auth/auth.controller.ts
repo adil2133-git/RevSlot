@@ -24,11 +24,13 @@ export const authController = {
  registerReviewer: async (req: Request, res: Response) => {
     const result = await authService.registerReviewer(req.body);
 
-    setAuthCookies(res, result.accessToken, result.refreshToken);
-
+    // No cookies set here — the account exists but there's no session
+    // yet. The user only gets logged in once they verify the OTP sent
+    // to their email (see verifyEmail below).
     res.status(201).json({
       success: true,
-      data: { user: result.user },
+      message: result.message,
+      data: { email: result.email, requiresVerification: result.requiresVerification },
     });
   },
 
@@ -110,6 +112,19 @@ export const authController = {
 
   verifyEmail: async (req: Request, res: Response) => {
     const result = await authService.verifyEmail(req.body);
+
+    // This is where a freshly registered user gets their first real
+    // session — cookies get set here now instead of at registration.
+    setAuthCookies(res, result.accessToken, result.refreshToken);
+
+    res.status(200).json({
+      success: true,
+      data: { user: result.user },
+    });
+  },
+
+  resendVerification: async (req: Request, res: Response) => {
+    const result = await authService.resendVerification(req.body);
 
     res.status(200).json({
       success: true,

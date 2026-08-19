@@ -27,7 +27,12 @@ export const ResetPasswordSchema = z.object({
 });
 
 export const VerifyEmailSchema = z.object({
-  token: z.string().min(1, "Token is required"),
+  email: z.email().trim().toLowerCase(),
+  otp: z.string().length(6, "OTP must be 6 digits"),
+});
+
+export const ResendVerificationSchema = z.object({
+  email: z.email().trim().toLowerCase(),
 });
 
 export const GoogleAuthSchema = z.object({
@@ -41,4 +46,5 @@ export type RefreshInput = z.infer<typeof RefreshSchema>;
 export type ForgotPasswordInput = z.infer<typeof ForgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof ResetPasswordSchema>;
 export type VerifyEmailInput = z.infer<typeof VerifyEmailSchema>;
+export type ResendVerificationInput = z.infer<typeof ResendVerificationSchema>;
 export type GoogleAuthInput = z.infer<typeof GoogleAuthSchema>;

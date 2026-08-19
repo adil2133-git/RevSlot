@@ -16,6 +16,8 @@ export const otpService = {
     const key = `otp:${purpose}:${email}`;
     await redis.set(key, code, { ex: OTP_TTL_SECONDS });
 
+    console.log(`\n========================================\n[OTP] Generated code: ${code}\n[OTP] For: ${email}\n[OTP] Purpose: ${purpose}\n========================================\n`);
+
     return code;
   },
 
