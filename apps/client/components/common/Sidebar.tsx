@@ -77,14 +77,14 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="flex h-screen w-64 flex-col border-r border-slate-100 bg-surface-card">
+    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-slate-100 bg-surface-card">
       <div className="flex h-16 items-center px-6">
         <Link href="/dashboard" className="text-lg font-semibold tracking-tight text-primary">
           RevSlot
         </Link>
       </div>
 
-      <nav className="flex-1 space-y-0.5 px-3 py-2">
+      <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-2">
         <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
           Main
         </p>
