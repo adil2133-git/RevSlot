@@ -48,6 +48,7 @@
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^26.1.2",
+    "@types/otp-generator": "^4.0.2",
     "@types/pg": "^8.20.4",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
