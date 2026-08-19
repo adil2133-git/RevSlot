@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
+import AuthProvider from "@/components/providers/AuthProvider";
+
 export const metadata: Metadata = {
   title: "RevSlot",
   description: "Academic project review scheduling",
@@ -22,7 +24,11 @@ export default function RootLayout({children}: Readonly<{
           rel="stylesheet"
         />
       </head>
-      <body className="bg-surface text-on-surface antialiased">{children}</body>
+       <body className="bg-surface text-on-surface antialiased">
+        <AuthProvider>
+          {children}
+        </AuthProvider>
+      </body>
     </html>
   );
 }
