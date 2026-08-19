@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import * as questionBankService from "./questionbank.service.js";
+import * as questionBankService from "./questionBank.service.js";
 
 // req.user is guaranteed present here — every route below sits behind
 // requireAuth + requireRole('reviewer').
