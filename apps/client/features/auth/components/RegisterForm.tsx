@@ -29,7 +29,9 @@ export default function RegisterForm() {
       // No session yet — the store just recorded pendingVerificationEmail.
       // The user has to enter the OTP we just emailed them before they
       // get real cookies and can reach the dashboard.
-      router.push("/verify-email");
+      // replace (not push): the account is already created, so Back
+      // shouldn't return to a resubmittable register form.
+      router.replace("/verify-email");
     } catch {
       // error already captured in store; surfaced below
     }

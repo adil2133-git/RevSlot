@@ -23,7 +23,9 @@ export default function VerifyEmailForm() {
     if (!pendingVerificationEmail) return;
     try {
       await verifyEmail({ email: pendingVerificationEmail, otp });
-      router.push("/dashboard");
+      // replace (not push): the OTP is already consumed, so Back
+      // shouldn't return to a stale verify-email screen.
+      router.replace("/dashboard");
     } catch {
       // error already captured in store; surfaced below
     }
