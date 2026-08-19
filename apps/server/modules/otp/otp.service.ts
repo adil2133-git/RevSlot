@@ -23,9 +23,14 @@ export const otpService = {
 
   verifyOtp: async (email: string, purpose: string, code: string): Promise<boolean> => {
     const key = `otp:${purpose}:${email}`;
-    const stored = await redis.get<string>(key);
+    const stored = await redis.get<string | number>(key);
 
-    if (!stored || stored !== code) return false;
+    // Upstash's client auto-JSON-parses values that look like valid JSON —
+    // a pure-digit string like "176550" is valid JSON (a number literal),
+    // so it comes back as the number 176550, not the string "176550".
+    // Without String(...) here, `stored !== code` fails on every single
+    // OTP check regardless of whether the code is actually correct.
+    if (!stored || String(stored) !== code) return false;
 
     await redis.del(key); // one-time use
     return true;
