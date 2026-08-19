@@ -8,17 +8,23 @@ const REFRESH_TOKEN_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
 // (Vercel frontend, AWS backend are different origins) — with 'lax' the
 // browser accepts the cookie but never sends it back on XHR/fetch, which
 // silently breaks auth right after deploy while working fine on localhost.
+// domain: '.revslot.com' (leading dot) makes the cookie valid across both
+// revslot.com (Next.js middleware reads it here) and api.revslot.com
+// (where it's set) — without it, the cookie is host-only and never
+// reaches the middleware running on the root domain.
 const setAuthCookies = (res: Response, accessToken: string, refreshToken: string) => {
   res.cookie('accessToken', accessToken, {
     httpOnly: true,
     secure: true,
     sameSite: 'none',
+    domain: '.revslot.com',
     maxAge: ACCESS_TOKEN_MAX_AGE,
   });
   res.cookie('refreshToken', refreshToken, {
     httpOnly: true,
     secure: true,
     sameSite: 'none',
+    domain: '.revslot.com',
     maxAge: REFRESH_TOKEN_MAX_AGE,
   });
 };
@@ -77,6 +83,7 @@ export const authController = {
       httpOnly: true,
       secure: true,
       sameSite: 'none' as const,
+      domain: '.revslot.com',
     }
     res.clearCookie('accessToken', clearOptions);
     res.clearCookie('refreshToken', clearOptions);
