@@ -52,8 +52,9 @@ export default function ForgotPasswordFlow() {
       });
       setStep("done");
       // Reset doesn't log the user in — send them to log in with the
-      // new password after a moment.
-      setTimeout(() => router.push("/login/reviewer"), 1800);
+      // new password after a moment. replace (not push): the OTP is
+      // already consumed, so Back shouldn't return to a stale reset form.
+      setTimeout(() => router.replace("/login/reviewer"), 1800);
     } catch {
       // error already captured in store; surfaced below
     }
