@@ -18,7 +18,7 @@ export const loginLimiter = createRateLimiter(
 
 export const registerLimiter = createRateLimiter(
   60 * 60 * 1000, // 1 hour
-  5,
+  50,
   "Too many registration attempts, try again later"
 );
  
