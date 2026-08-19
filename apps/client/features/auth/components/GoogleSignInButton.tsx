@@ -49,7 +49,9 @@ function GoogleSignInButton() {
             pendingIdToken.current = response.credential;
             try {
                 await googleAuth({ idToken: response.credential });
-                router.push("/dashboard");
+                // replace (not push): already signed in, so Back
+                // shouldn't return to the login/register page.
+                router.replace("/dashboard");
             } catch (err) {
                 // New Google user, no linked account yet — backend needs a
                 // WhatsApp number before it'll create one.
@@ -94,7 +96,9 @@ function GoogleSignInButton() {
                 idToken: pendingIdToken.current,
                 whatsappNumber: values.whatsappNumber,
             });
-            router.push("/dashboard");
+            // replace (not push): already signed in, so Back shouldn't
+            // return to the WhatsApp-number prompt.
+            router.replace("/dashboard");
         } catch {
             // error already captured in store; surfaced below
         }
