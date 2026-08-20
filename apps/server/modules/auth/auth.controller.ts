@@ -12,21 +12,36 @@ const REFRESH_TOKEN_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
 // revslot.com (Next.js middleware reads it here) and api.revslot.com
 // (where it's set) — without it, the cookie is host-only and never
 // reaches the middleware running on the root domain.
+const isProduction = process.env.NODE_ENV === 'production';
+const cookieDomain = process.env.COOKIE_DOMAIN || (isProduction ? '.revslot.com' : undefined);
+
+const getCookieOptions = (maxAge?: number) => {
+  const options: {
+    httpOnly: boolean;
+    secure: boolean;
+    sameSite: 'none' | 'lax';
+    domain?: string;
+    maxAge?: number;
+  } = {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
+  };
+
+  if (cookieDomain) {
+    options.domain = cookieDomain;
+  }
+
+  if (maxAge !== undefined) {
+    options.maxAge = maxAge;
+  }
+
+  return options;
+};
+
 const setAuthCookies = (res: Response, accessToken: string, refreshToken: string) => {
-  res.cookie('accessToken', accessToken, {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'none',
-    domain: '.revslot.com',
-    maxAge: ACCESS_TOKEN_MAX_AGE,
-  });
-  res.cookie('refreshToken', refreshToken, {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'none',
-    domain: '.revslot.com',
-    maxAge: REFRESH_TOKEN_MAX_AGE,
-  });
+  res.cookie('accessToken', accessToken, getCookieOptions(ACCESS_TOKEN_MAX_AGE));
+  res.cookie('refreshToken', refreshToken, getCookieOptions(REFRESH_TOKEN_MAX_AGE));
 };
 
 export const authController = {
@@ -79,12 +94,7 @@ export const authController = {
   },
 
   logout: async (req: Request, res: Response) => {
-    const clearOptions = {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'none' as const,
-      domain: '.revslot.com',
-    }
+    const clearOptions = getCookieOptions();
     res.clearCookie('accessToken', clearOptions);
     res.clearCookie('refreshToken', clearOptions);
 
