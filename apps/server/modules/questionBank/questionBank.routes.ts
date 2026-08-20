@@ -1,7 +1,7 @@
 import { Router } from "express";
 import * as questionBankController from "./questionBank.controller.js";
 import { validate } from "../../core/middlewares/validate.middleware.js";
-import { requireAuth, requireRole } from "../../core/middlewares/auth.middleware.js";
+import { requireReviewer } from "../../core/middlewares/auth.middleware.js";
 import { catchAsync } from "../../core/utils/catchAsync.js";
 import {
   CreateBankSchema,
@@ -14,9 +14,8 @@ import {
 const router = Router();
 
 // Question banks are reviewer-only end to end — advisors/interns never
-// see them (doc section 3.4), so every route here requires both a valid
-// session and the reviewer role, not just requireAuth alone.
-router.use(requireAuth, requireRole("reviewer"));
+// see them (doc section 3.4), so every route here requires the reviewer role.
+router.use(requireReviewer);
 
 router.get("/", catchAsync(questionBankController.listBanks));
 router.post("/", validate(CreateBankSchema), catchAsync(questionBankController.createBank));

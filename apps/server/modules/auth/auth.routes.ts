@@ -4,7 +4,7 @@ import { validate } from "../../core/middlewares/validate.middleware.js";
 import { LoginSchema, RegisterSchema, ForgotPasswordSchema, ResetPasswordSchema, VerifyEmailSchema, ResendVerificationSchema, GoogleAuthSchema } from "./auth.schema.js";
 import { catchAsync } from "../../core/utils/catchAsync.js";
 import { authController } from "./auth.controller.js";
-import { requireAuth, requireRole } from "../../core/middlewares/auth.middleware.js";
+import { requireAuth, requireAdmin } from "../../core/middlewares/auth.middleware.js";
 import { loginLimiter, registerLimiter, refreshLimiter } from "../../core/middlewares/rateLimit.middleware.js";
 
 const router = Router();
@@ -25,7 +25,7 @@ router.post("/resend-verification", validate(ResendVerificationSchema), catchAsy
 router.post("/google", validate(GoogleAuthSchema), catchAsync(authController.googleAuth));
 
 // for testing only
-router.get("/admin/test", requireAuth, requireRole("admin"),(req, res) => {
+router.get("/admin/test", requireAdmin, (req, res) => {
     res.json({
       success: true,
       message: "Admin access granted",

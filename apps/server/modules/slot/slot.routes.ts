@@ -3,15 +3,14 @@ import { validate, validateParams } from "../../core/middlewares/validate.middle
 import { GenerateSlotsSchema, HoldSlotParamsSchema } from "./slot.schema.js";
 import { catchAsync } from "../../core/utils/catchAsync.js";
 import { slotController } from "./slot.controller.js";
-import { requireAuth, requireRole } from "../../core/middlewares/auth.middleware.js";
+import { requireReviewer } from "../../core/middlewares/auth.middleware.js";
 
 const router = Router();
 
 // Reviewer must be logged in to generate slots (protected)
 router.post(
   "/generate",
-  requireAuth,
-  requireRole("reviewer"),
+  requireReviewer,
   validate(GenerateSlotsSchema),
   catchAsync(slotController.generateSlots)
 );

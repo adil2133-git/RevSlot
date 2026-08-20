@@ -38,3 +38,36 @@ export const requireRole = (role: "admin" | "reviewer") => {
     next();
   };
 };
+
+const createRoleAuthMiddleware = (role: "admin" | "reviewer") => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const token = req.cookies?.accessToken;
+
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: "Authorization token required",
+      });
+    }
+
+    try {
+      const payload = verifyAccessToken(token);
+      if (payload.role !== role) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied",
+        });
+      }
+      req.user = payload;
+      next();
+    } catch (error) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid or expired token",
+      });
+    }
+  };
+};
+
+export const requireReviewer = createRoleAuthMiddleware("reviewer");
+export const requireAdmin = createRoleAuthMiddleware("admin");
