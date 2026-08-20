@@ -1,47 +1,35 @@
 import type { Request, Response } from "express";
 import { authService } from "./auth.service.js";
 
-const ACCESS_TOKEN_MAX_AGE = 15 * 60 * 1000;          // 15 min
 const REFRESH_TOKEN_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
+const isProd = process.env.NODE_ENV === "production";
 
-// secure + sameSite: 'none' are required together for cross-site cookies
-// (Vercel frontend, AWS backend are different origins) — with 'lax' the
-// browser accepts the cookie but never sends it back on XHR/fetch, which
-// silently breaks auth right after deploy while working fine on localhost.
-// domain: '.revslot.com' (leading dot) makes the cookie valid across both
-// revslot.com (Next.js middleware reads it here) and api.revslot.com
-// (where it's set) — without it, the cookie is host-only and never
-// reaches the middleware running on the root domain.
-const isProduction = process.env.NODE_ENV === 'production';
-const cookieDomain = process.env.COOKIE_DOMAIN || (isProduction ? '.revslot.com' : undefined);
-
-const getCookieOptions = (maxAge?: number) => {
-  const options: {
-    httpOnly: boolean;
-    secure: boolean;
-    sameSite: 'none' | 'lax';
-    domain?: string;
-    maxAge?: number;
-  } = {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? 'none' : 'lax',
-  };
-
-  if (cookieDomain) {
-    options.domain = cookieDomain;
-  }
-
-  if (maxAge !== undefined) {
-    options.maxAge = maxAge;
-  }
-
-  return options;
+// Only the refresh token is cookied now — the access token goes in the
+// JSON response body instead, and the frontend holds it in memory. This
+// keeps the access token out of any cookie-based CSRF surface, while the
+// refresh token stays httpOnly so client-side JS (and XSS) can never
+// read it.
+//
+// secure + sameSite: 'none' + domain: '.revslot.com' are the correct
+// PRODUCTION config — Vercel (revslot.com) and AWS (api.revslot.com) are
+// different subdomains, so cross-site cookie rules apply, and the
+// leading-dot domain makes the cookie valid across both. But every one
+// of those three settings actively BREAKS cookies on localhost:
+// secure:true blocks any cookie over plain http://, and domain:
+// '.revslot.com' doesn't match 'localhost' at all — the browser just
+// silently refuses to set it. Hence the isProd branch below.
+const REFRESH_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: isProd,
+  sameSite: (isProd ? "none" : "lax") as "none" | "lax",
+  ...(isProd ? { domain: ".revslot.com" } : {}),
 };
 
-const setAuthCookies = (res: Response, accessToken: string, refreshToken: string) => {
-  res.cookie('accessToken', accessToken, getCookieOptions(ACCESS_TOKEN_MAX_AGE));
-  res.cookie('refreshToken', refreshToken, getCookieOptions(REFRESH_TOKEN_MAX_AGE));
+const setRefreshCookie = (res: Response, refreshToken: string) => {
+  res.cookie('refreshToken', refreshToken, {
+    ...REFRESH_COOKIE_OPTIONS,
+    maxAge: REFRESH_TOKEN_MAX_AGE,
+  });
 };
 
 export const authController = {
@@ -49,9 +37,8 @@ export const authController = {
  registerReviewer: async (req: Request, res: Response) => {
     const result = await authService.registerReviewer(req.body);
 
-    // No cookies set here — the account exists but there's no session
-    // yet. The user only gets logged in once they verify the OTP sent
-    // to their email (see verifyEmail below).
+    // No session yet — the account exists but requires OTP verification
+    // (see verifyEmail below) before any tokens are issued.
     res.status(201).json({
       success: true,
       message: result.message,
@@ -62,41 +49,57 @@ export const authController = {
  loginReviewer: async (req: Request, res: Response) => {
     const result = await authService.loginReviewer(req.body);
 
-    setAuthCookies(res, result.accessToken, result.refreshToken);
+    setRefreshCookie(res, result.refreshToken);
 
     res.status(200).json({
       success: true,
-      data: { user: result.user },
+      data: { user: result.user, accessToken: result.accessToken },
     });
   },
 
   loginAdmin: async (req: Request, res: Response) => {
     const result = await authService.loginAdmin(req.body);
 
-    setAuthCookies(res, result.accessToken, result.refreshToken);
+    setRefreshCookie(res, result.refreshToken);
 
     res.status(200).json({
       success: true,
-      data: { user: result.user },
+      data: { user: result.user, accessToken: result.accessToken },
     });
   },
 
   refreshToken: async (req: Request, res: Response) => {
     const refreshToken = req.cookies?.refreshToken;
+
+    if (!refreshToken) {
+      return res.status(401).json({
+        success: false,
+        message: "Refresh token required",
+      });
+    }
+
     const result = await authService.refreshToken(refreshToken);
 
-    setAuthCookies(res, result.accessToken, result.refreshToken);
+    // Rotation: the old refresh token is now revoked server-side, and
+    // this new one replaces it in the cookie.
+    setRefreshCookie(res, result.refreshToken);
 
     res.status(200).json({
       success: true,
       message: "Token refreshed",
+      data: { accessToken: result.accessToken },
     });
   },
 
   logout: async (req: Request, res: Response) => {
-    const clearOptions = getCookieOptions();
-    res.clearCookie('accessToken', clearOptions);
-    res.clearCookie('refreshToken', clearOptions);
+    const refreshToken = req.cookies?.refreshToken;
+
+    // Revokes the DB-tracked row so this refresh token can never be
+    // used again, even though its JWT signature stays valid until its
+    // natural 7-day expiry.
+    await authService.logout(refreshToken);
+
+    res.clearCookie('refreshToken', REFRESH_COOKIE_OPTIONS);
 
     res.status(200).json({
       success: true,
@@ -135,12 +138,13 @@ export const authController = {
     const result = await authService.verifyEmail(req.body);
 
     // This is where a freshly registered user gets their first real
-    // session — cookies get set here now instead of at registration.
-    setAuthCookies(res, result.accessToken, result.refreshToken);
+    // session — the refresh cookie gets set here now instead of at
+    // registration.
+    setRefreshCookie(res, result.refreshToken);
 
     res.status(200).json({
       success: true,
-      data: { user: result.user },
+      data: { user: result.user, accessToken: result.accessToken },
     });
   },
 
@@ -156,11 +160,11 @@ export const authController = {
   googleAuth: async (req: Request, res: Response) => {
     const result = await authService.googleAuth(req.body);
 
-    setAuthCookies(res, result.accessToken, result.refreshToken);
+    setRefreshCookie(res, result.refreshToken);
 
     res.status(200).json({
       success: true,
-      data: { user: result.user },
+      data: { user: result.user, accessToken: result.accessToken },
     });
   },
 };

@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-// The backend sets `accessToken` as an httpOnly cookie (auth.controller.ts
-// setAuthCookies). httpOnly only blocks *browser JS* (document.cookie) —
-// Next.js middleware runs server-side and can read it fine via
-// request.cookies. This is a presence/expiry check only, not signature
-// verification (Edge runtime, no access to the JWT secret) — real
-// verification happens via requireAuth on every protected API call.
-// const AUTH_COOKIE_NAME = "accessToken";
-
+// Only `refreshToken` is ever set as a cookie now — `accessToken` lives
+// in memory on the client and only ever appears in the JSON response
+// body, never a cookie. So refreshToken's presence is the only signal
+// available here. Same caveat as before: httpOnly only blocks browser
+// JS, not server-side middleware, but this is presence-only, not
+// signature verification — the Edge runtime has no access to the JWT
+// secret. Real verification happens via requireAuth on every protected
+// API call.
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const hasSession = request.cookies.has("accessToken") || request.cookies.has("refreshToken");
+  const hasSession = request.cookies.has("refreshToken");
 
   const isDashboardRoute = pathname.startsWith("/dashboard");
   const isAuthRoute = pathname.startsWith("/login") || pathname.startsWith("/register");

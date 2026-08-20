@@ -1,10 +1,18 @@
 import type { Request, Response, NextFunction } from "express";
 import { verifyAccessToken } from "../utils/jwt.js";
 
+// Access token now arrives as "Authorization: Bearer <token>" — it's no
+// longer a cookie, since the frontend holds it in memory and attaches
+// it manually via an axios request interceptor.
+const extractBearerToken = (req: Request): string | undefined => {
+  const header = req.headers.authorization;
+  if (!header?.startsWith("Bearer ")) return undefined;
+  return header.slice("Bearer ".length);
+};
 
 export const requireAuth = (req: Request, res: Response, next: NextFunction
 ) => {
-  const token = req.cookies?.accessToken;
+  const token = extractBearerToken(req);
 
   if (!token) {
     return res.status(401).json({
@@ -41,7 +49,7 @@ export const requireRole = (role: "admin" | "reviewer") => {
 
 const createRoleAuthMiddleware = (role: "admin" | "reviewer") => {
   return (req: Request, res: Response, next: NextFunction) => {
-    const token = req.cookies?.accessToken;
+    const token = extractBearerToken(req);
 
     if (!token) {
       return res.status(401).json({
@@ -70,4 +78,4 @@ const createRoleAuthMiddleware = (role: "admin" | "reviewer") => {
 };
 
 export const requireReviewer = createRoleAuthMiddleware("reviewer");
-export const requireAdmin = createRoleAuthMiddleware("admin");
+export const requireAdmin = createRoleAuthMiddleware("admin");

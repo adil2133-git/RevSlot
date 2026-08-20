@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 
 const ACCESS_SECRET = process.env.JWT_ACCESS_SECRET as string;
 const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET as string;
@@ -39,4 +40,16 @@ export const generateEmailVerificationToken = (payload: TokenPayload): string =>
 
 export const verifyEmailVerificationToken = (token: string): TokenPayload => {
     return jwt.verify(token, EMAIL_VERIFICATION_SECRET) as TokenPayload;
+}
+
+// Never store the raw refresh token in the DB — only its hash. The raw
+// token lives solely in the httpOnly cookie on the client. This lets
+// the server check "is this specific token still valid/unrevoked"
+// without a DB leak exposing anything directly usable — same principle
+// as password hashing, not for secrecy of the algorithm (SHA-256 here
+// is fine since this isn't protecting a low-entropy secret like a
+// password; the JWT itself is already high-entropy and signature-
+// verified separately via verifyRefreshToken above).
+export const hashRefreshToken = (token: string): string => {
+    return crypto.createHash("sha256").update(token).digest("hex");
 }

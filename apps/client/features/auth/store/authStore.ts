@@ -15,13 +15,15 @@ import {
   loginAdmin,
   registerReviewer,
   logout as logoutApi,
-  fetchCurrentUser,
+  refreshAccessToken,
+  getMe,
   forgotPassword as forgotPasswordApi,
   resetPassword as resetPasswordApi,
   verifyEmail as verifyEmailApi,
   resendVerification as resendVerificationApi,
   googleAuth as googleAuthApi,
 } from "../api/authApi";
+import { setAccessToken } from "@/lib/axios";
 
 type AuthState = {
   user: AuthUser | null;
@@ -41,6 +43,10 @@ type AuthState = {
   register: (payload: RegisterPayload) => Promise<void>;
   logout: () => Promise<void>;
   logoutLocal: () => void;
+  /** Re-establishes a session on app load: gets a fresh access token
+   *  using the httpOnly refresh cookie, then fetches the user profile
+   *  with that token. Two round trips, on purpose — there's no way to
+   *  get both in one call with the current backend shape. */
   hydrate: () => Promise<void>;
 
   forgotPassword: (payload: ForgotPasswordPayload) => Promise<string>;
@@ -65,7 +71,8 @@ export const useAuthStore = create<AuthState>((set) => ({
   loginAsReviewer: async (payload) => {
     set({ isLoading: true, error: null });
     try {
-      const user = await loginReviewer(payload);
+      const { user, accessToken } = await loginReviewer(payload);
+      setAccessToken(accessToken);
       set({ user, isLoading: false });
     } catch (err) {
       set({ isLoading: false, error: (err as Error).message });
@@ -76,7 +83,8 @@ export const useAuthStore = create<AuthState>((set) => ({
   loginAsAdmin: async (payload) => {
     set({ isLoading: true, error: null });
     try {
-      const user = await loginAdmin(payload);
+      const { user, accessToken } = await loginAdmin(payload);
+      setAccessToken(accessToken);
       set({ user, isLoading: false });
     } catch (err) {
       set({ isLoading: false, error: (err as Error).message });
@@ -88,8 +96,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true, error: null });
     try {
       const { email } = await registerReviewer(payload);
-      // No `user` set here — no session exists yet. Just remember which
-      // email is pending verification for the next screen.
+      // No `user` set here, no accessToken to store — no session exists
+      // yet. Just remember which email is pending verification.
       set({ pendingVerificationEmail: email, isLoading: false });
     } catch (err) {
       set({ isLoading: false, error: (err as Error).message });
@@ -103,17 +111,27 @@ export const useAuthStore = create<AuthState>((set) => ({
     } catch {
       // ignore — local state still clears below
     } finally {
+      setAccessToken(null);
       set({ user: null });
     }
   },
 
-  logoutLocal: () => set({ user: null }),
+  logoutLocal: () => {
+    setAccessToken(null);
+    set({ user: null });
+  },
 
   hydrate: async () => {
     try {
-      const user = await fetchCurrentUser();
+      const accessToken = await refreshAccessToken();
+      setAccessToken(accessToken);
+      const user = await getMe();
       set({ user, isHydrated: true });
     } catch {
+      // No valid refresh cookie, or getMe failed after a refresh that
+      // did succeed — either way, no session. Make sure axios doesn't
+      // keep a half-set token around from a partial failure.
+      setAccessToken(null);
       set({ user: null, isHydrated: true });
     }
   },
@@ -145,8 +163,9 @@ export const useAuthStore = create<AuthState>((set) => ({
   verifyEmail: async (payload) => {
     set({ isLoading: true, error: null });
     try {
-      const user = await verifyEmailApi(payload);
+      const { user, accessToken } = await verifyEmailApi(payload);
       // This is where a freshly registered user actually gets a session.
+      setAccessToken(accessToken);
       set({ user, isLoading: false, pendingVerificationEmail: null });
     } catch (err) {
       set({ isLoading: false, error: (err as Error).message });
@@ -169,7 +188,8 @@ export const useAuthStore = create<AuthState>((set) => ({
   googleAuth: async (payload) => {
     set({ isLoading: true, error: null });
     try {
-      const user = await googleAuthApi(payload);
+      const { user, accessToken } = await googleAuthApi(payload);
+      setAccessToken(accessToken);
       set({ user, isLoading: false });
     } catch (err) {
       set({ isLoading: false, error: (err as Error).message });
