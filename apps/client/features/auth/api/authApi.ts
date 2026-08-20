@@ -5,7 +5,9 @@ import type {
   ForgotPasswordPayload,
   GoogleAuthPayload,
   LoginPayload,
+  MeResponse,
   MessageResponse,
+  RefreshResponse,
   RegisterPayload,
   RegisterResponse,
   ResendVerificationPayload,
@@ -15,17 +17,17 @@ import type {
 
 export async function loginReviewer(payload: LoginPayload) {
   const { data } = await api.post<AuthResponse>("/auth/reviewer/login", payload);
-  return data.data.user;
+  return { user: data.data.user, accessToken: data.data.accessToken };
 }
 
 export async function loginAdmin(payload: LoginPayload) {
   const { data } = await api.post<AuthResponse>("/auth/admin/login", payload);
-  return data.data.user;
+  return { user: data.data.user, accessToken: data.data.accessToken };
 }
 
 // No session is created here anymore — the account exists, but the user
 // must verify the OTP sent to their email (see verifyEmail) before they
-// get real cookies. Returns the email + a confirmation message, not a user.
+// get a real session. Returns the email + a confirmation message, not a user.
 export async function registerReviewer(payload: RegisterPayload) {
   const { data } = await api.post<RegisterResponse>("/auth/reviewer/register", payload);
   return { email: data.data.email, message: data.message };
@@ -35,11 +37,20 @@ export async function logout() {
   await api.post<MessageResponse>("/auth/logout");
 }
 
-// Server-verified session check — used on app load instead of trusting
-// anything client-side, since the token itself is httpOnly and invisible
-// to JS anyway.
-export async function fetchCurrentUser() {
-  const { data } = await api.get<AuthResponse>("/auth/me");
+// Uses the httpOnly refresh cookie to mint a fresh access token. Returns
+// ONLY the token — no user data. This is intentionally separate from
+// getMe() below: on app load you need both (a valid token to attach to
+// requests, THEN the actual profile), not one call doing double duty.
+export async function refreshAccessToken() {
+  const { data } = await api.post<RefreshResponse>("/auth/refresh");
+  return data.data.accessToken;
+}
+
+// Fetches the logged-in user's profile. Requires a valid access token
+// already attached to the request (lib/axios.ts's interceptor handles
+// this) — call AFTER refreshAccessToken() succeeds, never instead of it.
+export async function getMe() {
+  const { data } = await api.get<MeResponse>("/auth/me");
   return data.data.user;
 }
 
@@ -56,11 +67,12 @@ export async function resetPassword(payload: ResetPasswordPayload) {
 }
 
 // OTP-based now — {email, otp} instead of a link token. On success this
-// is where the user actually gets logged in (cookies set, user returned),
-// since registration itself no longer creates a session.
+// is where the user actually gets logged in (refresh cookie set, access
+// token + user returned), since registration itself no longer creates a
+// session.
 export async function verifyEmail(payload: VerifyEmailPayload) {
   const { data } = await api.post<AuthResponse>("/auth/verify-email", payload);
-  return data.data.user;
+  return { user: data.data.user, accessToken: data.data.accessToken };
 }
 
 // Requests a fresh OTP, for when the first one expired or got lost.
@@ -69,10 +81,11 @@ export async function resendVerification(payload: ResendVerificationPayload) {
   return data.message;
 }
 
-// Logs the user in (cookies set) on success, same as loginReviewer.
-// Throws a 422 if this is a brand-new Google user and whatsappNumber
-// wasn't included — caller should catch that and prompt for it.
+// Logs the user in (refresh cookie set, access token returned) on
+// success, same as loginReviewer. Throws a 422 if this is a brand-new
+// Google user and whatsappNumber wasn't included — caller should catch
+// that and prompt for it.
 export async function googleAuth(payload: GoogleAuthPayload) {
   const { data } = await api.post<AuthResponse>("/auth/google", payload);
-  return data.data.user;
+  return { user: data.data.user, accessToken: data.data.accessToken };
 }

@@ -2,19 +2,35 @@ import axios from "axios";
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000/api",
-  // accessToken/refreshToken are httpOnly cookies set by the backend —
-  // withCredentials makes the browser send + accept them automatically.
-  // No manual header attachment needed (and none is possible — httpOnly
-  // means JS can't read the token even if we wanted to).
+  // withCredentials is still needed so the httpOnly refreshToken cookie
+  // rides along on /auth/refresh and /auth/logout calls. The accessToken
+  // is NOT a cookie anymore — it lives in memory only (set below) and
+  // gets attached manually via the Authorization header on every request.
   withCredentials: true,
   headers: {
     "Content-Type": "application/json",
   },
 });
 
+// In-memory only — never localStorage (readable by any injected/XSS JS)
+// and never a cookie (that's the whole point of moving it here). Lost on
+// a hard refresh by design; AuthProvider re-establishes it on every app
+// load via refreshAccessToken() + getMe().
+let currentAccessToken: string | null = null;
+export function setAccessToken(token: string | null) {
+  currentAccessToken = token;
+}
+
+api.interceptors.request.use((config) => {
+  if (currentAccessToken) {
+    config.headers.Authorization = `Bearer ${currentAccessToken}`;
+  }
+  return config;
+});
+
 // Registered by AuthProvider on mount. Called when a refresh attempt
-// itself fails — i.e. the refresh token is also expired/invalid and the
-// user needs to be sent back to login.
+// itself fails — i.e. the refresh token is also expired/invalid/revoked
+// and the user needs to be sent back to login.
 let sessionExpiredHandler: (() => void) | null = null;
 export function onSessionExpired(handler: () => void) {
   sessionExpiredHandler = handler;
@@ -27,7 +43,7 @@ export function onSessionExpired(handler: () => void) {
 // refresh token is still valid.
 const SKIP_REFRESH_FOR = ["/auth/reviewer/login", "/auth/admin/login", "/auth/refresh"];
 
-let pendingRefresh: Promise<void> | null = null;
+let pendingRefresh: Promise<string> | null = null;
 
 // Small typed error so callers can branch on status (e.g. Google auth's
 // 422 "WhatsApp number required for new account") without re-parsing
@@ -51,15 +67,28 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !shouldSkip && !originalRequest._retried) {
       originalRequest._retried = true;
       try {
+        // Capture the NEW access token from the response and store it —
+        // the previous version discarded the refresh response entirely,
+        // which worked when the access token was also a cookie (the
+        // browser carried it forward automatically) but silently does
+        // nothing useful now that it only lives in this module's memory.
         pendingRefresh ??= api
           .post("/auth/refresh")
-          .then(() => undefined)
+          .then((res) => {
+            const newToken = res.data.data.accessToken;
+            setAccessToken(newToken);
+            return newToken;
+          })
           .finally(() => {
             pendingRefresh = null;
           });
-        await pendingRefresh;
+
+        const newToken = await pendingRefresh;
+        originalRequest.headers = originalRequest.headers ?? {};
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
         return api(originalRequest);
       } catch {
+        setAccessToken(null);
         sessionExpiredHandler?.();
       }
     }
