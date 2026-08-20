@@ -19,8 +19,6 @@ import type {
   GoogleAuthInput,
 } from "./auth.schema.js";
 import {
-  generateAccessToken,
-  generateRefreshToken,
   verifyRefreshToken,
 } from "../../core/utils/jwt.js";
 
@@ -28,6 +26,7 @@ import { otpService } from "../otp/otp.service.js";
 import { emailService } from "../../services/email.service.js";
 import { forgotPasswordTemplate } from "../../emails/templates/forgotPassword.js";
 import { verifyEmailTemplate } from "../../emails/templates/verifyEmail.js";
+import { refreshTokenService } from "./refreshToken.service.js";
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID as string;
 
@@ -39,7 +38,7 @@ const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 
 // Common fields required for authentication
-type AuthUser = Pick<
+type AuthUser = Pick <
   InferSelectModel<typeof reviewers>,
   "id" |
   "name" |
@@ -84,9 +83,8 @@ const createAuthResponse = async (user: AuthUser, password: string, role: "revie
     role,
   };
 
-  // Generate tokens
-  const accessToken = generateAccessToken(payload);
-  const refreshToken = generateRefreshToken(payload);
+  // Generate + store tokens (refresh token hash goes in the DB here)
+  const { accessToken, refreshToken } = await refreshTokenService.issueTokenPair(payload);
 
   // Return safe user data
   return {
@@ -106,14 +104,15 @@ const createAuthResponse = async (user: AuthUser, password: string, role: "revie
 // Issues real session cookies without a password check — used after OTP
 // email verification and Google sign-in, where identity is already
 // proven a different way.
-const issueSession = (
+const issueSession = async (
   role: "reviewer" | "admin",
   userRow: { id: number; name: string; email: string; avatarUrl: string | null; bio: string | null },
 ) => {
   const payload = { userId: userRow.id, role };
+  const { accessToken, refreshToken } = await refreshTokenService.issueTokenPair(payload);
   return {
-    accessToken: generateAccessToken(payload),
-    refreshToken: generateRefreshToken(payload),
+    accessToken,
+    refreshToken,
     user: {
       id: userRow.id,
       name: userRow.name,
@@ -227,12 +226,18 @@ export const authService = {
       throw new AppError("Account not found or inactive", 401);
     }
 
-    const newPayload = { userId: user.id, role: payload.role };
+    // Validates the token against the refresh_tokens table (not revoked,
+    // not expired, hash matches) and rotates it — issuing + storing a
+    // brand new pair. Throws if the token was already rotated once
+    // before (reuse/theft signal) or otherwise invalid.
+    return refreshTokenService.rotate(refreshToken);
+  },
 
-    return {
-      accessToken: generateAccessToken(newPayload),
-      refreshToken: generateRefreshToken(newPayload),
-    };
+  // Logout — revokes this session's refresh token in the DB so it can
+  // never be used again, even though the JWT signature would otherwise
+  // stay valid until its natural 7-day expiry.
+  logout: async (refreshToken: string | undefined) => {
+    await refreshTokenService.revoke(refreshToken);
   },
 
   // Get current logged-in user
@@ -360,7 +365,7 @@ export const authService = {
       throw new AppError("Failed to verify email", 500);
     }
 
-    return issueSession("reviewer", updated);
+    return await issueSession("reviewer", updated);
   },
 
   // Resend a fresh OTP — for when the first one expired or got lost.
@@ -454,6 +459,6 @@ export const authService = {
       throw new AppError("Account is inactive", 403);
     }
 
-    return issueSession("reviewer", reviewer);
+    return await issueSession("reviewer", reviewer);
   },
 };

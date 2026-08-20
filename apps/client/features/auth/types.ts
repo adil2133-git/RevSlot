@@ -54,16 +54,26 @@ export type GoogleAuthPayload = {
 };
 
 // ---- Raw backend envelopes ----
-// Every response is wrapped in { success, ... }. accessToken/refreshToken
-// are NEVER in the body — they're set as httpOnly cookies server-side.
+// Every response is wrapped in { success, ... }. The refresh token is
+// NEVER in the body — it's set as an httpOnly cookie server-side. The
+// access token IS in the body now (not a cookie) — the frontend holds
+// it in memory (see authStore) and attaches it via an Authorization
+// header (see lib/axios.ts).
 type ApiDataEnvelope<T> = { success: true; data: T };
 type ApiMessageEnvelope = { success: true; message: string };
 
-export type AuthResponse = ApiDataEnvelope<{ user: AuthUser }>;
+export type AuthResponse = ApiDataEnvelope<{ user: AuthUser; accessToken: string }>;
+export type RefreshResponse = ApiDataEnvelope<{ accessToken: string }>;
+// GET /auth/me — requires a valid access token already attached; returns
+// just the user, no tokens (nothing to refresh here).
+export type MeResponse = ApiDataEnvelope<{ user: AuthUser }>;
 export type MessageResponse = ApiMessageEnvelope;
 
-// registerReviewer no longer logs the user in — no session, no cookies,
+// registerReviewer no longer logs the user in — no session, no tokens,
 // just confirmation that the account exists and an OTP was sent.
+// message lives inside `data` here (ApiDataEnvelope), unlike
+// MessageResponse where it's top-level — matches auth.controller.ts's
+// registerReviewer response shape exactly: { success, message, data }.
 export type RegisterResponse = ApiDataEnvelope<{
   email: string;
   requiresVerification: boolean;
