@@ -1,7 +1,7 @@
 import { Router } from "express";
 
 import { validate } from "../../core/middlewares/validate.middleware.js";
-import { requireAuth, requireRole } from "../../core/middlewares/auth.middleware.js";
+import { requireReviewer } from "../../core/middlewares/auth.middleware.js";
 import { catchAsync } from "../../core/utils/catchAsync.js";
 
 import {
@@ -14,7 +14,7 @@ import { availabilityController } from "./availability.controller.js";
 
 const router = Router();
 
-router.use(requireAuth, requireRole("reviewer"));
+router.use(requireReviewer);
 
 router.post("/", validate(CreateTemplateSchema), catchAsync(availabilityController.createTemplate));
 router.get("/", catchAsync(availabilityController.listTemplates));
