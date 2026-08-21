@@ -7,7 +7,7 @@ import { availabilityTemplates } from "../db/schema/availabilityTemplates.js";
 import { templateTimeBlocks } from "../db/schema/templateTimeBlocks.js";
 import { eventTypes } from "../db/schema/eventTypes.js";
 import { slots } from "../db/schema/slots.js";
-import { bookings } from "../db/schema/bookings.js";
+import { bookings } from "../modules/booking/bookings.model.js";
 import { eq, and } from "drizzle-orm";
 
 const seed = async () => {

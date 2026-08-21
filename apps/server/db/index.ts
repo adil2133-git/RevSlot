@@ -4,9 +4,9 @@ export * from './schema/reviewers.js';
 export * from './schema/availabilityTemplates.js';
 export * from './schema/templateTimeBlocks.js';
 export * from './schema/eventTypes.js';
-export * from './schema/vacationBlocks.js';
+export * from '../modules/vacation/vacation.model.js';
 export * from './schema/slots.js';
-export * from './schema/bookings.js';
+export * from '../modules/booking/bookings.model.js';
 export * from './schema/questionBanks.js';
 export * from './schema/questions.js';
 export * from './schema/templateDateOverrideBlocks.js'

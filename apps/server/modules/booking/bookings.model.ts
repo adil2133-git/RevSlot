@@ -1,7 +1,7 @@
 import { pgTable, serial, integer, varchar, text, timestamp } from 'drizzle-orm/pg-core';
-import { reviewers } from './reviewers.js';
-import { eventTypes } from './eventTypes.js';
-import { bookingStatus } from './enums.js';
+import { reviewers } from '../../db/schema/reviewers.js';
+import { eventTypes } from '../../db/schema/eventTypes.js';
+import { bookingStatus } from '../../db/schema/enums.js';
 
 export const bookings = pgTable('bookings', {
   id: serial('id').primaryKey(),
@@ -24,6 +24,9 @@ export const bookings = pgTable('bookings', {
   endTime: timestamp('end_time', { withTimezone: true }).notNull(),
 
   status: bookingStatus('status').default('confirmed'),
+
+  cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+  cancelledReason: varchar('cancelled_reason', { length: 255 }),
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });

@@ -2,7 +2,7 @@ import dayjs from "dayjs";
 import { eq, and, ne, sql } from "drizzle-orm";
 import { db } from "../../config/db.js";
 import { slots } from "../../db/schema/slots.js";
-import { bookings } from "../../db/schema/bookings.js";
+import { bookings } from "./bookings.model.js";
 import { AppError } from "../../core/errors/AppError.js";
 import type { CreateBookingInput } from "./booking.schema.js";
 
