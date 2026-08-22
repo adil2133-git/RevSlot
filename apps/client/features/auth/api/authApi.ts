@@ -41,10 +41,6 @@ export async function logout() {
 // ONLY the token — no user data. This is intentionally separate from
 // getMe() below: on app load you need both (a valid token to attach to
 // requests, THEN the actual profile), not one call doing double duty.
-export async function refreshAccessToken() {
-  const { data } = await api.post<RefreshResponse>("/auth/refresh");
-  return data.data.accessToken;
-}
 
 // Fetches the logged-in user's profile. Requires a valid access token
 // already attached to the request (lib/axios.ts's interceptor handles
@@ -89,3 +85,4 @@ export async function googleAuth(payload: GoogleAuthPayload) {
   const { data } = await api.post<AuthResponse>("/auth/google", payload);
   return { user: data.data.user, accessToken: data.data.accessToken };
 }
+

@@ -15,7 +15,6 @@ import {
   loginAdmin,
   registerReviewer,
   logout as logoutApi,
-  refreshAccessToken,
   getMe,
   forgotPassword as forgotPasswordApi,
   resetPassword as resetPasswordApi,
@@ -23,7 +22,7 @@ import {
   resendVerification as resendVerificationApi,
   googleAuth as googleAuthApi,
 } from "../api/authApi";
-import { setAccessToken } from "@/lib/axios";
+import { setAccessToken, refreshAccessToken, ApiError } from "@/lib/axios";
 
 type AuthState = {
   user: AuthUser | null;
@@ -127,10 +126,15 @@ export const useAuthStore = create<AuthState>((set) => ({
       setAccessToken(accessToken);
       const user = await getMe();
       set({ user, isHydrated: true });
-    } catch {
+    } catch (err) {
       // No valid refresh cookie, or getMe failed after a refresh that
       // did succeed — either way, no session. Make sure axios doesn't
       // keep a half-set token around from a partial failure.
+      if (err instanceof ApiError && err.status === 429) {
+        set({ isHydrated: true });
+        return;
+      }
+
       setAccessToken(null);
       set({ user: null, isHydrated: true });
     }
