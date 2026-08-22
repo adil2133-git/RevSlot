@@ -1,10 +1,35 @@
 import { z } from "zod";
 
 // Used by the public booking page to look up a reviewer + event type
-// by reviewerId and event slug (e.g. /42/project-review)
+// by username and event slug (e.g. /shibin/project-review)
 export const BookingPageParamsSchema = z.object({
-  reviewerId: z.coerce.number().int().positive(),
-  eventSlug: z.string().min(1),
+  username: z.string().trim().min(1, "Username is required"),
+  eventSlug: z.string().trim().min(1, "eventSlug is required"),
+});
+
+export const CreateEventTypeSchema = z.object({
+    availabilityTemplateId: z.number().int().positive(),
+    name: z.string().trim().min(1, "Event name is required").max(150, "Event name must be at most 150 characters"),
+    description: z.string().trim().max(1000, "Description must be at most 1000 characters").optional(),
+    durationMinutes: z.number().int().positive("Duration must be greater than 0"),
+    price: z.number().int().min(0, "Price cannot be negative").default(0),
+    bufferBeforeMinutes: z.number().int().min(0, "Buffer cannot be negative").default(0),
+    bufferAfterMinutes: z.number().int().min(0, "Buffer cannot be negative").default(0),
+    meetingLink: z.string().trim().url("Invalid meeting link").max(500, "Meeting link must be at most 500 characters").optional(),
+});
+
+export const UpdateEventTypeSchema = z.object({
+  availabilityTemplateId: z.number().int().positive().optional(),
+  name: z.string().trim().min(1, "Event name is required").max(150, "Event name must be at most 150 characters").optional(),
+  description: z.string().trim().max(1000, "Description must be at most 1000 characters").nullable().optional(),
+  durationMinutes: z.number().int().positive("Duration must be greater than 0").optional(),
+  price: z.number().int().min(0, "Price cannot be negative").optional(),
+  bufferBeforeMinutes: z.number().int().min(0, "Buffer cannot be negative").optional(),
+  bufferAfterMinutes: z.number().int().min(0, "Buffer cannot be negative").optional(),
+  meetingLink: z.string().trim().url("Invalid meeting link").max(500, "Meeting link must be at most 500 characters").nullable().optional(),
+  isActive: z.boolean().optional(),
 });
 
 export type BookingPageParamsInput = z.infer<typeof BookingPageParamsSchema>;
+export type CreateEventTypeInput = z.infer<typeof CreateEventTypeSchema>;
+export type UpdateEventTypeInput = z.infer<typeof UpdateEventTypeSchema>;

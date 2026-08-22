@@ -18,7 +18,7 @@ export const slotController = {
       Number(eventTypeId),
       String(dateFrom),
       String(dateTo)
-    );
+    ); 
 
     res.status(200).json({
       success: true,

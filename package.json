@@ -14,6 +14,7 @@
     "test": "pnpm --parallel --filter client --filter server test",
     "test:watch": "pnpm --parallel --filter client --filter server test:watch",
     "lint": "pnpm --parallel --filter client --filter server lint",
+    "db:generate": "pnpm --filter server db:generate",
     "db:migrate": "pnpm --filter server db:migrate",
     "db:seed": "pnpm --filter server db:seed",
     "db:reset": "pnpm --filter server db:reset",

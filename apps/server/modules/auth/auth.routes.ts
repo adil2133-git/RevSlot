@@ -13,7 +13,7 @@ router.post("/reviewer/register", registerLimiter, validate(RegisterSchema), cat
 router.post("/reviewer/login", loginLimiter, validate(LoginSchema), catchAsync(authController.loginReviewer));
 router.post("/admin/login", loginLimiter, validate(LoginSchema), catchAsync(authController.loginAdmin))
 router.post("/refresh", refreshLimiter, catchAsync(authController.refreshToken));
-router.post("/logout", requireAuth, catchAsync(authController.logout));
+router.post("/logout", catchAsync(authController.logout));
 
 router.get("/me", requireAuth, catchAsync(authController.getMe));
 
