@@ -45,6 +45,27 @@ const SKIP_REFRESH_FOR = ["/auth/reviewer/login", "/auth/admin/login", "/auth/re
 
 let pendingRefresh: Promise<string> | null = null;
 
+export function refreshAccessToken(): Promise<string> {
+  if (pendingRefresh) {
+    return pendingRefresh;
+  }
+
+  pendingRefresh = api
+    .post("/auth/refresh")
+    .then((res) => {
+      const newToken = res.data.data.accessToken;
+
+      setAccessToken(newToken);
+
+      return newToken;
+    })
+    .finally(() => {
+      pendingRefresh = null;
+    });
+
+  return pendingRefresh;
+}
+
 // Small typed error so callers can branch on status (e.g. Google auth's
 // 422 "WhatsApp number required for new account") without re-parsing
 // axios internals.
@@ -72,18 +93,7 @@ api.interceptors.response.use(
         // which worked when the access token was also a cookie (the
         // browser carried it forward automatically) but silently does
         // nothing useful now that it only lives in this module's memory.
-        pendingRefresh ??= api
-          .post("/auth/refresh")
-          .then((res) => {
-            const newToken = res.data.data.accessToken;
-            setAccessToken(newToken);
-            return newToken;
-          })
-          .finally(() => {
-            pendingRefresh = null;
-          });
-
-        const newToken = await pendingRefresh;
+        const newToken = await refreshAccessToken();
         originalRequest.headers = originalRequest.headers ?? {};
         originalRequest.headers.Authorization = `Bearer ${newToken}`;
         return api(originalRequest);

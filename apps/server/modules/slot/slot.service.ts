@@ -116,7 +116,7 @@ export const slotService = {
     const results = await db
       .select()
       .from(slots)
-      .where(
+      .where( 
         and(
           eq(slots.eventTypeId, eventTypeId),
           gte(slots.slotDate, dateFrom),
