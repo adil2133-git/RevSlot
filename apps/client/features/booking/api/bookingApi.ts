@@ -28,9 +28,10 @@ export async function fetchAvailableSlots(
   return data.data;
 }
 
-export async function holdSlot(slotId: number) {
+export async function holdSlot(slot: { eventTypeId: number; date: string; startTime: string; endTime: string }) {
   const { data } = await api.post<{ success: boolean; data: HoldResult }>(
-    `/slots/${slotId}/hold`
+    `/slots/hold`,
+    slot
   );
   return data.data;
 }

@@ -1,27 +1,18 @@
 import { Router } from "express";
-import { validate, validateParams } from "../../core/middlewares/validate.middleware.js";
-import { GenerateSlotsSchema, HoldSlotParamsSchema } from "./slot.schema.js";
+import { validate, validateQuery } from "../../core/middlewares/validate.middleware.js";
+import { GetAvailableSlotsQuerySchema, HoldSlotSchema } from "./slot.schema.js";
 import { catchAsync } from "../../core/utils/catchAsync.js";
 import { slotController } from "./slot.controller.js";
-import { requireReviewer } from "../../core/middlewares/auth.middleware.js";
 
 const router = Router();
 
-// Reviewer must be logged in to generate slots (protected)
-router.post(
-  "/generate",
-  requireReviewer,
-  validate(GenerateSlotsSchema),
-  catchAsync(slotController.generateSlots)
-);
-
 // Public — advisor booking page, no login needed
-router.get("/available", catchAsync(slotController.getAvailableSlots));
+router.get("/available", validateQuery(GetAvailableSlotsQuerySchema), catchAsync(slotController.getAvailableSlots));
 
 // Public — holds a slot while the advisor fills out the booking form
 router.post(
-  "/:id/hold",
-  validateParams(HoldSlotParamsSchema),
+  "/hold",
+  validate(HoldSlotSchema),
   catchAsync(slotController.holdSlot)
 );
 

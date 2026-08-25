@@ -118,10 +118,12 @@ const seed = async () => {
     console.log("seed successfully created event types");
 
     // --- Test Slots (for the "Individual Review" event type) ---
-    // Generate a full 2-week spread (next 10 weekdays), 9AM–5PM, split into
-    // durationMinutes chunks — same idea as slotService.generateSlots — so
-    // every teammate's calendar shows slots on every working day, not just
-    // one or two isolated dates.
+    // NOTE: slots are compute-on-read now (see slotService.getAvailableSlots)
+    // — availability comes from the template + overrides + vacation blocks,
+    // never from pre-generated rows. So we don't seed "available" rows at
+    // all here; a `slots` row only exists once someone actually holds or
+    // books a time. We just seed one `held` row and one `booked` row (with
+    // its matching booking) so there's an example of each to test against.
     const [individualReview] = await db
         .select()
         .from(eventTypes)
@@ -166,68 +168,44 @@ const seed = async () => {
     };
 
     const weekdays = nextWeekdays(10);
-    const slotsToInsert: (typeof slots.$inferInsert)[] = [];
-
-    for (const date of weekdays) {
-        for (const { start, end } of generateSlotsForDay(date, individualReview.durationMinutes)) {
-            slotsToInsert.push({
-                eventTypeId: individualReview.id,
-                reviewerId: testReviewer.id,
-                slotDate: date,
-                startTime: start,
-                endTime: end,
-                status: "available",
-            });
-        }
-    }
-
-    await db.insert(slots).values(slotsToInsert).onConflictDoNothing({
-        target: [slots.eventTypeId, slots.slotDate, slots.startTime]
-    });
-
-    console.log(`seed successfully created ${slotsToInsert.length} available slots across ${weekdays.length} weekdays`);
-
-    // Grab two specific slots from what we just generated and flip them to
-    // "held" / "booked", so there's an example of each status without
-    // guessing exact date/time strings that might not exist in the block.
-    const generatedSlots = await db
-        .select()
-        .from(slots)
-        .where(
-            and(
-                eq(slots.eventTypeId, individualReview.id),
-                eq(slots.status, "available")
-            )
-        );
 
     // Held slot — fixed holdToken so your teammate can hit POST /bookings
-    // directly in Postman without calling the hold endpoint first.
+    // directly in Postman without calling the hold endpoint first. This is
+    // the ONLY kind of write that ever happens for a not-yet-booked slot —
+    // exactly what slotService.holdSlot does at request time.
     const SEED_HOLD_TOKEN = "11111111-1111-1111-1111-111111111111";
-    const heldCandidate = generatedSlots.find((s) => s.slotDate === weekdays[1]);
+    const [heldSlotTime] = generateSlotsForDay(weekdays[1]!, individualReview.durationMinutes);
 
-    if (heldCandidate) {
-        await db
-            .update(slots)
-            .set({
+    if (heldSlotTime) {
+        const [heldRow] = await db
+            .insert(slots)
+            .values({
+                eventTypeId: individualReview.id,
+                reviewerId: testReviewer.id,
+                slotDate: weekdays[1]!,
+                startTime: heldSlotTime.start,
+                endTime: heldSlotTime.end,
                 status: "held",
                 holdToken: SEED_HOLD_TOKEN,
                 holdExpiresAt: dayjs().add(1, "day").toDate(), // generous expiry so it's usable whenever you test
-                updatedAt: new Date(),
             })
-            .where(eq(slots.id, heldCandidate.id));
+            .onConflictDoNothing({
+                target: [slots.eventTypeId, slots.slotDate, slots.startTime]
+            })
+            .returning();
 
-        console.log(`seed successfully marked one slot as held (holdToken: ${SEED_HOLD_TOKEN})`);
+        if (heldRow) {
+            console.log(`seed successfully created one held slot (holdToken: ${SEED_HOLD_TOKEN})`);
+        }
     }
 
     // Booked slot + matching booking row — for testing "already booked" /
     // read-only booking views without having to create one manually.
-    const bookedCandidate = generatedSlots.find(
-        (s) => s.slotDate === weekdays[2] && s.id !== heldCandidate?.id
-    );
+    const [bookedSlotTime] = generateSlotsForDay(weekdays[2]!, individualReview.durationMinutes);
 
-    if (bookedCandidate) {
-        const bookingStart = dayjs(`${bookedCandidate.slotDate}T${bookedCandidate.startTime}`).toDate();
-        const bookingEnd = dayjs(`${bookedCandidate.slotDate}T${bookedCandidate.endTime}`).toDate();
+    if (bookedSlotTime) {
+        const bookingStart = dayjs(`${weekdays[2]}T${bookedSlotTime.start}`).toDate();
+        const bookingEnd = dayjs(`${weekdays[2]}T${bookedSlotTime.end}`).toDate();
 
         const existingBooking = await db
             .select()
@@ -240,25 +218,37 @@ const seed = async () => {
             );
 
         if (existingBooking.length === 0) {
-            await db
-                .update(slots)
-                .set({ status: "booked", updatedAt: new Date() })
-                .where(eq(slots.id, bookedCandidate.id));
+            const [bookedRow] = await db
+                .insert(slots)
+                .values({
+                    eventTypeId: individualReview.id,
+                    reviewerId: testReviewer.id,
+                    slotDate: weekdays[2]!,
+                    startTime: bookedSlotTime.start,
+                    endTime: bookedSlotTime.end,
+                    status: "booked",
+                })
+                .onConflictDoNothing({
+                    target: [slots.eventTypeId, slots.slotDate, slots.startTime]
+                })
+                .returning();
 
-            await db.insert(bookings).values({
-                eventTypeId: individualReview.id,
-                reviewerId: testReviewer.id,
-                internName: "Seed Intern",
-                batch: "2026-Batch-A",
-                advisorEmail: "advisor@test.com",
-                internEmails: ["intern@test.com"],
-                weekStage: "Week 4",
-                startTime: bookingStart,
-                endTime: bookingEnd,
-                status: "confirmed",
-            });
+            if (bookedRow) {
+                await db.insert(bookings).values({
+                    eventTypeId: individualReview.id,
+                    reviewerId: testReviewer.id,
+                    internName: "Seed Intern",
+                    batch: "2026-Batch-A",
+                    advisorEmail: "advisor@test.com",
+                    internEmails: ["intern@test.com"],
+                    weekStage: "Week 4",
+                    startTime: bookingStart,
+                    endTime: bookingEnd,
+                    status: "confirmed",
+                });
 
-            console.log("seed successfully marked one slot as booked + created matching booking");
+                console.log("seed successfully created one booked slot + matching booking");
+            }
         }
     }
 
@@ -268,12 +258,12 @@ const seed = async () => {
     console.log(`Event type id:  ${individualReview.id} (slug: individual-review)`);
     console.log(`Reviewer id:    ${testReviewer.id}`);
     console.log(`Booking page:   /${testReviewer.id}/individual-review`);
-    console.log(`Available slots spread across: ${weekdays.join(", ")}`);
-    if (heldCandidate) {
-        console.log(`Held slot on ${heldCandidate.slotDate} ${heldCandidate.startTime} — holdToken: ${SEED_HOLD_TOKEN} (use for POST /bookings)`);
+    console.log(`Availability computed live (template + overrides + vacation blocks) — no pre-generated rows.`);
+    if (heldSlotTime) {
+        console.log(`Held slot on ${weekdays[1]} ${heldSlotTime.start} — holdToken: ${SEED_HOLD_TOKEN} (use for POST /bookings)`);
     }
-    if (bookedCandidate) {
-        console.log(`Booked slot on ${bookedCandidate.slotDate} ${bookedCandidate.startTime} (already has a matching booking row)`);
+    if (bookedSlotTime) {
+        console.log(`Booked slot on ${weekdays[2]} ${bookedSlotTime.start} (already has a matching booking row)`);
     }
     console.log("---------------------------------\n");
 };

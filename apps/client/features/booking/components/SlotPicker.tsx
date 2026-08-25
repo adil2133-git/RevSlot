@@ -98,7 +98,7 @@ export default function SlotPicker({
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {slotsForSelectedDate.map((slot) => (
             <button
-              key={slot.id}
+              key={`${slot.date}-${slot.startTime}`}
               disabled={holding}
               onClick={() => onSelectSlot(slot)}
               className="rounded-lg border border-slate-300 bg-surface-card px-3 py-2 text-sm text-on-surface hover:border-primary disabled:opacity-50"

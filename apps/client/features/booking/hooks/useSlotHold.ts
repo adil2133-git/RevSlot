@@ -39,7 +39,12 @@ export function useSlotHold(loadSlots: () => void) {
     setHoldError(null);
     setHolding(true);
     try {
-      const result = await holdSlot(slot.id);
+      const result = await holdSlot({
+  eventTypeId: slot.eventTypeId,
+  date: slot.date,
+  startTime: slot.startTime,
+  endTime: slot.endTime,
+});
       setHoldResult(result);
       setHeldSlot(slot);
     } catch (err) {

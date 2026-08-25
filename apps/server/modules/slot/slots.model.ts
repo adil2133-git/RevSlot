@@ -13,7 +13,7 @@ export const slots = pgTable(
     slotDate: date('slot_date').notNull(),
     startTime: time('start_time').notNull(),
     endTime: time('end_time').notNull(),
-    status: slotStatus('status').default('available'),
+    status: slotStatus('status').notNull(),
     holdToken: text('hold_token'),
     holdExpiresAt: timestamp('hold_expires_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
