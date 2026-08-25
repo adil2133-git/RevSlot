@@ -1,8 +1,8 @@
 import { pgTable, serial, integer, date, time, text, timestamp, unique, index } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
-import { eventTypes } from './eventTypes.js';
-import { reviewers } from './reviewers.js';
-import { slotStatus } from './enums.js';
+import { eventTypes } from '../eventType/eventTypes.model.js';
+import { reviewers } from '../auth/reviewers.model.js';
+import { slotStatus } from '../../db/schema/enums.js';
 
 export const slots = pgTable(
   'slots',

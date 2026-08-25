@@ -1,5 +1,5 @@
 import { pgTable, serial, integer, varchar, text, timestamp, unique, index } from 'drizzle-orm/pg-core';
-import { reviewers } from './reviewers.js';
+import { reviewers } from '../auth/reviewers.model.js';
 
 export const questionBanks = pgTable(
   'question_banks',

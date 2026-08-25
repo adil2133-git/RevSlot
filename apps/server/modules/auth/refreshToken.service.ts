@@ -2,7 +2,7 @@ import crypto from "crypto";
 import { eq, and, isNull } from "drizzle-orm";
 
 import { db } from "../../config/db.js";
-import { refreshTokens } from "../../db/schema/refreshTokens.js";
+import { refreshTokens } from "./refreshTokens.model.js";
 import { AppError } from "../../core/errors/AppError.js";
 import {
   generateAccessToken,
@@ -13,6 +13,14 @@ import {
 
 const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
+// A just-rotated token getting reused within this window is almost always
+// a harmless race — e.g. two browser tabs sharing the same httpOnly
+// refresh cookie both firing /auth/refresh within milliseconds of each
+// other, or React Strict Mode / dev Fast Refresh double-firing hydrate().
+// Reuse past this window is a much stronger signal of actual token theft.
+
+
+const REUSE_GRACE_PERIOD_MS = 10 * 1000; // 10 seconds
 // SHA-256, not bcrypt: a refresh token is already a long, random,
 // high-entropy string (nobody is brute-forcing it), so bcrypt's
 // deliberate slowness buys nothing here. SHA-256 being deterministic is
@@ -68,6 +76,14 @@ export const refreshTokenService = {
     }
 
     if (row.revokedAt) {
+       const revokedMsAgo = Date.now() - row.revokedAt.getTime();
+
+       if(revokedMsAgo <= REUSE_GRACE_PERIOD_MS){
+          return refreshTokenService.issueTokenPair({
+          userId: row.userId,
+          role: row.role,
+        });
+       }
       await db
         .update(refreshTokens)
         .set({ revokedAt: new Date() })

@@ -4,7 +4,7 @@ import { OAuth2Client } from "google-auth-library";
 import { eq, type InferSelectModel } from "drizzle-orm";
 import { db } from "../../config/db.js";
 
-import { reviewers } from "../../db/schema/reviewers.js";
+import { reviewers } from "./reviewers.model.js";
 import { admins } from "../../db/schema/admins.js";
 
 import { AppError } from "../../core/errors/AppError.js";
@@ -22,7 +22,7 @@ import {
   verifyRefreshToken,
 } from "../../core/utils/jwt.js";
 
-import { otpService } from "../otp/otp.service.js";
+import { otpService } from "./otp.service.js";
 import { emailService } from "../../services/email.service.js";
 import { forgotPasswordTemplate } from "../../emails/templates/forgotPassword.js";
 import { verifyEmailTemplate } from "../../emails/templates/verifyEmail.js";

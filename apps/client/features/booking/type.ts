@@ -15,6 +15,23 @@ export type BookingPageInfo = {
   };
 };
 
+export type ReviewerProfile = {
+  reviewer: {
+    id: number;
+    name: string;
+    avatarUrl: string | null;
+    bio: string | null;
+  };
+  eventTypes: {
+    id: number;
+    name: string;
+    slug: string;
+    description: string | null;
+    durationMinutes: number;
+    price: number;
+  }[];
+};
+
 export type SlotItem = {
   id: number;
   eventTypeId: number;

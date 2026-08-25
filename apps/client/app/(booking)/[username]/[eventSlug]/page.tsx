@@ -20,12 +20,12 @@ import TimeSelectedCard from "@/features/booking/components/TimeSelectedCard";
 import BookingForm from "@/features/booking/components/BookingForm";
 
 export default function PublicBookingPage() {
-  const params = useParams<{ reviewerId: string; eventSlug: string }>();
-  const reviewerId = Number(params.reviewerId);
+  const params = useParams<{ username: string; eventSlug: string }>();
+  const username = params.username;
   const eventSlug = params.eventSlug;
 
   const { pageInfo, pageError, pageLoading } = useBookingPageInfo(
-    reviewerId,
+    username,
     eventSlug
   );
 

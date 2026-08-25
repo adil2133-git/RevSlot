@@ -1,6 +1,6 @@
 import { pgTable, serial, integer, smallint, time, timestamp, index, check } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
-import { availabilityTemplates } from './availabilityTemplates.js';
+import { availabilityTemplates } from './availabilityTemplates.model.js';
 
 export const templateTimeBlocks = pgTable(
   'template_time_blocks',

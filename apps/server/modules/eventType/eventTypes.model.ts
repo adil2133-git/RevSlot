@@ -1,7 +1,7 @@
 import { pgTable, serial, integer, varchar, text, smallint, boolean, timestamp, unique, index, check } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
-import { reviewers } from './reviewers.js';
-import { availabilityTemplates } from './availabilityTemplates.js';
+import { reviewers } from '../auth/reviewers.model.js';
+import { availabilityTemplates } from '../availability/availabilityTemplates.model.js';
 
 export const eventTypes = pgTable(
     'event_types',
@@ -13,9 +13,13 @@ export const eventTypes = pgTable(
         slug: varchar('slug', { length: 100 }).notNull(),
         durationMinutes: smallint('duration_minutes').notNull(),
         description: text('description'),
-        isActive: boolean('is_active').default(true),
-        createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-        updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+        price: integer('price').notNull().default(0),
+        bufferBeforeMinutes: integer("buffer_before_minutes").notNull().default(0),
+        bufferAfterMinutes: integer("buffer_after_minutes").notNull().default(0),
+        meetingLink: varchar("meeting_link", { length: 500 }),
+        isActive: boolean('is_active').notNull().default(true),
+        createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+        updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
     },
     (table) => [
         unique('unique_event_type_slug').on(table.reviewerId, table.slug),

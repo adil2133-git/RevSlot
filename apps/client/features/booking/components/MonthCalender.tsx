@@ -72,9 +72,9 @@ export default function MonthCalendar({
                   : isPast
                   ? "text-slate-300"
                   : isSelected
-                  ? "bg-slate-900 font-medium text-white"
+                  ? "bg-primary font-medium text-on-primary"
                   : isToday
-                  ? "bg-slate-100 font-medium text-on-surface"
+                  ? "bg-secondary font-medium text-on-surface"
                   : "text-on-surface hover:bg-slate-100"
               } disabled:cursor-default`}
             >
@@ -83,7 +83,7 @@ export default function MonthCalendar({
                 <span
                   className={`absolute bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full ${
                     isSelected
-                      ? "bg-white"
+                      ? "bg-on-primary"
                       : availableCount > 0
                       ? "bg-emerald-500"
                       : "bg-slate-300"

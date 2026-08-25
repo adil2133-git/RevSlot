@@ -2,10 +2,17 @@ import dayjs from "dayjs";
 import { randomUUID } from "crypto";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { db } from "../../config/db.js";
+<<<<<<< HEAD
 import { eventTypes } from "../../db/schema/eventTypes.js";
 import { templateTimeBlocks } from "../../db/schema/templateTimeBlocks.js";
 import { vacationBlocks } from "../vacation/vacation.model.js";
 import { slots } from "../../db/schema/slots.js";
+=======
+import { eventTypes } from "../eventType/eventTypes.model.js";
+import { templateTimeBlocks } from "../availability/templateTimeBlocks.model.js";
+import { vacationBlocks } from "../../db/schema/vacationBlocks.js";
+import { slots } from "./slots.model.js";
+>>>>>>> 9f867fd24c28debb05fc85d789f98dc7fe2abffb
 import { AppError } from "../../core/errors/AppError.js";
 import type { GenerateSlotsInput } from "./slot.schema.js";
 
@@ -72,7 +79,9 @@ export const slotService = {
             dateStr,
             block.startTime,
             block.endTime,
-            eventType.durationMinutes
+            eventType.durationMinutes,
+            eventType.bufferBeforeMinutes,
+            eventType.bufferAfterMinutes
           );
 
           for (const slot of generated) {
@@ -116,7 +125,7 @@ export const slotService = {
     const results = await db
       .select()
       .from(slots)
-      .where(
+      .where( 
         and(
           eq(slots.eventTypeId, eventTypeId),
           gte(slots.slotDate, dateFrom),
@@ -184,9 +193,12 @@ function generateSlotsForBlock(
   date: string,
   blockStart: string,
   blockEnd: string,
-  durationMinutes: number
+  durationMinutes: number,
+  bufferBeforeMinutes = 0,
+  bufferAfterMinutes = 0
 ) {
   const result: { start: string; end: string }[] = [];
+  const gapBetweenSlots = bufferBeforeMinutes + bufferAfterMinutes;
 
   let slotStart = dayjs(`${date}T${blockStart}`);
   const blockEndTime = dayjs(`${date}T${blockEnd}`);
@@ -200,7 +212,7 @@ function generateSlotsForBlock(
       start: slotStart.format("HH:mm:ss"),
       end: slotEnd.format("HH:mm:ss"),
     });
-    slotStart = slotEnd;
+    slotStart = slotEnd.add(gapBetweenSlots, "minute");
   }
 
   return result;

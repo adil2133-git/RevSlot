@@ -19,7 +19,7 @@ export default function BookingConfirmation({
   use12Hour,
 }: BookingConfirmationProps) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+    <div className="flex min-h-screen items-center justify-center bg-surface px-4">
       <div className="max-w-md rounded-2xl border border-slate-200 bg-surface-card p-8 text-center shadow-sm">
         <h1 className="mb-2 text-xl font-semibold text-on-surface">
           Booking confirmed!
@@ -42,7 +42,7 @@ export default function BookingConfirmation({
         <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
           <button
             onClick={() => window.location.reload()}
-            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white"
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary"
           >
             Book another slot
           </button>
