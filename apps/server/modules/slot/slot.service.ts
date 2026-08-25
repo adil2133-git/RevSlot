@@ -2,10 +2,10 @@ import dayjs from "dayjs";
 import { randomUUID } from "crypto";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { db } from "../../config/db.js";
-import { eventTypes } from "../../db/schema/eventTypes.js";
-import { templateTimeBlocks } from "../../db/schema/templateTimeBlocks.js";
+import { eventTypes } from "../eventType/eventTypes.model.js";
+import { templateTimeBlocks } from "../availability/templateTimeBlocks.model.js";
 import { vacationBlocks } from "../../db/schema/vacationBlocks.js";
-import { slots } from "../../db/schema/slots.js";
+import { slots } from "./slots.model.js";
 import { AppError } from "../../core/errors/AppError.js";
 import type { GenerateSlotsInput } from "./slot.schema.js";
 
@@ -72,7 +72,9 @@ export const slotService = {
             dateStr,
             block.startTime,
             block.endTime,
-            eventType.durationMinutes
+            eventType.durationMinutes,
+            eventType.bufferBeforeMinutes,
+            eventType.bufferAfterMinutes
           );
 
           for (const slot of generated) {
@@ -184,9 +186,12 @@ function generateSlotsForBlock(
   date: string,
   blockStart: string,
   blockEnd: string,
-  durationMinutes: number
+  durationMinutes: number,
+  bufferBeforeMinutes = 0,
+  bufferAfterMinutes = 0
 ) {
   const result: { start: string; end: string }[] = [];
+  const gapBetweenSlots = bufferBeforeMinutes + bufferAfterMinutes;
 
   let slotStart = dayjs(`${date}T${blockStart}`);
   const blockEndTime = dayjs(`${date}T${blockEnd}`);
@@ -200,7 +205,7 @@ function generateSlotsForBlock(
       start: slotStart.format("HH:mm:ss"),
       end: slotEnd.format("HH:mm:ss"),
     });
-    slotStart = slotEnd;
+    slotStart = slotEnd.add(gapBetweenSlots, "minute");
   }
 
   return result;

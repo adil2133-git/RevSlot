@@ -17,7 +17,7 @@ export default function StepIndicator({ currentStep }: StepIndicatorProps) {
             <div
               className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-medium ${
                 currentStep >= step.n
-                  ? "bg-slate-900 text-white"
+                  ? "bg-primary text-on-primary"
                   : "bg-slate-200 text-slate-500"
               }`}
             >

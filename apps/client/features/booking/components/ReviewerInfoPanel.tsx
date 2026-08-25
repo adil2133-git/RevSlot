@@ -17,7 +17,7 @@ export default function ReviewerInfoPanel({ pageInfo }: ReviewerInfoPanelProps) 
           className="h-14 w-14 rounded-full object-cover"
         />
       ) : (
-        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-900 text-base font-semibold text-white">
+        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-base font-semibold text-on-primary">
           {initials}
         </div>
       )}

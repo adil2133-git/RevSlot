@@ -1,5 +1,5 @@
 import { pgTable, serial, integer, varchar, timestamp, index } from 'drizzle-orm/pg-core';
-import { userRole } from './enums.js';
+import { userRole } from '../../db/schema/enums.js';
 
 export const refreshTokens = pgTable(
   'refresh_tokens',

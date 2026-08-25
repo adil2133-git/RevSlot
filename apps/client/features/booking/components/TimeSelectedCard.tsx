@@ -45,13 +45,13 @@ export default function TimeSelectedCard({
       <div className="mt-3 flex items-center justify-between rounded-xl border border-slate-200 p-4">
         <p className="text-sm text-slate-600">
           Hold expires in{" "}
-          <span className={secondsLeft <= 60 ? "font-medium text-red-600" : "font-medium text-on-surface"}>
+          <span className={secondsLeft <= 60 ? "font-medium text-error" : "font-medium text-on-surface"}>
             {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, "0")}
           </span>
         </p>
         <button
           onClick={onContinue}
-          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white"
+          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary"
         >
           Continue to details
         </button>

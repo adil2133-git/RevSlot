@@ -17,7 +17,6 @@ router.post("/logout", catchAsync(authController.logout));
 
 router.get("/me", requireAuth, catchAsync(authController.getMe));
 
-
 router.post("/forgot-password", validate(ForgotPasswordSchema), catchAsync(authController.forgotPassword));
 router.post("/reset-password", validate(ResetPasswordSchema), catchAsync(authController.resetPassword));
 router.post("/verify-email", validate(VerifyEmailSchema), catchAsync(authController.verifyEmail));
