@@ -2,7 +2,7 @@ import crypto from "crypto";
 import { eq, and, isNull } from "drizzle-orm";
 
 import { db } from "../../config/db.js";
-import { refreshTokens } from "../../db/schema/refreshTokens.js";
+import { refreshTokens } from "./refreshTokens.model.js";
 import { AppError } from "../../core/errors/AppError.js";
 import {
   generateAccessToken,

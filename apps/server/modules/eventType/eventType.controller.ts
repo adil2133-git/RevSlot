@@ -1,11 +1,23 @@
 import type { Request, Response } from "express";
 import { eventTypeService } from "./eventType.service.js";
-import { BookingPageParamsSchema } from "./eventType.schema.js";
+import { BookingPageParamsSchema, ReviewerProfileParamsSchema } from "./eventType.schema.js";
 
 export const eventTypeController = {
   getBookingPageInfo: async (req: Request, res: Response) => {
     const { username, eventSlug } = BookingPageParamsSchema.parse(req.params);
     const result = await eventTypeService.getBookingPageInfo(username, eventSlug);
+
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  },
+
+    // Public — GET /event-types/:username → reviewer + their active event
+  // types, for the profile-style "pick a session" page.
+  getReviewerProfile: async (req: Request, res: Response) => {
+    const { username } = ReviewerProfileParamsSchema.parse(req.params);
+    const result = await eventTypeService.getReviewerProfile(username);
 
     res.status(200).json({
       success: true,

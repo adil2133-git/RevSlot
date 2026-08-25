@@ -1,11 +1,11 @@
 import { eq, and, asc, inArray, ne } from "drizzle-orm";
 import { db } from "../../config/db.js";
 
-import { availabilityTemplates } from "../../db/schema/availabilityTemplates.js";
-import { templateTimeBlocks } from "../../db/schema/templateTimeBlocks.js";
+import { availabilityTemplates } from "./availabilityTemplates.model.js";
+import { templateTimeBlocks } from "./templateTimeBlocks.model.js";
 
-import { templateDateOverrides } from "../../db/schema/templateDateOverrides.js";
-import { templateOverrideBlocks } from "../../db/schema/templateDateOverrideBlocks.js";
+import { templateDateOverrides } from "./templateDateOverrides.model.js";
+import { templateOverrideBlocks } from "./templateDateOverrideBlocks.model.js";
 import type { CreateDateOverrideInput } from "./availability.schema.js";
 
 import { AppError } from "../../core/errors/AppError.js";

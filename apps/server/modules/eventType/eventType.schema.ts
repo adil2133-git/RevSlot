@@ -7,6 +7,12 @@ export const BookingPageParamsSchema = z.object({
   eventSlug: z.string().trim().min(1, "eventSlug is required"),
 });
 
+// Used by the public profile page (e.g. /shibin) — just a username,
+// returns the reviewer + their active event types to pick from.
+export const ReviewerProfileParamsSchema = z.object({
+  username: z.string().trim().min(1, "Username is required"),
+});
+
 export const CreateEventTypeSchema = z.object({
     availabilityTemplateId: z.number().int().positive(),
     name: z.string().trim().min(1, "Event name is required").max(150, "Event name must be at most 150 characters"),
@@ -31,5 +37,6 @@ export const UpdateEventTypeSchema = z.object({
 });
 
 export type BookingPageParamsInput = z.infer<typeof BookingPageParamsSchema>;
+export type ReviewerProfileParamsInput = z.infer<typeof ReviewerProfileParamsSchema>;
 export type CreateEventTypeInput = z.infer<typeof CreateEventTypeSchema>;
 export type UpdateEventTypeInput = z.infer<typeof UpdateEventTypeSchema>;

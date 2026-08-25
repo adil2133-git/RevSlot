@@ -1,5 +1,5 @@
 import { pgTable, serial, integer, date, boolean, timestamp, unique, index } from 'drizzle-orm/pg-core';
-import { availabilityTemplates } from './availabilityTemplates.js';
+import { availabilityTemplates } from './availabilityTemplates.model.js';
 
 export const templateDateOverrides = pgTable(
   'template_date_overrides',

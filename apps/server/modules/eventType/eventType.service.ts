@@ -1,8 +1,8 @@
 import { eq, and, desc } from "drizzle-orm";
 import { db } from "../../config/db.js";
-import { reviewers } from "../../db/schema/reviewers.js";
-import { eventTypes } from "../../db/schema/eventTypes.js";
-import { availabilityTemplates } from "../../db/schema/availabilityTemplates.js";
+import { reviewers } from "../auth/reviewers.model.js";
+import { eventTypes } from "./eventTypes.model.js";
+import { availabilityTemplates } from "../availability/availabilityTemplates.model.js";
 import { AppError } from "../../core/errors/AppError.js";
 
 import type { CreateEventTypeInput, UpdateEventTypeInput } from "./eventType.schema.js";
@@ -59,6 +59,45 @@ export const eventTypeService = {
     }
 
     return { reviewer, eventType };
+  },
+
+   
+  // Public lookup for the profile page — given just a username, returns
+  // the reviewer plus every active event type they offer, so a visitor
+  // can pick which one to book (e.g. /shibin-tharthees → list of cards,
+  // same idea as cal.com/{username}).
+  getReviewerProfile: async (username: string) => {
+    const [reviewer] = await db
+      .select({
+        id: reviewers.id,
+        name: reviewers.name,
+        avatarUrl: reviewers.avatarUrl,
+        bio: reviewers.bio,
+      })
+      .from(reviewers)
+      .where(and(eq(reviewers.username, username), eq(reviewers.isActive, true)))
+      .limit(1);
+
+    if (!reviewer) {
+      throw new AppError("Reviewer not found", 404);
+    }
+
+    // Public-safe fields only — same subset as getBookingPageInfo, no
+    // internal ids (availabilityTemplateId), buffers, or meeting links.
+    const activeEventTypes = await db
+      .select({
+        id: eventTypes.id,
+        name: eventTypes.name,
+        slug: eventTypes.slug,
+        description: eventTypes.description,
+        durationMinutes: eventTypes.durationMinutes,
+        price: eventTypes.price,
+      })
+      .from(eventTypes)
+      .where(and(eq(eventTypes.reviewerId, reviewer.id), eq(eventTypes.isActive, true)))
+      .orderBy(desc(eventTypes.createdAt));
+
+    return { reviewer, eventTypes: activeEventTypes };
   },
 
   createEventType: async (

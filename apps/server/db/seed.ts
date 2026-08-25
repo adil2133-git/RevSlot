@@ -2,12 +2,12 @@ import bcrypt from "bcryptjs";
 import dayjs from "dayjs";
 import { db } from "../config/db.js";
 import { admins } from "../db/schema/admins.js";
-import { reviewers } from "../db/schema/reviewers.js";
-import { availabilityTemplates } from "../db/schema/availabilityTemplates.js";
-import { templateTimeBlocks } from "../db/schema/templateTimeBlocks.js";
-import { eventTypes } from "../db/schema/eventTypes.js";
-import { slots } from "../db/schema/slots.js";
-import { bookings } from "../db/schema/bookings.js";
+import { reviewers } from "../modules/auth/reviewers.model.js";
+import { availabilityTemplates } from "../modules/availability/availabilityTemplates.model.js";
+import { templateTimeBlocks } from "../modules/availability/templateTimeBlocks.model.js";
+import { eventTypes } from "../modules/eventType/eventTypes.model.js";
+import { slots } from "../modules/slot/slots.model.js";
+import { bookings } from "../modules/booking/bookings.model.js";
 import { eq, and } from "drizzle-orm";
 
 const seed = async () => {

@@ -1,7 +1,7 @@
 import { pgTable, serial, integer, varchar, text, timestamp } from 'drizzle-orm/pg-core';
-import { reviewers } from './reviewers.js';
-import { eventTypes } from './eventTypes.js';
-import { bookingStatus } from './enums.js';
+import { reviewers } from '../auth/reviewers.model.js';
+import { eventTypes } from '../eventType/eventTypes.model.js';
+import { bookingStatus } from '../../db/schema/enums.js';
 
 export const bookings = pgTable('bookings', {
   id: serial('id').primaryKey(),

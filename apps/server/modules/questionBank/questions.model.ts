@@ -1,5 +1,5 @@
 import { pgTable, serial, integer, text, smallint, timestamp, index } from 'drizzle-orm/pg-core';
-import { questionBanks } from './questionBanks.js';
+import { questionBanks } from './questionBanks.model.js';
 
 export const questions = pgTable(
   'questions',
