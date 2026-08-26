@@ -2,17 +2,10 @@ import dayjs from "dayjs";
 import { randomUUID } from "crypto";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { db } from "../../config/db.js";
-<<<<<<< HEAD
-import { eventTypes } from "../../db/schema/eventTypes.js";
-import { templateTimeBlocks } from "../../db/schema/templateTimeBlocks.js";
-import { vacationBlocks } from "../vacation/vacation.model.js";
-import { slots } from "../../db/schema/slots.js";
-=======
 import { eventTypes } from "../eventType/eventTypes.model.js";
 import { templateTimeBlocks } from "../availability/templateTimeBlocks.model.js";
-import { vacationBlocks } from "../../db/schema/vacationBlocks.js";
+import { vacationBlocks } from "../vacation/vacation.model.js";
 import { slots } from "./slots.model.js";
->>>>>>> 9f867fd24c28debb05fc85d789f98dc7fe2abffb
 import { AppError } from "../../core/errors/AppError.js";
 import type { GenerateSlotsInput } from "./slot.schema.js";
 
