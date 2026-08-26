@@ -9,7 +9,7 @@ import { templateOverrideBlocks } from "../availability/templateDateOverrideBloc
 import { vacationBlocks } from "../../db/schema/vacationBlocks.js";
 import { slots } from "./slots.model.js";
 import { AppError } from "../../core/errors/AppError.js";
-import type { HoldSlotInput } from "./slot.schema.js";
+import type { HoldSlotInput, ReleaseSlotInput } from "./slot.schema.js";
 
 type TimeBlockLike = { startTime: string, endTime: string };
 type Candidate = { slotDate: string; startTime: string; endTime: string};
@@ -128,6 +128,8 @@ function computeCandidates(
   const candidates: Candidate[] = [];
   let current = dayjs(dateFrom);
   const end = dayjs(dateTo);
+  const now = dayjs();
+  const todayStr = now.format("YYYY-MM-DD");     
 
   while (current.isSame(end) || current.isBefore(end)) {
     const dateStr = current.format("YYYY-MM-DD");
@@ -154,6 +156,12 @@ function computeCandidates(
         );
 
         for (const slot of generated) {
+            if (dateStr === todayStr) {
+            const slotStart = dayjs(`${dateStr}T${slot.start}`);
+            if (!slotStart.isAfter(now)) {
+              continue;
+            }
+          }
           candidates.push({ slotDate: dateStr, startTime: slot.start, endTime: slot.end });
         }
       }
@@ -178,7 +186,7 @@ export const slotService = {
       return [];
     }
  
-    const candidates = computeCandidates(dateFrom, dateTo, eventType, timeBlocks, overridesByDate, vacations);
+    const candidates = computeCandidates(dateFrom, effectiveDateTo, eventType, timeBlocks, overridesByDate, vacations);
  
     if (candidates.length === 0) {
       return [];
@@ -285,8 +293,29 @@ export const slotService = {
       return { slotId: inserted.id, holdToken, holdExpiresAt };
     });
   },
-};
 
+   // Called when an advisor backs out of a hold (picks a different slot,
+// hits "Change", closes the tab). Deletes the row outright rather than
+// just flipping status, so it stops being "permanent" DB clutter and
+// frees up the slot for someone else immediately instead of waiting out
+// the 5-minute holdExpiresAt. Only ever touches rows that are still
+// `held` under this exact token — a `booked` row (or someone else's
+// hold) is never affected, so this can't be used to cancel a real
+// booking.
+releaseSlot: async (data: ReleaseSlotInput) => {
+  const [released] = await db
+    .delete(slots)
+    .where(
+      and(
+        eq(slots.holdToken, data.holdToken),
+        eq(slots.status, "held")
+      )
+    )
+    .returning({ id: slots.id });
+
+  return { released: Boolean(released) };
+},
+};
  
 
 // Helper — splits a time block (e.g. 09:00-17:00) into smaller slots based on duration

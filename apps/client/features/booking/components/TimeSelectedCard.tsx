@@ -29,7 +29,7 @@ export default function TimeSelectedCard({
           <div>
             <p className="text-sm font-medium text-emerald-800">Time selected</p>
             <p className="text-xs text-emerald-700">
-              {dayjs(heldSlot.slotDate).format("dddd, MMMM D")} at{" "}
+              {dayjs(heldSlot.date).format("dddd, MMMM D")} at{" "}
               {formatSlotTime(heldSlot.startTime, use12Hour)}
             </p>
           </div>

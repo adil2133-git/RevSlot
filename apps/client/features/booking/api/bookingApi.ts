@@ -36,6 +36,14 @@ export async function holdSlot(slot: { eventTypeId: number; date: string; startT
   return data.data;
 }
 
+export async function releaseSlot(holdToken: string) {
+  const { data } = await api.post<{ success: boolean; data: { released: boolean } }>(
+    `/slots/release`,
+    { holdToken }
+  );
+  return data.data;
+}
+
 export async function createBooking(payload: BookingFormPayload) {
   const { data } = await api.post<{ success: boolean; data: unknown }>(
     "/bookings",

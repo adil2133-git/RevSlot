@@ -33,5 +33,10 @@ export const HoldSlotSchema = z.object({
    endTime: z.string().regex(timeRegex, "endTime must be HH:MM or HH:MM:SS"),
 });
 
+export const ReleaseSlotSchema = z.object({
+   holdToken: z.string().uuid("holdToken must be a valid token"),
+});
+
 export type GetAvailableSlotsQuery = z.infer<typeof GetAvailableSlotsQuerySchema>;
 export type HoldSlotInput = z.infer<typeof HoldSlotSchema>;
+export type ReleaseSlotInput = z.infer<typeof ReleaseSlotSchema>;

@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { slotService } from "./slot.service.js";
-import type { GetAvailableSlotsQuery, HoldSlotInput } from "./slot.schema.js"
+import type { GetAvailableSlotsQuery, HoldSlotInput, ReleaseSlotInput } from "./slot.schema.js"
 
 export const slotController = {
 
@@ -26,4 +26,13 @@ export const slotController = {
       data: result,
     });
   },
+
+  releaseSlot: async (req: Request, res: Response) => {
+  const result = await slotService.releaseSlot(req.body as ReleaseSlotInput)
+  res.status(200).json({
+    success: true,
+    data: result,
+  });
+},
+
 };
