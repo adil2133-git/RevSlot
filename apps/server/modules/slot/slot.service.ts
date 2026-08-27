@@ -4,7 +4,7 @@ import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { db } from "../../config/db.js";
 import { eventTypes } from "../eventType/eventTypes.model.js";
 import { templateTimeBlocks } from "../availability/templateTimeBlocks.model.js";
-import { vacationBlocks } from "../../db/schema/vacationBlocks.js";
+import { vacationBlocks } from "../vacation/vacation.model.js";
 import { slots } from "./slots.model.js";
 import { AppError } from "../../core/errors/AppError.js";
 import type { GenerateSlotsInput } from "./slot.schema.js";
