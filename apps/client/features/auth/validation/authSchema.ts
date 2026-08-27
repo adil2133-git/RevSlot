@@ -3,6 +3,8 @@ import { z } from "zod";
 // Public URL slug: /:username/:eventSlug — must mirror the server's rules.
 const usernameSchema = z
   .string()
+  .trim()
+  .toLowerCase()
   .min(3, "At least 3 characters")
   .max(30, "At most 30 characters")
   .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "Lowercase letters, numbers, and hyphens only");

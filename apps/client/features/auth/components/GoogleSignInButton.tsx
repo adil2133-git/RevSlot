@@ -117,6 +117,17 @@ function GoogleSignInButton() {
                 <p className="text-xs text-slate-600">
                     Advisors use this as a fallback if you don&apos;t show up on Meet.
                 </p>
+
+                <input
+                   placeholder="username"
+                   maxLength={30}
+                   {...register("username")}
+                   className="..."
+                 />
+                {errors.username && (
+                    <p className="text-sm text-error">{errors.username.message}</p>
+                )}
+
                 <input
                     placeholder="+91 98765 43210"
                     maxLength={15}
