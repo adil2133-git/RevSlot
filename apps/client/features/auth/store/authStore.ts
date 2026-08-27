@@ -21,6 +21,7 @@ import {
   verifyEmail as verifyEmailApi,
   resendVerification as resendVerificationApi,
   googleAuth as googleAuthApi,
+  updateUsername as updateUsernameApi,
 } from "../api/authApi";
 import { setAccessToken, refreshAccessToken, ApiError } from "@/lib/axios";
 
@@ -75,6 +76,7 @@ type AuthState = {
    *  `.status === 422`) if this is a new Google user and whatsappNumber
    *  wasn't supplied — caller should catch that and re-call with it. */
   googleAuth: (payload: GoogleAuthPayload) => Promise<void>;
+  updateUsername: (username: string) => Promise<void>;
 };
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -223,6 +225,17 @@ export const useAuthStore = create<AuthState>((set) => ({
       const { user, accessToken } = await googleAuthApi(payload);
       setAccessToken(accessToken);
       set({ user, isLoading: false });
+    } catch (err) {
+      set({ isLoading: false, error: (err as Error).message });
+      throw err;
+    }
+  },
+
+  updateUsername: async (username: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const updatedUser = await updateUsernameApi(username);
+      set({ user: updatedUser, isLoading: false });
     } catch (err) {
       set({ isLoading: false, error: (err as Error).message });
       throw err;
