@@ -34,8 +34,9 @@ export default function LoginForm({ role }: LoginFormProps) {
         await loginAsReviewer(values);
       }
       // replace (not push): already logged in, so Back shouldn't
-      // return to the login form.
-      router.replace("/dashboard");
+      // return to the login form. Admins land in the admin console,
+      // reviewers in their own dashboard.
+      router.replace(role === "admin" ? "/admin/dashboard" : "/dashboard");
     } catch {
       // error already captured in store; surfaced below
     }
