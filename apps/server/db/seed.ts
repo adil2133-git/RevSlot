@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import dayjs from "dayjs";
-import { admins } from "../db/schema/admins.js";
+import { admins } from "../modules/admin/admins.model.js";
 import { db, pool } from "../config/db.js";
 import { reviewers } from "../modules/auth/reviewers.model.js";
 import { availabilityTemplates } from "../modules/availability/availabilityTemplates.model.js";
