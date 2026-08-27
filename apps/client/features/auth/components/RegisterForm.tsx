@@ -76,6 +76,24 @@ export default function RegisterForm() {
       </div>
 
       <div>
+  <label htmlFor="username" className="mb-1 block text-[13px] font-semibold text-slate-600">
+    Username
+  </label>
+  <input
+    id="username"
+    type="text"
+    placeholder="john-thomas"
+    autoCapitalize="none"
+    {...register("username")}
+    className="w-full rounded-lg border border-slate-200 bg-slate-50/40 px-4 py-2 text-sm outline-none transition-all placeholder:text-slate-400 hover:border-slate-300 focus:border-primary focus:bg-white focus:ring-4 focus:ring-secondary/50"
+  />
+  <p className="mt-1 text-xs text-slate-400">
+    Your public booking link: revslot.com/{"{username}"}
+  </p>
+  {errors.username && <p className="mt-1 text-xs text-error">{errors.username.message}</p>}
+</div>
+
+      <div>
         <label htmlFor="whatsappNumber" className="mb-1 block text-[13px] font-semibold text-slate-600">
           WhatsApp Number
         </label>

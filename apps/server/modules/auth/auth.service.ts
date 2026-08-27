@@ -141,11 +141,22 @@ export const authService = {
 
     const passwordHash = await bcrypt.hash(data.password, 12);
 
+    const existingUsername = await db
+      .select()
+      .from(reviewers)
+      .where(eq(reviewers.username, data.username))
+      .limit(1);
+
+if (existingUsername.length > 0) {
+  throw new AppError("Username is already taken", 409);
+}
+
     const [newReviewer] = await db
       .insert(reviewers)
       .values({
         name: data.name,
         email: data.email,
+        username: data.username,
         passwordHash,
         whatsappNumber: data.whatsappNumber,
       })
@@ -437,11 +448,26 @@ export const authService = {
           throw new AppError("WhatsApp number is required for new account registration", 422);
         }
 
+        if (!data.username) {
+  throw new AppError("Username is required for new account registration", 422);
+}
+
+const existingUsername = await db
+      .select()
+      .from(reviewers)
+      .where(eq(reviewers.username, data.username))
+      .limit(1);
+
+if (existingUsername.length > 0) {
+  throw new AppError("Username is already taken", 409);
+}
+
         [reviewer] = await db
           .insert(reviewers)
           .values({
             name: name ?? "Reviewer",
             email,
+            username: data.username,
             googleId,
             avatarUrl: picture,
             whatsappNumber: data.whatsappNumber,

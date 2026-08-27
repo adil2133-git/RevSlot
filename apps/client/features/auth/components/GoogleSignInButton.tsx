@@ -95,6 +95,7 @@ function GoogleSignInButton() {
             await googleAuth({
                 idToken: pendingIdToken.current,
                 whatsappNumber: values.whatsappNumber,
+                username: values.username,
             });
             // replace (not push): already signed in, so Back shouldn't
             // return to the WhatsApp-number prompt.
