@@ -116,6 +116,16 @@ export const authController = {
     });
   },
 
+  updateUsername: async (req: Request, res: Response) => {
+    const user = await authService.updateUsername(req.user!.userId, req.user!.role, req.body.username);
+
+    res.status(200).json({
+      success: true,
+      message: "Username updated successfully",
+      data: { user },
+    });
+  },
+
   forgotPassword: async (req: Request, res: Response) => {
     const result = await authService.forgotPassword(req.body);
 

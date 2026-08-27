@@ -14,6 +14,7 @@ import {
     replaceTimeBlocksRequest,
 } from "../api/availability.api";
 import { useAvailabilityStore } from "../store/availability.store";
+import { useAuthStore } from "@/features/auth/store/authStore";
 import { guessTimezone } from "../utils/timezones";
 import { normalizeTime } from "../utils/time";
 
@@ -50,6 +51,7 @@ interface ScheduleFormProps {
 
 export default function ScheduleForm({ mode, templateId }: ScheduleFormProps) {
     const router = useRouter();
+    const user = useAuthStore((state) => state.user);
     const { loadTemplates } = useAvailabilityStore();
 
     const [name, setName] = useState("Working Hours");
@@ -180,6 +182,11 @@ export default function ScheduleForm({ mode, templateId }: ScheduleFormProps) {
     async function handleSave() {
         setError(null);
 
+        if (!user?.username) {
+            setError("Username is required before setting availability. Please set your username first in your profile.");
+            return;
+        }
+
         if (name.trim().length < 2) {
             setError("Name must be at least 2 characters.");
             return;
@@ -231,6 +238,21 @@ export default function ScheduleForm({ mode, templateId }: ScheduleFormProps) {
 
     return (
         <div className="pb-24">
+            {!user?.username && mode === "create" && (
+                <div className="mb-6 rounded-xl border border-error-container bg-error-container/40 p-4 text-sm text-error">
+                    <div className="flex items-center gap-2 font-semibold">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="12" y1="8" x2="12" y2="12" />
+                            <line x1="12" y1="16" x2="12.01" y2="16" />
+                        </svg>
+                        Username Required
+                    </div>
+                    <p className="mt-1">
+                        Username is required before setting availability. Please set your username first in your profile.
+                    </p>
+                </div>
+            )}
             <div className="mb-6 flex items-center justify-between">
                 <h1 className="text-2xl font-semibold tracking-tight text-on-surface">
                     {mode === "create" ? "Add a new schedule" : "Edit schedule"}

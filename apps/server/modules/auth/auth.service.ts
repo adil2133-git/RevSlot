@@ -48,7 +48,9 @@ type AuthUser = Pick <
   "bio" |
   "isActive" |
   "emailVerified"
->;
+> & {
+  username?: string | null;
+};
 
 // Common authentication logic
 const createAuthResponse = async (user: AuthUser, password: string, role: "reviewer" | "admin") => {
@@ -107,6 +109,7 @@ const createAuthResponse = async (user: AuthUser, password: string, role: "revie
     user: {
       id: user.id,
       name: user.name,
+      username: user.username ?? null,
       email: user.email,
       role,
       avatarUrl: user.avatarUrl,
@@ -120,7 +123,7 @@ const createAuthResponse = async (user: AuthUser, password: string, role: "revie
 // proven a different way.
 const issueSession = async (
   role: "reviewer" | "admin",
-  userRow: { id: number; name: string; email: string; avatarUrl: string | null; bio: string | null },
+  userRow: { id: number; name: string; username?: string | null; email: string; avatarUrl: string | null; bio: string | null },
 ) => {
   const payload = { userId: userRow.id, role };
   const { accessToken, refreshToken } = await refreshTokenService.issueTokenPair(payload);
@@ -130,6 +133,7 @@ const issueSession = async (
     user: {
       id: userRow.id,
       name: userRow.name,
+      username: userRow.username ?? null,
       email: userRow.email,
       role,
       avatarUrl: userRow.avatarUrl,
@@ -271,10 +275,51 @@ export const authService = {
     return {
       id: user.id,
       name: user.name,
+      username: ("username" in user ? user.username : null) ?? null,
       email: user.email,
       role,
       avatarUrl: user.avatarUrl,
       bio: user.bio,
+    };
+  },
+
+  // Updates username for a logged-in reviewer
+  updateUsername: async (userId: number, role: "reviewer" | "admin", usernameInput: string) => {
+    if (role !== "reviewer") {
+      throw new AppError("Only reviewers can set a username", 403);
+    }
+
+    const cleanUsername = usernameInput.toLowerCase().trim();
+
+    // Check if username is already taken by another reviewer
+    const [existing] = await db
+      .select({ id: reviewers.id })
+      .from(reviewers)
+      .where(eq(reviewers.username, cleanUsername))
+      .limit(1);
+
+    if (existing && existing.id !== userId) {
+      throw new AppError("Username is already taken", 409);
+    }
+
+    const [updated] = await db
+      .update(reviewers)
+      .set({ username: cleanUsername, updatedAt: new Date() })
+      .where(eq(reviewers.id, userId))
+      .returning();
+
+    if (!updated) {
+      throw new AppError("User not found", 404);
+    }
+
+    return {
+      id: updated.id,
+      name: updated.name,
+      username: updated.username,
+      email: updated.email,
+      role: "reviewer" as const,
+      avatarUrl: updated.avatarUrl,
+      bio: updated.bio,
     };
   },
 
