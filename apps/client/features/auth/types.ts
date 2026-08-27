@@ -22,6 +22,7 @@ export type LoginPayload = {
 export type RegisterPayload = {
   name: string;
   email: string;
+  username: string;
   whatsappNumber: string;
   password: string;
 };
@@ -52,6 +53,7 @@ export type ResendVerificationPayload = {
 export type GoogleAuthPayload = {
   idToken: string;
   whatsappNumber?: string;
+  username?: string;
 };
 
 // ---- Raw backend envelopes ----

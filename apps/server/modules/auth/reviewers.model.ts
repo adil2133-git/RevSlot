@@ -6,7 +6,7 @@ export const reviewers = pgTable(
   {
     id: serial('id').primaryKey(),
     name: varchar('name', { length: 150 }).notNull(),
-    username: varchar('username', {length: 50}).unique(),
+    username: varchar('username', {length: 50}).notNull().unique(),
     email: varchar('email', { length: 255 }).notNull().unique(),
     passwordHash: text('password_hash'),
     googleId: varchar('google_id', { length: 255 }).unique(), // ← new

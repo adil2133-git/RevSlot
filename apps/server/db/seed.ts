@@ -30,6 +30,7 @@ const seed = async () => {
     await db.insert(reviewers).values({
         name: "Test Reviewer",
         email: "reviewer@test.com",
+        username: "test-reviewer",
         passwordHash: reviewerPasswordHash,
         whatsappNumber: "9999999999"
     }).onConflictDoNothing({

@@ -58,7 +58,7 @@ export const eventTypeService = {
     if (!eventType) {
       throw new AppError("Event type not found", 404);
     }
-
+ 
     return { reviewer, eventType };
   },
 

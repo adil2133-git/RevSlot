@@ -1,15 +1,27 @@
 import { z } from "zod";
 
+const usernameSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .min(3, "Username must be at least 3 characters")
+  .max(30, "Username must be at most 30 characters")
+  .regex(
+    /^[a-z0-9]+(-[a-z0-9]+)*$/,
+    "Username can only contain lowercase letters, numbers, and hyphens"
+  );
+
 export const RegisterSchema = z.object({
-    name: z.string().trim().min(2).max(50),
-    email: z.email().trim().toLowerCase(),
-    whatsappNumber: z.string().trim().regex(/^\+?[0-9]{10,15}$/, "Invalid WhatsApp number"),
-    password: z.string().min(8).max(72),
-  });
+  name: z.string().trim().min(2).max(50),
+  email: z.email().trim().toLowerCase(),
+  username: usernameSchema,
+  whatsappNumber: z.string().trim().regex(/^\+?[0-9]{10,15}$/, "Invalid WhatsApp number"),
+  password: z.string().min(8).max(72),
+});
 
 export const LoginSchema = z.object({
-    email: z.email().trim().toLowerCase(),
-    password: z.string().min(8).max(72),
+  email: z.email().trim().toLowerCase(),
+  password: z.string().min(8).max(72),
 });
 
 export const RefreshSchema = z.object({
@@ -38,24 +50,19 @@ export const ResendVerificationSchema = z.object({
 export const GoogleAuthSchema = z.object({
   idToken: z.string().min(1, "ID token is required"),
   whatsappNumber: z.string().trim().regex(/^\+?[0-9]{10,15}$/, "Invalid WhatsApp number").optional(),
+  username: usernameSchema.optional(),
 });
 
 export const UpdateUsernameSchema = z.object({
-  username: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .min(3, "Username must be at least 3 characters")
-    .max(50, "Username must be at most 50 characters")
-    .regex(/^[a-z0-9_-]+$/, "Username can only contain lowercase letters, numbers, underscores, and hyphens"),
+  username: usernameSchema,
 });
 
 export type RegisterInput = z.infer<typeof RegisterSchema>;
-export type LoginInput = z.infer<typeof LoginSchema>
+export type LoginInput = z.infer<typeof LoginSchema>;
 export type RefreshInput = z.infer<typeof RefreshSchema>;
 export type ForgotPasswordInput = z.infer<typeof ForgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof ResetPasswordSchema>;
 export type VerifyEmailInput = z.infer<typeof VerifyEmailSchema>;
 export type ResendVerificationInput = z.infer<typeof ResendVerificationSchema>;
 export type GoogleAuthInput = z.infer<typeof GoogleAuthSchema>;
-export type UpdateUsernameInput = z.infer<typeof UpdateUsernameSchema>;
+export type UpdateUsernameInput = z.infer<typeof UpdateUsernameSchema>;
