@@ -18,11 +18,15 @@ const isProd = process.env.NODE_ENV === "production";
 // secure:true blocks any cookie over plain http://, and domain:
 // '.revslot.com' doesn't match 'localhost' at all — the browser just
 // silently refuses to set it. Hence the isProd branch below.
+const cookieDomain = process.env.COOKIE_DOMAIN !== undefined
+  ? (process.env.COOKIE_DOMAIN || undefined)
+  : (isProd ? ".revslot.com" : undefined);
+
 const REFRESH_COOKIE_OPTIONS = {
   httpOnly: true,
   secure: isProd,
   sameSite: (isProd ? "none" : "lax") as "none" | "lax",
-  ...(isProd ? { domain: ".revslot.com" } : {}),
+  ...(cookieDomain && cookieDomain !== "none" ? { domain: cookieDomain } : {}),
 };
 
 const setRefreshCookie = (res: Response, refreshToken: string) => {
