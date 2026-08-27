@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { PlusIcon } from "@/features/vacation/components/icons";
 
-import VacationCard from "@/features/vacation/components/vacationCard";
+import VacationCard from "@/features/vacation/components/VacationCard";
 import {
   listVacationBlocks,
   deleteVacationBlock,
@@ -11,6 +12,8 @@ import {
 } from "@/features/vacation/api/vacationApi";
 
 export default function VacationPage() {
+  const router = useRouter();
+
   const [blocks, setBlocks] = useState<VacationBlock[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,13 +48,11 @@ export default function VacationPage() {
   };
 
   const handleEdit = (block: VacationBlock) => {
-    // wired up once the Create/Edit modal is built
-    console.log("edit", block);
+    router.push(`/dashboard/vacation/${block.id}/edit`);
   };
 
   const handleCreate = () => {
-    // wired up once the Create/Edit modal is built
-    console.log("create new");
+    router.push("/dashboard/vacation/new");
   };
 
   return (
