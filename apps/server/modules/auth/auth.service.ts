@@ -5,7 +5,7 @@ import { eq, type InferSelectModel } from "drizzle-orm";
 import { db } from "../../config/db.js";
 
 import { reviewers } from "./reviewers.model.js";
-import { admins } from "../../db/schema/admins.js";
+import { admins } from "../admin/admins.model.js";
 
 import { AppError } from "../../core/errors/AppError.js";
 
@@ -72,8 +72,13 @@ const createAuthResponse = async (user: AuthUser, password: string, role: "revie
     throw new AppError("Invalid email or password", 401);
   }
 
-  // Hard-block login until the email is verified via OTP
-  if (!user.emailVerified) {
+  // Hard-block login until the email is verified via OTP — but only for
+  // reviewers. Admins have no self-registration or verification-email
+  // flow at all (accounts are provisioned directly, e.g. via db/seed.ts),
+  // so there is nothing that could ever flip emailVerified to true for a
+  // real admin account. Applying this gate to admins would just be a
+  // permanent lockout, not a real security check.
+  if (role === "reviewer" && !user.emailVerified) {
     throw new AppError("Please verify your email before logging in", 403);
   }
 

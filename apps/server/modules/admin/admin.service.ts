@@ -1,9 +1,9 @@
 import dayjs from "dayjs";
 import { eq, and, or, ilike, sql, gte, lte, desc, count } from "drizzle-orm";
 import { db } from "../../config/db.js";
-import { reviewers } from "../../db/schema/reviewers.js";
-import { bookings } from "../../db/schema/bookings.js";
-import { eventTypes } from "../../db/schema/eventTypes.js";
+import { reviewers } from "../auth/reviewers.model.js";
+import { bookings } from "../booking/bookings.model.js";
+import { eventTypes } from "../eventType/eventTypes.model.js";
 import { AppError } from "../../core/errors/AppError.js";
 import type {
   ListReviewersQuery,
