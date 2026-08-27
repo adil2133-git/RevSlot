@@ -1,5 +1,5 @@
 export * from './schema/enums.js';
-export * from './schema/admins.js';
+export * from '../modules/admin/admins.model.js';
 export * from '../modules/auth/reviewers.model.js';
 export * from '../modules/availability/availabilityTemplates.model.js';
 export * from '../modules/availability/templateTimeBlocks.model.js';

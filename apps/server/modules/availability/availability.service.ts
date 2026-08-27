@@ -164,7 +164,15 @@ export const availabilityService = {
       throw new AppError("A template with this name already exists", 409);
     }
 
-    if (data.isDefault) {
+    const userTemplates = await db
+      .select({ id: availabilityTemplates.id })
+      .from(availabilityTemplates)
+      .where(eq(availabilityTemplates.reviewerId, reviewerId));
+
+    const isFirst = userTemplates.length === 0;
+    const shouldBeDefault = Boolean(data.isDefault || isFirst);
+
+    if (shouldBeDefault) {
       await db
         .update(availabilityTemplates)
         .set({ isDefault: false, updatedAt: new Date() })
@@ -178,7 +186,7 @@ export const availabilityService = {
         name: data.name,
         description: data.description,
         timezone: data.timezone,
-        isDefault: data.isDefault,
+        isDefault: shouldBeDefault,
       })
       .returning();
 
@@ -249,7 +257,15 @@ export const availabilityService = {
       }
     }
 
-    if (data.isDefault) {
+    const userTemplates = await db
+      .select({ id: availabilityTemplates.id })
+      .from(availabilityTemplates)
+      .where(eq(availabilityTemplates.reviewerId, reviewerId));
+
+    const isOnlyTemplate = userTemplates.length === 1;
+    const finalIsDefault = isOnlyTemplate ? true : data.isDefault;
+
+    if (finalIsDefault) {
       await db
         .update(availabilityTemplates)
         .set({ isDefault: false, updatedAt: new Date() })
@@ -261,9 +277,14 @@ export const availabilityService = {
         );
     }
 
+    const updateData = { ...data };
+    if (finalIsDefault !== undefined) {
+      updateData.isDefault = finalIsDefault;
+    }
+
     const [updated] = await db
       .update(availabilityTemplates)
-      .set({ ...data, updatedAt: new Date() })
+      .set({ ...updateData, updatedAt: new Date() })
       .where(eq(availabilityTemplates.id, templateId))
       .returning();
 
@@ -277,6 +298,30 @@ export const availabilityService = {
     await db
       .delete(availabilityTemplates)
       .where(eq(availabilityTemplates.id, templateId));
+
+    const remaining = await db
+      .select()
+      .from(availabilityTemplates)
+      .where(eq(availabilityTemplates.reviewerId, reviewerId))
+      .orderBy(asc(availabilityTemplates.createdAt));
+
+    const firstRemaining = remaining[0];
+    if (remaining.length === 1 && firstRemaining) {
+      if (!firstRemaining.isDefault) {
+        await db
+          .update(availabilityTemplates)
+          .set({ isDefault: true, updatedAt: new Date() })
+          .where(eq(availabilityTemplates.id, firstRemaining.id));
+      }
+    } else if (remaining.length > 1 && firstRemaining) {
+      const hasDefault = remaining.some((t) => t.isDefault);
+      if (!hasDefault) {
+        await db
+          .update(availabilityTemplates)
+          .set({ isDefault: true, updatedAt: new Date() })
+          .where(eq(availabilityTemplates.id, firstRemaining.id));
+      }
+    }
 
     return { id: templateId };
   },

@@ -13,6 +13,7 @@ import {
     getTemplateByIdRequest,
     replaceTimeBlocksRequest,
 } from "../api/availability.api";
+import { useAvailabilityStore } from "../store/availability.store";
 import { guessTimezone } from "../utils/timezones";
 import { normalizeTime } from "../utils/time";
 
@@ -49,10 +50,12 @@ interface ScheduleFormProps {
 
 export default function ScheduleForm({ mode, templateId }: ScheduleFormProps) {
     const router = useRouter();
+    const { loadTemplates } = useAvailabilityStore();
 
     const [name, setName] = useState("Working Hours");
     const [tz, setTz] = useState(guessTimezone());
     const [isDefault, setIsDefault] = useState(false);
+    const [isOnlyTemplate, setIsOnlyTemplate] = useState(false);
     const [days, setDays] = useState<DaysState>(defaultDaysState());
     const [overrides, setOverrides] = useState<DateOverride[]>([]);
     const [savedTemplateId, setSavedTemplateId] = useState<number | null>(templateId ?? null);
@@ -60,6 +63,29 @@ export default function ScheduleForm({ mode, templateId }: ScheduleFormProps) {
     const [loading, setLoading] = useState(mode === "edit");
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        (async () => {
+            try {
+                await loadTemplates();
+                const currentTemplates = useAvailabilityStore.getState().templates;
+
+                if (mode === "create") {
+                    if (currentTemplates.length === 0) {
+                        setIsDefault(true);
+                        setIsOnlyTemplate(true);
+                    }
+                } else if (mode === "edit" && templateId) {
+                    if (currentTemplates.length === 1) {
+                        setIsDefault(true);
+                        setIsOnlyTemplate(true);
+                    }
+                }
+            } catch (err) {
+                // non-critical check failure
+            }
+        })();
+    }, [mode, templateId, loadTemplates]);
 
     useEffect(() => {
         if (mode !== "edit" || !templateId) return;
@@ -180,12 +206,13 @@ export default function ScheduleForm({ mode, templateId }: ScheduleFormProps) {
         setSaving(true);
         try {
             let id = templateId;
+            const targetDefault = isOnlyTemplate ? true : isDefault;
             if (mode === "create") {
-                const template = await createTemplateRequest({ name: name.trim(), timezone: tz, isDefault });
+                const template = await createTemplateRequest({ name: name.trim(), timezone: tz, isDefault: targetDefault });
                 id = template.id;
                 setSavedTemplateId(id);
             } else if (id) {
-                await updateTemplateRequest(id, { name: name.trim(), timezone: tz, isDefault });
+                await updateTemplateRequest(id, { name: name.trim(), timezone: tz, isDefault: targetDefault });
             }
             if (id) {
                 await replaceTimeBlocksRequest(id, blocksPayload);
@@ -270,10 +297,18 @@ export default function ScheduleForm({ mode, templateId }: ScheduleFormProps) {
             />
 
             <div className="mt-6 flex items-center gap-3 border-t border-slate-100 pt-5">
-                <Switch checked={isDefault} onChange={() => setIsDefault((v) => !v)} />
+                <Switch
+                    checked={isDefault || isOnlyTemplate}
+                    disabled={isOnlyTemplate}
+                    onChange={() => !isOnlyTemplate && setIsDefault((v) => !v)}
+                />
                 <div>
                     <p className="text-sm font-medium text-on-surface">Set as default</p>
-                    <p className="text-xs text-slate-400">This schedule will be used by default for new event types</p>
+                    <p className="text-xs text-slate-400">
+                        {isOnlyTemplate
+                            ? "This is your only schedule, so it is automatically set as default"
+                            : "This schedule will be used by default for new event types"}
+                    </p>
                 </div>
             </div>
 

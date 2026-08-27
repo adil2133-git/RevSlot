@@ -1,9 +1,9 @@
 import dayjs from "dayjs";
 import { eq, and, or, ilike, sql, gte, lte, desc, count } from "drizzle-orm";
 import { db } from "../../config/db.js";
-import { reviewers } from "../../db/schema/reviewers.js";
-import { bookings } from "../../db/schema/bookings.js";
-import { eventTypes } from "../../db/schema/eventTypes.js";
+import { reviewers } from "../auth/reviewers.model.js";
+import { bookings } from "../booking/bookings.model.js";
+import { eventTypes } from "../eventType/eventTypes.model.js";
 import { AppError } from "../../core/errors/AppError.js";
 import type {
   ListReviewersQuery,
@@ -27,7 +27,7 @@ export const adminService = {
 
     const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-    const [rows, [{ total }]] = await Promise.all([
+    const [rows, totalResult] = await Promise.all([
       db
         .select({
           id: reviewers.id,
@@ -45,6 +45,8 @@ export const adminService = {
         .offset((page - 1) * limit),
       db.select({ total: count() }).from(reviewers).where(where),
     ]);
+
+    const total = totalResult[0]?.total ?? 0;
 
     return {
       reviewers: rows,
@@ -85,7 +87,7 @@ export const adminService = {
 
     const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-    const [rows, [{ total }]] = await Promise.all([
+    const [rows, totalResult] = await Promise.all([
       db
         .select({
           id: bookings.id,
@@ -110,6 +112,8 @@ export const adminService = {
       db.select({ total: count() }).from(bookings).where(where),
     ]);
 
+    const total = totalResult[0]?.total ?? 0;
+
     return {
       bookings: rows,
       pagination: { page, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) },
@@ -128,12 +132,12 @@ export const adminService = {
     const lastWeekEnd = now.subtract(1, "week").endOf("week").toDate();
 
     const [
-      [{ totalReviewers }],
-      [{ activeReviewers }],
-      [{ bookingsThisWeek }],
-      [{ bookingsLastWeek }],
-      [{ totalCompletedOrNoShow }],
-      [{ noShowCount }],
+      totalReviewersResult,
+      activeReviewersResult,
+      bookingsThisWeekResult,
+      bookingsLastWeekResult,
+      totalCompletedOrNoShowResult,
+      noShowCountResult,
     ] = await Promise.all([
       db.select({ totalReviewers: count() }).from(reviewers),
       db.select({ activeReviewers: count() }).from(reviewers).where(eq(reviewers.isActive, true)),
@@ -154,6 +158,13 @@ export const adminService = {
         .where(sql`${bookings.status} IN ('completed', 'no_show')`),
       db.select({ noShowCount: count() }).from(bookings).where(eq(bookings.status, "no_show")),
     ]);
+
+    const totalReviewers = totalReviewersResult[0]?.totalReviewers ?? 0;
+    const activeReviewers = activeReviewersResult[0]?.activeReviewers ?? 0;
+    const bookingsThisWeek = bookingsThisWeekResult[0]?.bookingsThisWeek ?? 0;
+    const bookingsLastWeek = bookingsLastWeekResult[0]?.bookingsLastWeek ?? 0;
+    const totalCompletedOrNoShow = totalCompletedOrNoShowResult[0]?.totalCompletedOrNoShow ?? 0;
+    const noShowCount = noShowCountResult[0]?.noShowCount ?? 0;
 
     const bookingsWeekChangePct =
       bookingsLastWeek === 0

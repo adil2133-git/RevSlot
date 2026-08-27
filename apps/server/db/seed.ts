@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import dayjs from "dayjs";
 import { db } from "../config/db.js";
-import { admins } from "../db/schema/admins.js";
+import { admins } from "../modules/admin/admins.model.js";
 import { reviewers } from "../modules/auth/reviewers.model.js";
 import { availabilityTemplates } from "../modules/availability/availabilityTemplates.model.js";
 import { templateTimeBlocks } from "../modules/availability/templateTimeBlocks.model.js";
@@ -16,7 +16,8 @@ const seed = async () => {
     await db.insert(admins).values({
         name: "Test Admin",
         email: "admin@test.com",
-        passwordHash
+        passwordHash,
+        emailVerified: true
     }).onConflictDoNothing({
         target: admins.email
     });
