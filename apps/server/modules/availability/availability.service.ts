@@ -8,6 +8,7 @@ import { templateDateOverrides } from "./templateDateOverrides.model.js";
 import { templateOverrideBlocks } from "./templateDateOverrideBlocks.model.js";
 import { eventTypes } from "../eventType/eventTypes.model.js";
 import { bookings } from "../booking/bookings.model.js";
+import { reviewers } from "../auth/reviewers.model.js";
 import type { CreateDateOverrideInput } from "./availability.schema.js";
 
 import { AppError } from "../../core/errors/AppError.js";
@@ -149,6 +150,16 @@ export const availabilityService = {
 
   // Creates a new availability template for the reviewer, rejecting duplicate names
   createTemplate: async (reviewerId: number, data: CreateTemplateInput) => {
+    // Check if reviewer has a username set before allowing availability creation
+    const [reviewer] = await db
+      .select({ username: reviewers.username })
+      .from(reviewers)
+      .where(eq(reviewers.id, reviewerId))
+      .limit(1);
+
+    if (!reviewer || !reviewer.username || reviewer.username.trim().length === 0) {
+      throw new AppError("Username is required before setting availability", 400);
+    }
     const [existing] = await db
       .select()
       .from(availabilityTemplates)

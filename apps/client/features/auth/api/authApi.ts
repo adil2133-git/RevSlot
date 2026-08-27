@@ -86,3 +86,8 @@ export async function googleAuth(payload: GoogleAuthPayload) {
   return { user: data.data.user, accessToken: data.data.accessToken };
 }
 
+export async function updateUsername(username: string) {
+  const { data } = await api.patch<MeResponse>("/auth/profile/username", { username });
+  return data.data.user;
+}
+

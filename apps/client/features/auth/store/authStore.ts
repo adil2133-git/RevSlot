@@ -21,8 +21,26 @@ import {
   verifyEmail as verifyEmailApi,
   resendVerification as resendVerificationApi,
   googleAuth as googleAuthApi,
+  updateUsername as updateUsernameApi,
 } from "../api/authApi";
 import { setAccessToken, refreshAccessToken, ApiError } from "@/lib/axios";
+
+// Shape of the `details` the backend attaches to the 403 thrown by
+// createAuthResponse() when a reviewer logs in before verifying their
+// email (see auth.service.ts). Narrowed with a type guard since
+// ApiError.details comes in as `unknown`.
+type RequiresVerificationDetails = { requiresVerification: true; email: string };
+
+function isRequiresVerificationDetails(
+  details: unknown
+): details is RequiresVerificationDetails {
+  return (
+    typeof details === "object" &&
+    details !== null &&
+    (details as Record<string, unknown>).requiresVerification === true &&
+    typeof (details as Record<string, unknown>).email === "string"
+  );
+}
 
 type AuthState = {
   user: AuthUser | null;
@@ -58,6 +76,7 @@ type AuthState = {
    *  `.status === 422`) if this is a new Google user and whatsappNumber
    *  wasn't supplied — caller should catch that and re-call with it. */
   googleAuth: (payload: GoogleAuthPayload) => Promise<void>;
+  updateUsername: (username: string) => Promise<void>;
 };
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -74,6 +93,17 @@ export const useAuthStore = create<AuthState>((set) => ({
       setAccessToken(accessToken);
       set({ user, isLoading: false });
     } catch (err) {
+      // Unverified account — the backend confirms it exists and sends
+      // the email back in `details`. Populate pendingVerificationEmail
+      // from that (not from a prior register() call, which may never
+      // have happened in this session — e.g. the user registered,
+      // closed the tab before verifying, and came back to log in
+      // instead) so /verify-email has what it needs. Still rethrown:
+      // the caller (LoginForm) is what actually redirects there.
+      if (err instanceof ApiError && err.status === 403 && isRequiresVerificationDetails(err.details)) {
+        set({ isLoading: false, error: null, pendingVerificationEmail: err.details.email });
+        throw err;
+      }
       set({ isLoading: false, error: (err as Error).message });
       throw err;
     }
@@ -195,6 +225,17 @@ export const useAuthStore = create<AuthState>((set) => ({
       const { user, accessToken } = await googleAuthApi(payload);
       setAccessToken(accessToken);
       set({ user, isLoading: false });
+    } catch (err) {
+      set({ isLoading: false, error: (err as Error).message });
+      throw err;
+    }
+  },
+
+  updateUsername: async (username: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const updatedUser = await updateUsernameApi(username);
+      set({ user: updatedUser, isLoading: false });
     } catch (err) {
       set({ isLoading: false, error: (err as Error).message });
       throw err;

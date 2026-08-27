@@ -48,7 +48,9 @@ type AuthUser = Pick <
   "bio" |
   "isActive" |
   "emailVerified"
->;
+> & {
+  username?: string | null;
+};
 
 // Common authentication logic
 const createAuthResponse = async (user: AuthUser, password: string, role: "reviewer" | "admin") => {
@@ -78,8 +80,17 @@ const createAuthResponse = async (user: AuthUser, password: string, role: "revie
   // so there is nothing that could ever flip emailVerified to true for a
   // real admin account. Applying this gate to admins would just be a
   // permanent lockout, not a real security check.
+  //
+  // `details` carries the email back to the client so the frontend can
+  // route straight to /verify-email even when it has no other record of
+  // this account (e.g. the user closed the tab after registering and
+  // lost the in-memory pendingVerificationEmail, then came back and
+  // tried to log in instead of registering again).
   if (role === "reviewer" && !user.emailVerified) {
-    throw new AppError("Please verify your email before logging in", 403);
+    throw new AppError("Please verify your email before logging in", 403, {
+      requiresVerification: true,
+      email: user.email,
+    });
   }
 
   // Create JWT payload
@@ -98,6 +109,7 @@ const createAuthResponse = async (user: AuthUser, password: string, role: "revie
     user: {
       id: user.id,
       name: user.name,
+      username: user.username ?? null,
       email: user.email,
       role,
       avatarUrl: user.avatarUrl,
@@ -111,7 +123,7 @@ const createAuthResponse = async (user: AuthUser, password: string, role: "revie
 // proven a different way.
 const issueSession = async (
   role: "reviewer" | "admin",
-  userRow: { id: number; name: string; email: string; avatarUrl: string | null; bio: string | null },
+  userRow: { id: number; name: string; username?: string | null; email: string; avatarUrl: string | null; bio: string | null },
 ) => {
   const payload = { userId: userRow.id, role };
   const { accessToken, refreshToken } = await refreshTokenService.issueTokenPair(payload);
@@ -121,6 +133,7 @@ const issueSession = async (
     user: {
       id: userRow.id,
       name: userRow.name,
+      username: userRow.username ?? null,
       email: userRow.email,
       role,
       avatarUrl: userRow.avatarUrl,
@@ -273,10 +286,51 @@ if (existingUsername.length > 0) {
     return {
       id: user.id,
       name: user.name,
+      username: ("username" in user ? user.username : null) ?? null,
       email: user.email,
       role,
       avatarUrl: user.avatarUrl,
       bio: user.bio,
+    };
+  },
+
+  // Updates username for a logged-in reviewer
+  updateUsername: async (userId: number, role: "reviewer" | "admin", usernameInput: string) => {
+    if (role !== "reviewer") {
+      throw new AppError("Only reviewers can set a username", 403);
+    }
+
+    const cleanUsername = usernameInput.toLowerCase().trim();
+
+    // Check if username is already taken by another reviewer
+    const [existing] = await db
+      .select({ id: reviewers.id })
+      .from(reviewers)
+      .where(eq(reviewers.username, cleanUsername))
+      .limit(1);
+
+    if (existing && existing.id !== userId) {
+      throw new AppError("Username is already taken", 409);
+    }
+
+    const [updated] = await db
+      .update(reviewers)
+      .set({ username: cleanUsername, updatedAt: new Date() })
+      .where(eq(reviewers.id, userId))
+      .returning();
+
+    if (!updated) {
+      throw new AppError("User not found", 404);
+    }
+
+    return {
+      id: updated.id,
+      name: updated.name,
+      username: updated.username,
+      email: updated.email,
+      role: "reviewer" as const,
+      avatarUrl: updated.avatarUrl,
+      bio: updated.bio,
     };
   },
 
