@@ -8,6 +8,8 @@ import { vacationBlocks } from "../vacation/vacation.model.js";
 import { slots } from "./slots.model.js";
 import { AppError } from "../../core/errors/AppError.js";
 import type { HoldSlotInput, ReleaseSlotInput } from "./slot.schema.js";
+import { templateDateOverrides } from "../availability/templateDateOverrides.model.js";
+import { templateOverrideBlocks } from "../availability/templateDateOverrideBlocks.model.js";
 
 type TimeBlockLike = { startTime: string, endTime: string };
 type Candidate = { slotDate: string; startTime: string; endTime: string};
