@@ -68,13 +68,17 @@ export function refreshAccessToken(): Promise<string> {
 
 // Small typed error so callers can branch on status (e.g. Google auth's
 // 422 "WhatsApp number required for new account") without re-parsing
-// axios internals.
+// axios internals. `details` mirrors whatever the backend's AppError
+// attached (see error.middleware.ts) — e.g. login's 403 "please verify
+// your email" response includes { requiresVerification, email }.
 export class ApiError extends Error {
   status?: number;
-  constructor(message: string, status?: number) {
+  details?: unknown;
+  constructor(message: string, status?: number, details?: unknown) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.details = details;
   }
 }
 
@@ -105,7 +109,9 @@ api.interceptors.response.use(
 
     const message =
       error.response?.data?.message ?? error.message ?? "Something went wrong";
-    return Promise.reject(new ApiError(message, error.response?.status));
+    return Promise.reject(
+      new ApiError(message, error.response?.status, error.response?.data?.details)
+    );
   }
 );
 

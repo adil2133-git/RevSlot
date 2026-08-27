@@ -78,8 +78,17 @@ const createAuthResponse = async (user: AuthUser, password: string, role: "revie
   // so there is nothing that could ever flip emailVerified to true for a
   // real admin account. Applying this gate to admins would just be a
   // permanent lockout, not a real security check.
+  //
+  // `details` carries the email back to the client so the frontend can
+  // route straight to /verify-email even when it has no other record of
+  // this account (e.g. the user closed the tab after registering and
+  // lost the in-memory pendingVerificationEmail, then came back and
+  // tried to log in instead of registering again).
   if (role === "reviewer" && !user.emailVerified) {
-    throw new AppError("Please verify your email before logging in", 403);
+    throw new AppError("Please verify your email before logging in", 403, {
+      requiresVerification: true,
+      email: user.email,
+    });
   }
 
   // Create JWT payload
