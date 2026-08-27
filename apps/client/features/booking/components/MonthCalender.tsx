@@ -9,6 +9,7 @@ type MonthCalendarProps = {
   selectedDate: string;
   setSelectedDate: (date: string) => void;
   availableCountByDate: Record<string, number>;
+  bookingWindowDays: number;
 };
 
 export default function MonthCalendar({
@@ -18,7 +19,10 @@ export default function MonthCalendar({
   selectedDate,
   setSelectedDate,
   availableCountByDate,
+  bookingWindowDays,
 }: MonthCalendarProps) {
+  const maxBookableDate = dayjs().add(bookingWindowDays, "day");
+  const nextMonthDisabled = visibleMonth.format("YYYY-MM") >= maxBookableDate.format("YYYY-MM");
   return (
     <div className="mb-5 rounded-xl border border-slate-200 p-4">
       <div className="mb-3 flex items-center justify-between">
@@ -37,6 +41,7 @@ export default function MonthCalendar({
         </p>
         <button
           onClick={() => setVisibleMonth((m) => m.add(1, "month"))}
+          disabled={nextMonthDisabled}
           aria-label="Next month"
           className="rounded-md p-1 text-slate-500 hover:bg-slate-100"
         >
@@ -58,6 +63,7 @@ export default function MonthCalendar({
           const isPast = day.isBefore(dayjs(), "day");
           const isToday = day.isSame(dayjs(), "day");
           const isSelected = dateStr === selectedDate;
+          const isBeyondWindow = day.isAfter(maxBookableDate, "day");
           const availableCount = availableCountByDate[dateStr] ?? 0;
           const clickable = inMonth && !isPast;
 
@@ -69,12 +75,12 @@ export default function MonthCalendar({
               className={`relative rounded-lg py-2 text-sm ${
                 !inMonth
                   ? "text-slate-300"
-                  : isPast
+                  : isPast || isBeyondWindow
                   ? "text-slate-300"
                   : isSelected
-                  ? "bg-slate-900 font-medium text-white"
+                  ? "bg-primary font-medium text-on-primary"
                   : isToday
-                  ? "bg-slate-100 font-medium text-on-surface"
+                  ? "bg-secondary font-medium text-on-surface"
                   : "text-on-surface hover:bg-slate-100"
               } disabled:cursor-default`}
             >
@@ -83,7 +89,7 @@ export default function MonthCalendar({
                 <span
                   className={`absolute bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full ${
                     isSelected
-                      ? "bg-white"
+                      ? "bg-on-primary"
                       : availableCount > 0
                       ? "bg-emerald-500"
                       : "bg-slate-300"

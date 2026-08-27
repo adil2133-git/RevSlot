@@ -17,6 +17,22 @@ export const validate = (schema: ZodType) => {
   };
 };
 
+export const validateQuery = (schema: ZodType) => {
+   return (req: Request, res: Response, next: NextFunction) => {
+     const result = schema.safeParse(req.query);
+
+     if (!result.success) {
+       const message = result.error.issues
+       .map((issue) => issue.message).join(', ');
+
+       return next(new AppError(message, 400));
+     }
+     // Zod-parsed (coerced) query goes on res.locals — req.query itself is
+     // getter-only in newer Express versions and can't be reassigned.
+    res.locals.query = result.data;
+     next();
+   };
+ };
 
 export const validateParams = (schema: ZodType) => {
   return (req: Request, res: Response, next: NextFunction) => {

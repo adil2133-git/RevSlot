@@ -1,7 +1,7 @@
 import { eq, and, asc, sql } from "drizzle-orm";
 import { db } from "../../config/db.js";
-import { questionBanks } from "../../db/schema/questionBanks.js";
-import { questions } from "../../db/schema/questions.js";
+import { questionBanks } from "./questionBanks.model.js";
+import { questions } from "./questions.model.js";
 import { AppError } from "../../core/errors/AppError.js";
 import type {
   CreateBankInput,

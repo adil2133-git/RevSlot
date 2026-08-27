@@ -12,17 +12,32 @@ export type BookingPageInfo = {
     durationMinutes: number;
     description: string | null;
     timezone: string;
+    bookingWindowDays: number;
   };
 };
 
+export type ReviewerProfile = {
+  reviewer: {
+    id: number;
+    name: string;
+    avatarUrl: string | null;
+    bio: string | null;
+  };
+  eventTypes: {
+    id: number;
+    name: string;
+    slug: string;
+    description: string | null;
+    durationMinutes: number;
+    price: number;
+  }[];
+};
+
 export type SlotItem = {
-  id: number;
   eventTypeId: number;
-  reviewerId: number;
-  slotDate: string;
+  date: string;
   startTime: string;
   endTime: string;
-  status: "available" | "held" | "booked" | "unavailable" | "completed" | "no_show";
 };
 
 export type HoldResult = {

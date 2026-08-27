@@ -45,8 +45,7 @@ export function useAvailableSlots(eventTypeId: number | undefined) {
   const availableCountByDate = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const s of slots) {
-      if (s.status !== "available") continue;
-      counts[s.slotDate] = (counts[s.slotDate] ?? 0) + 1;
+      counts[s.date] = (counts[s.date] ?? 0) + 1;
     }
     return counts;
   }, [slots]);

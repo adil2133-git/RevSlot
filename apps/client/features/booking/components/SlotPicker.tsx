@@ -33,7 +33,7 @@ export default function SlotPicker({
           <button
             onClick={() => setUse12Hour(true)}
             className={`rounded-md px-2 py-1 ${
-              use12Hour ? "bg-slate-900 text-white" : "text-slate-500"
+              use12Hour ? "bg-primary text-on-primary" : "text-slate-500"
             }`}
           >
             12h
@@ -41,7 +41,7 @@ export default function SlotPicker({
           <button
             onClick={() => setUse12Hour(false)}
             className={`rounded-md px-2 py-1 ${
-              !use12Hour ? "bg-slate-900 text-white" : "text-slate-500"
+              !use12Hour ? "bg-primary text-on-primary" : "text-slate-500"
             }`}
           >
             24h
@@ -98,10 +98,10 @@ export default function SlotPicker({
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {slotsForSelectedDate.map((slot) => (
             <button
-              key={slot.id}
+              key={`${slot.date}-${slot.startTime}`}
               disabled={holding}
               onClick={() => onSelectSlot(slot)}
-              className="rounded-lg border border-slate-300 bg-surface-card px-3 py-2 text-sm text-on-surface hover:border-slate-900 disabled:opacity-50"
+              className="rounded-lg border border-slate-300 bg-surface-card px-3 py-2 text-sm text-on-surface hover:border-primary disabled:opacity-50"
             >
               {formatSlotTime(slot.startTime, use12Hour)}
             </button>
@@ -109,7 +109,7 @@ export default function SlotPicker({
         </div>
       )}
 
-      {holdError && <p className="mt-4 text-sm text-red-600">{holdError}</p>}
+      {holdError && <p className="mt-4 text-sm text-error">{holdError}</p>}
     </>
   );
 }

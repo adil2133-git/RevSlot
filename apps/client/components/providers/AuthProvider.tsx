@@ -17,6 +17,8 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     pathnameRef.current = pathname;
   }, [pathname]);
 
+  const hasHydrated = useRef(false)
+
   useEffect(() => {
     onSessionExpired(() => {
       logoutLocal();
@@ -26,8 +28,11 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         router.push("/login/reviewer");
       }
     });
+      if (!hasHydrated.current) {
+    hasHydrated.current = true;
     hydrate();
-  }, []);
+  }
+ }, []);
 
   if (!isHydrated) {
     return (
