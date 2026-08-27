@@ -4,7 +4,10 @@ import type { ListReviewersQuery, ListBookingsQuery } from "./admin.schema.js";
 
 export const adminController = {
   listReviewers: async (req: Request, res: Response) => {
-    const result = await adminService.listReviewers(req.query as unknown as ListReviewersQuery);
+    // validateQuery puts the parsed/defaulted query on res.locals.query —
+    // req.query is read-only in this Express version and can't be reassigned.
+    const query = res.locals.query as ListReviewersQuery;
+    const result = await adminService.listReviewers(query);
     res.status(200).json({ success: true, data: result });
   },
 
@@ -15,7 +18,8 @@ export const adminController = {
   },
 
   listBookings: async (req: Request, res: Response) => {
-    const result = await adminService.listBookings(req.query as unknown as ListBookingsQuery);
+    const query = res.locals.query as ListBookingsQuery;
+    const result = await adminService.listBookings(query);
     res.status(200).json({ success: true, data: result });
   },
 
