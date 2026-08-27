@@ -4,7 +4,7 @@ export * from '../modules/auth/reviewers.model.js';
 export * from '../modules/availability/availabilityTemplates.model.js';
 export * from '../modules/availability/templateTimeBlocks.model.js';
 export * from '../modules/eventType/eventTypes.model.js';
-export * from './schema/vacationBlocks.js';
+export * from '../modules/vacation/vacation.model.js';
 export * from '../modules/slot/slots.model.js';
 export * from '../modules/booking/bookings.model.js';
 export * from '../modules/questionBank/questionBanks.model.js';

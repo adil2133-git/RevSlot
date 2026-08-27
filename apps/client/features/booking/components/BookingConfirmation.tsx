@@ -26,7 +26,7 @@ export default function BookingConfirmation({
         </h1>
         {heldSlot && (
           <p className="mt-1 text-sm font-medium text-on-surface">
-            {dayjs(heldSlot.slotDate).format("ddd, MMM D")} ·{" "}
+            {dayjs(heldSlot.date).format("ddd, MMM D")} ·{" "}
             {formatSlotTime(heldSlot.startTime, use12Hour)}–
             {formatSlotTime(heldSlot.endTime, use12Hour)}{" "}
             ({pageInfo.eventType.timezone})

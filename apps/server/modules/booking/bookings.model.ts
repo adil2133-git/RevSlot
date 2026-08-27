@@ -25,5 +25,8 @@ export const bookings = pgTable('bookings', {
 
   status: bookingStatus('status').default('confirmed'),
 
+  cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+  cancelledReason: varchar('cancelled_reason', { length: 255 }),
+
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });

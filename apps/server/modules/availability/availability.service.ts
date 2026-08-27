@@ -1,4 +1,4 @@
-import { eq, and, asc, inArray, ne } from "drizzle-orm";
+import { eq, and, asc, inArray, ne, sql } from "drizzle-orm";
 import { db } from "../../config/db.js";
 
 import { availabilityTemplates } from "./availabilityTemplates.model.js";
@@ -6,6 +6,8 @@ import { templateTimeBlocks } from "./templateTimeBlocks.model.js";
 
 import { templateDateOverrides } from "./templateDateOverrides.model.js";
 import { templateOverrideBlocks } from "./templateDateOverrideBlocks.model.js";
+import { eventTypes } from "../eventType/eventTypes.model.js";
+import { bookings } from "../booking/bookings.model.js";
 import type { CreateDateOverrideInput } from "./availability.schema.js";
 
 import { AppError } from "../../core/errors/AppError.js";
@@ -15,6 +17,7 @@ import type {
   UpdateTemplateInput,
   ReplaceTimeBlocksInput,
 } from "./availability.schema.js";
+import dayjs from "dayjs";
 
 let cachedTimezones: { value: string; label: string }[] | null = null;
 
@@ -69,6 +72,67 @@ const getOwnedTemplateOrThrow = async (reviewerId: number, templateId: number) =
   }
 
   return template;
+};
+
+// Checks whether an existing booking's time still fits inside the given
+// time blocks. If blocks is empty (fully unavailable), nothing fits.
+const bookingFitsInBlocks = (
+  bookingStart: Date,
+  bookingEnd: Date,
+  blocks: { startTime: string; endTime: string }[],
+  overrideDate: string
+) => {
+  if (blocks.length === 0) return false;
+
+  const bookingStartTime = dayjs(bookingStart).format("HH:mm:ss");
+  const bookingEndTime = dayjs(bookingEnd).format("HH:mm:ss");
+
+  return blocks.some(
+    (block) => bookingStartTime >= block.startTime && bookingEndTime <= block.endTime
+  );
+};
+
+// Finds bookings on the override's date (under event types using this
+// template) whose time no longer fits the new/absent availability.
+const findConflictingBookings = async (
+  templateId: number,
+  date: string,
+  isUnavailable: boolean,
+  newBlocks: { startTime: string; endTime: string }[]
+) => {
+  // 1. Find all event types using this template
+  const relatedEventTypes = await db
+    .select({ id: eventTypes.id })
+    .from(eventTypes)
+    .where(eq(eventTypes.availabilityTemplateId, templateId));
+
+  if (relatedEventTypes.length === 0) return [];
+
+  const eventTypeIds = relatedEventTypes.map((e) => e.id);
+
+  // 2. Find confirmed bookings on this date, under those event types
+  const candidateBookings = await db
+    .select()
+    .from(bookings)
+    .where(
+      and(
+        inArray(bookings.eventTypeId, eventTypeIds),
+        eq(bookings.status, "confirmed"),
+        sql`${bookings.startTime}::date = ${date}::date`
+      )
+    );
+
+  if (candidateBookings.length === 0) return [];
+
+  // 3. Filter to only those whose time no longer fits
+  if (isUnavailable) {
+    // Fully unavailable — every booking on this date is a conflict
+    return candidateBookings;
+  }
+
+  return candidateBookings.filter(
+    (b) => !bookingFitsInBlocks(b.startTime, b.endTime, newBlocks, date)
+  );
 };
 
 export const availabilityService = {
@@ -252,53 +316,72 @@ export const availabilityService = {
   },
 
   createDateOverride: async (reviewerId: number, templateId: number, data: CreateDateOverrideInput) => {
-    await getOwnedTemplateOrThrow(reviewerId, templateId);
+  await getOwnedTemplateOrThrow(reviewerId, templateId);
 
-    const today = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD", lexically comparable
-    if (data.date < today) {
-      throw new AppError("Cannot add an override for a past date", 400);
+  const today = new Date().toISOString().slice(0, 10);
+  if (data.date < today) {
+    throw new AppError("Cannot add an override for a past date", 400);
+  }
+
+  const [existing] = await db
+    .select()
+    .from(templateDateOverrides)
+    .where(and(eq(templateDateOverrides.templateId, templateId), eq(templateDateOverrides.date, data.date)))
+    .limit(1);
+
+  if (existing) {
+    throw new AppError("An override for this date already exists", 409);
+  }
+
+  // Check for conflicting bookings BEFORE creating, so we can include the
+  // warning in the same response without a second round-trip.
+  const conflictingBookings = await findConflictingBookings(
+    templateId,
+    data.date,
+    data.isUnavailable,
+    data.isUnavailable ? [] : data.blocks
+  );
+
+  const result = await db.transaction(async (tx) => {
+    const [override] = await tx
+      .insert(templateDateOverrides)
+      .values({ templateId, date: data.date, isUnavailable: data.isUnavailable })
+      .returning();
+
+    if (!override) {
+      throw new AppError("Failed to create date override", 500);
     }
 
-    const [existing] = await db
-      .select()
-      .from(templateDateOverrides)
-      .where(and(eq(templateDateOverrides.templateId, templateId), eq(templateDateOverrides.date, data.date)))
-      .limit(1);
-
-    if (existing) {
-      throw new AppError("An override for this date already exists", 409);
-    }
-
-    const result = await db.transaction(async (tx) => {
-      const [override] = await tx
-        .insert(templateDateOverrides)
-        .values({ templateId, date: data.date, isUnavailable: data.isUnavailable })
+    let blocks: (typeof templateOverrideBlocks.$inferSelect)[] = [];
+    if (!data.isUnavailable && data.blocks.length > 0) {
+      blocks = await tx
+        .insert(templateOverrideBlocks)
+        .values(
+          data.blocks.map((block, idx) => ({
+            overrideId: override.id,
+            startTime: block.startTime,
+            endTime: block.endTime,
+            displayOrder: block.displayOrder ?? idx,
+          }))
+        )
         .returning();
+    }
 
-      if (!override) {
-        throw new AppError("Failed to create date override", 500);
-      }
+    return { ...override, blocks };
+  });
 
-      let blocks: (typeof templateOverrideBlocks.$inferSelect)[] = [];
-      if (!data.isUnavailable && data.blocks.length > 0) {
-        blocks = await tx
-          .insert(templateOverrideBlocks)
-          .values(
-            data.blocks.map((block, idx) => ({
-              overrideId: override.id,
-              startTime: block.startTime,
-              endTime: block.endTime,
-              displayOrder: block.displayOrder ?? idx,
-            }))
-          )
-          .returning();
-      }
-
-      return { ...override, blocks };
-    });
-
-    return result;
-  },
+  // Not blocking, just informational — override is created either way.
+  return {
+    ...result,
+    warning:
+      conflictingBookings.length > 0
+        ? {
+            message: `${conflictingBookings.length} existing booking(s) on this date may no longer fit your updated availability`,
+            affectedBookings: conflictingBookings,
+          }
+        : null,
+  };
+},
 
   // Lists all date overrides (with their blocks) for a template
   listDateOverrides: async (reviewerId: number, templateId: number) => {

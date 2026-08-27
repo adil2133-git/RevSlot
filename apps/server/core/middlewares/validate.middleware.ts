@@ -49,20 +49,19 @@ export const validateParams = (schema: ZodType) => {
    };
 };
 
+// New — admin list endpoints (reviewers, bookings) need query-string
+// validation (search/status/pagination filters) that no existing module
+// required yet, so this mirrors validate/validateParams above.
+export const validateQuery = (schema: ZodType) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const result = schema.safeParse(req.query);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    if (!result.success) {
+      const message = result.error.issues
+        .map((issue) => issue.message).join(', ');
+      return next(new AppError(message, 400));
+    }
+    req.query = result.data as typeof req.query;
+    next();
+  };
+};
