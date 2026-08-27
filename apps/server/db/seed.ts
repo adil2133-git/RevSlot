@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import dayjs from "dayjs";
-import { db } from "../config/db.js";
-import { admins } from "../modules/admin/admins.model.js";
+import { admins } from "../db/schema/admins.js";
+import { db, pool } from "../config/db.js";
 import { reviewers } from "../modules/auth/reviewers.model.js";
 import { availabilityTemplates } from "../modules/availability/availabilityTemplates.model.js";
 import { templateTimeBlocks } from "../modules/availability/templateTimeBlocks.model.js";
@@ -270,7 +270,11 @@ const seed = async () => {
     console.log("---------------------------------\n");
 };
 
-seed().catch((error) => {
+seed().then(async () => {
+    await pool.end();
+    process.exit(0);
+}).catch(async (error) => {
     console.log("seed failed", error);
+    await pool.end();
     process.exit(1);
 });
