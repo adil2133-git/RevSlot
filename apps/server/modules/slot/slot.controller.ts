@@ -1,23 +1,16 @@
 import type { Request, Response } from "express";
 import { slotService } from "./slot.service.js";
+import type { GetAvailableSlotsQuery, HoldSlotInput, ReleaseSlotInput } from "./slot.schema.js"
 
 export const slotController = {
-  generateSlots: async (req: Request, res: Response) => {
-    const result = await slotService.generateSlots(req.body, req.user!.userId);
-
-    res.status(201).json({
-      success: true,
-      data: result,
-    });
-  },
 
   getAvailableSlots: async (req: Request, res: Response) => {
-    const { eventTypeId, dateFrom, dateTo } = req.query;
+    const { eventTypeId, dateFrom, dateTo } = res.locals.query as GetAvailableSlotsQuery;
 
     const result = await slotService.getAvailableSlots(
-      Number(eventTypeId),
-      String(dateFrom),
-      String(dateTo)
+        eventTypeId,
+        dateFrom,
+        dateTo
     ); 
 
     res.status(200).json({
@@ -27,13 +20,19 @@ export const slotController = {
   },
 
   holdSlot: async (req: Request, res: Response) => {
-    const slotId = Number(req.params.id);
-
-    const result = await slotService.holdSlot(slotId);
-
+    const result = await slotService.holdSlot(req.body as HoldSlotInput)
     res.status(200).json({
       success: true,
       data: result,
     });
   },
+
+  releaseSlot: async (req: Request, res: Response) => {
+  const result = await slotService.releaseSlot(req.body as ReleaseSlotInput)
+  res.status(200).json({
+    success: true,
+    data: result,
+  });
+},
+
 };

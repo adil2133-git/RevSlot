@@ -39,6 +39,7 @@ export const eventTypeService = {
         durationMinutes: eventTypes.durationMinutes,
         description: eventTypes.description,
         timezone: availabilityTemplates.timezone,
+        bookingWindowDays: eventTypes.bookingWindowDays,
       })
       .from(eventTypes)
       .innerJoin(

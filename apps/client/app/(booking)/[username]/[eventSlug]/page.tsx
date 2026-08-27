@@ -65,7 +65,7 @@ export default function PublicBookingPage() {
   } = useBookingForm(holdResult);
 
   const currentStep = bookingDone ? 3 : showDetailsForm ? 2 : 1;
-  const slotsForSelectedDate = slots.filter((s) => s.slotDate === selectedDate);
+  const slotsForSelectedDate = slots.filter((s) => s.date === selectedDate);
 
   if (pageLoading) return <LoadingSkeleton />;
   if (pageError || !pageInfo) return <ErrorState message={pageError} />;
@@ -100,6 +100,7 @@ export default function PublicBookingPage() {
                     selectedDate={selectedDate}
                     setSelectedDate={setSelectedDate}
                     availableCountByDate={availableCountByDate}
+                    bookingWindowDays={pageInfo.eventType.bookingWindowDays}
                   />
                   <SlotPicker
                     selectedDate={selectedDate}

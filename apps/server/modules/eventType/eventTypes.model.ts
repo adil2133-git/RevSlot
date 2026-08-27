@@ -16,6 +16,7 @@ export const eventTypes = pgTable(
         price: integer('price').notNull().default(0),
         bufferBeforeMinutes: integer("buffer_before_minutes").notNull().default(0),
         bufferAfterMinutes: integer("buffer_after_minutes").notNull().default(0),
+        bookingWindowDays: smallint("booking_window_days").notNull().default(14),
         meetingLink: varchar("meeting_link", { length: 500 }),
         isActive: boolean('is_active').notNull().default(true),
         createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -26,5 +27,6 @@ export const eventTypes = pgTable(
         index('idx_event_types_reviewer').on(table.reviewerId),
         index('idx_event_types_template').on(table.availabilityTemplateId),
         check('valid_duration', sql`${table.durationMinutes} > 0`),
+        check('valid_booking_window', sql`${table.bookingWindowDays} > 0`),
     ]
 );
