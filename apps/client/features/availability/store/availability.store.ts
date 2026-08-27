@@ -33,6 +33,7 @@ export const useAvailabilityStore = create<AvailabilityState>((set, get) => ({
     set({ templates: previous.filter((t) => t.id !== id) });
     try {
       await deleteTemplateRequest(id);
+      await get().loadTemplates();
     } catch (err) {
       set({
         templates: previous, // roll back on failure
