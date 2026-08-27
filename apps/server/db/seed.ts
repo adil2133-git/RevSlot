@@ -16,7 +16,8 @@ const seed = async () => {
     await db.insert(admins).values({
         name: "Test Admin",
         email: "admin@test.com",
-        passwordHash
+        passwordHash,
+        emailVerified: true
     }).onConflictDoNothing({
         target: admins.email
     });
@@ -29,6 +30,7 @@ const seed = async () => {
     await db.insert(reviewers).values({
         name: "Test Reviewer",
         email: "reviewer@test.com",
+        username: "test-reviewer",
         passwordHash: reviewerPasswordHash,
         whatsappNumber: "9999999999"
     }).onConflictDoNothing({

@@ -13,6 +13,8 @@ import {
     getTemplateByIdRequest,
     replaceTimeBlocksRequest,
 } from "../api/availability.api";
+import { useAvailabilityStore } from "../store/availability.store";
+import { useAuthStore } from "@/features/auth/store/authStore";
 import { guessTimezone } from "../utils/timezones";
 import { normalizeTime } from "../utils/time";
 
@@ -49,10 +51,13 @@ interface ScheduleFormProps {
 
 export default function ScheduleForm({ mode, templateId }: ScheduleFormProps) {
     const router = useRouter();
+    const user = useAuthStore((state) => state.user);
+    const { loadTemplates } = useAvailabilityStore();
 
     const [name, setName] = useState("Working Hours");
     const [tz, setTz] = useState(guessTimezone());
     const [isDefault, setIsDefault] = useState(false);
+    const [isOnlyTemplate, setIsOnlyTemplate] = useState(false);
     const [days, setDays] = useState<DaysState>(defaultDaysState());
     const [overrides, setOverrides] = useState<DateOverride[]>([]);
     const [savedTemplateId, setSavedTemplateId] = useState<number | null>(templateId ?? null);
@@ -60,6 +65,29 @@ export default function ScheduleForm({ mode, templateId }: ScheduleFormProps) {
     const [loading, setLoading] = useState(mode === "edit");
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        (async () => {
+            try {
+                await loadTemplates();
+                const currentTemplates = useAvailabilityStore.getState().templates;
+
+                if (mode === "create") {
+                    if (currentTemplates.length === 0) {
+                        setIsDefault(true);
+                        setIsOnlyTemplate(true);
+                    }
+                } else if (mode === "edit" && templateId) {
+                    if (currentTemplates.length === 1) {
+                        setIsDefault(true);
+                        setIsOnlyTemplate(true);
+                    }
+                }
+            } catch (err) {
+                // non-critical check failure
+            }
+        })();
+    }, [mode, templateId, loadTemplates]);
 
     useEffect(() => {
         if (mode !== "edit" || !templateId) return;
@@ -154,6 +182,11 @@ export default function ScheduleForm({ mode, templateId }: ScheduleFormProps) {
     async function handleSave() {
         setError(null);
 
+        if (!user?.username) {
+            setError("Username is required before setting availability. Please set your username first in your profile.");
+            return;
+        }
+
         if (name.trim().length < 2) {
             setError("Name must be at least 2 characters.");
             return;
@@ -180,12 +213,13 @@ export default function ScheduleForm({ mode, templateId }: ScheduleFormProps) {
         setSaving(true);
         try {
             let id = templateId;
+            const targetDefault = isOnlyTemplate ? true : isDefault;
             if (mode === "create") {
-                const template = await createTemplateRequest({ name: name.trim(), timezone: tz, isDefault });
+                const template = await createTemplateRequest({ name: name.trim(), timezone: tz, isDefault: targetDefault });
                 id = template.id;
                 setSavedTemplateId(id);
             } else if (id) {
-                await updateTemplateRequest(id, { name: name.trim(), timezone: tz, isDefault });
+                await updateTemplateRequest(id, { name: name.trim(), timezone: tz, isDefault: targetDefault });
             }
             if (id) {
                 await replaceTimeBlocksRequest(id, blocksPayload);
@@ -204,6 +238,21 @@ export default function ScheduleForm({ mode, templateId }: ScheduleFormProps) {
 
     return (
         <div className="pb-24">
+            {!user?.username && mode === "create" && (
+                <div className="mb-6 rounded-xl border border-error-container bg-error-container/40 p-4 text-sm text-error">
+                    <div className="flex items-center gap-2 font-semibold">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="12" y1="8" x2="12" y2="12" />
+                            <line x1="12" y1="16" x2="12.01" y2="16" />
+                        </svg>
+                        Username Required
+                    </div>
+                    <p className="mt-1">
+                        Username is required before setting availability. Please set your username first in your profile.
+                    </p>
+                </div>
+            )}
             <div className="mb-6 flex items-center justify-between">
                 <h1 className="text-2xl font-semibold tracking-tight text-on-surface">
                     {mode === "create" ? "Add a new schedule" : "Edit schedule"}
@@ -270,10 +319,18 @@ export default function ScheduleForm({ mode, templateId }: ScheduleFormProps) {
             />
 
             <div className="mt-6 flex items-center gap-3 border-t border-slate-100 pt-5">
-                <Switch checked={isDefault} onChange={() => setIsDefault((v) => !v)} />
+                <Switch
+                    checked={isDefault || isOnlyTemplate}
+                    disabled={isOnlyTemplate}
+                    onChange={() => !isOnlyTemplate && setIsDefault((v) => !v)}
+                />
                 <div>
                     <p className="text-sm font-medium text-on-surface">Set as default</p>
-                    <p className="text-xs text-slate-400">This schedule will be used by default for new event types</p>
+                    <p className="text-xs text-slate-400">
+                        {isOnlyTemplate
+                            ? "This is your only schedule, so it is automatically set as default"
+                            : "This schedule will be used by default for new event types"}
+                    </p>
                 </div>
             </div>
 

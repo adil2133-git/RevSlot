@@ -8,6 +8,7 @@ import Link from "next/link";
 import { loginSchema, type LoginFormValues } from "../validation/authSchema";
 import { useAuthStore } from "../store/authStore";
 import GoogleSignInButton from "./GoogleSignInButton";
+import { ApiError } from "@/lib/axios";
 
 type LoginFormProps = {
   role: "reviewer" | "admin";
@@ -34,10 +35,19 @@ export default function LoginForm({ role }: LoginFormProps) {
         await loginAsReviewer(values);
       }
       // replace (not push): already logged in, so Back shouldn't
-      // return to the login form.
-      router.replace("/dashboard");
-    } catch {
-      // error already captured in store; surfaced below
+      // return to the login form. Admins land in the admin console,
+      // reviewers in their own dashboard.
+      router.replace(role === "admin" ? "/admin/dashboard" : "/dashboard");
+    } catch (err) {
+      // Unverified reviewer account: the store has already stashed the
+      // email as pendingVerificationEmail, so /verify-email can pick up
+      // right where registration left off instead of dead-ending on
+      // "please verify your email" with no way back to the OTP screen.
+      if (err instanceof ApiError && err.status === 403 && (err.details as { requiresVerification?: boolean } | undefined)?.requiresVerification) {
+        router.replace("/verify-email");
+        return;
+      }
+      // other errors already captured in store; surfaced below
     }
   };
 

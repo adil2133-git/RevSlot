@@ -6,6 +6,7 @@ export type AuthUser = {
   id: number;
   role: UserRole;
   name: string;
+  username: string | null;
   email: string;
   avatarUrl: string | null;
   bio: string | null;
@@ -21,6 +22,7 @@ export type LoginPayload = {
 export type RegisterPayload = {
   name: string;
   email: string;
+  username: string;
   whatsappNumber: string;
   password: string;
 };
@@ -51,6 +53,7 @@ export type ResendVerificationPayload = {
 export type GoogleAuthPayload = {
   idToken: string;
   whatsappNumber?: string;
+  username?: string;
 };
 
 // ---- Raw backend envelopes ----
