@@ -45,7 +45,7 @@ export async function releaseSlot(holdToken: string) {
 }
 
 export async function createBooking(payload: BookingFormPayload) {
-  const { data } = await api.post<{ success: boolean; data: unknown }>(
+  const { data } = await api.post<{ success: boolean; data: {meetLink: string | null}; }>(
     "/bookings",
     payload
   );

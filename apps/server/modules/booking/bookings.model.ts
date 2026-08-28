@@ -24,6 +24,8 @@ export const bookings = pgTable('bookings', {
   endTime: timestamp('end_time', { withTimezone: true }).notNull(),
 
   status: bookingStatus('status').default('confirmed'),
+  meetLink: text('meet_link'),
+  googleEventId: varchar('google_event_id', { length: 255 }),
 
   cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
   cancelledReason: varchar('cancelled_reason', { length: 255 }),

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useReviewerProfile } from "@/features/booking/hooks/useReviewerProfile";
+import PoweredByFooter from "@/features/booking/components/PoweredByFooter";
 
 const ClockIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -114,6 +115,7 @@ export default function ReviewerProfilePage() {
           </div>
         )}
       </div>
+      <PoweredByFooter />
     </div>
   );
 }

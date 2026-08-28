@@ -4,12 +4,14 @@ import dayjs from "dayjs";
 import Link from "next/link";
 import type { BookingPageInfo, SlotItem } from "../type";
 import { formatSlotTime } from "../utils";
+import PoweredByFooter from "./PoweredByFooter";
 
 type BookingConfirmationProps = {
   pageInfo: BookingPageInfo;
   heldSlot: SlotItem | null;
   advisorEmail: string;
   use12Hour: boolean;
+  meetLink: string | null;
 };
 
 export default function BookingConfirmation({
@@ -17,9 +19,10 @@ export default function BookingConfirmation({
   heldSlot,
   advisorEmail,
   use12Hour,
+  meetLink
 }: BookingConfirmationProps) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surface px-4">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-surface px-4">
       <div className="max-w-md rounded-2xl border border-slate-200 bg-surface-card p-8 text-center shadow-sm">
         <h1 className="mb-2 text-xl font-semibold text-on-surface">
           Booking confirmed!
@@ -39,6 +42,17 @@ export default function BookingConfirmation({
           A confirmation has been sent to {advisorEmail}.
         </p>
 
+        {meetLink && (
+            <a
+               href={meetLink}
+               target="_blank"
+               rel="noopener noreferrer"
+               className="mt-4 inline-block w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary"
+            >
+              Join Google Meet
+          </a>
+       )}
+
         <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
           <button
             onClick={() => window.location.reload()}
@@ -54,6 +68,7 @@ export default function BookingConfirmation({
           </Link>
         </div>
       </div>
+      <PoweredByFooter />
     </div>
   );
 }
