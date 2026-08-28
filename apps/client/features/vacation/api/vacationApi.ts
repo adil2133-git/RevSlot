@@ -1,4 +1,4 @@
-import api from "@/lib/axios";
+import api, { ApiError } from "@/lib/axios";
 
 export interface VacationBlock {
   id: number;
@@ -18,12 +18,7 @@ export interface AffectedBooking {
   advisorEmail: string;
   startTime: string; // ISO timestamp
   endTime: string;
-  eventTypeName?: string; // not yet in backend response — flagged below
-}
-
-interface ConfirmationRequiredError {
-  message: string;
-  details: { affectedBookings: AffectedBooking[] };
+  eventTypeName: string;
 }
 
 export async function listVacationBlocks() {
@@ -66,15 +61,16 @@ export async function deleteVacationBlock(id: number) {
   await api.delete(`/vacation-blocks/${id}`);
 }
 
-// Type guard — narrows a caught axios error into the 409 confirmation-required shape
+// Type guard — narrows a caught ApiError into the 409 confirmation-required
+// shape, where `details.affectedBookings` is guaranteed present.
 export function isConfirmationRequiredError(
   error: unknown
-): error is { response: { status: 409; data: ConfirmationRequiredError } } {
+): error is ApiError & { details: { affectedBookings: AffectedBooking[] } } {
   return (
-    typeof error === "object" &&
-    error !== null &&
-    "response" in error &&
-    (error as any).response?.status === 409 &&
-    (error as any).response?.data?.details?.affectedBookings !== undefined
+    error instanceof ApiError &&
+    error.status === 409 &&
+    typeof error.details === "object" &&
+    error.details !== null &&
+    "affectedBookings" in error.details
   );
 }
