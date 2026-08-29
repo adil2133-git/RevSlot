@@ -13,6 +13,7 @@ export function useBookingForm(holdResult: HoldResult | null) {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [bookingDone, setBookingDone] = useState(false);
+  const [meetLink, setMeetLink] = useState<string | null>(null);
 
   const {
     register,
@@ -41,18 +42,19 @@ export function useBookingForm(holdResult: HoldResult | null) {
     setSubmitError(null);
     setSubmitting(true);
     try {
-      await createBooking({
-        holdToken: holdResult.holdToken,
-        advisorName: values.advisorName,
-        advisorEmail: values.advisorEmail,
-        internName: values.internName,
-        batch: values.batch,
-        weekStage: values.weekStage,
-        internEmails: values.internEmails
-          ? values.internEmails.split(",").map((e) => e.trim()).filter(Boolean)
-          : undefined,
-      });
-      setBookingDone(true);
+      const result = await createBooking({
+      holdToken: holdResult.holdToken,
+      advisorName: values.advisorName,
+      advisorEmail: values.advisorEmail,
+      internName: values.internName,
+      batch: values.batch,
+      weekStage: values.weekStage,
+      internEmails: values.internEmails
+        ? values.internEmails.split(",").map((e) => e.trim()).filter(Boolean)
+        : undefined,
+});
+setMeetLink(result.meetLink ?? null);
+setBookingDone(true);
     } catch (err) {
       setSubmitError(
         err instanceof Error ? err.message : "Could not confirm the booking"
@@ -69,6 +71,7 @@ export function useBookingForm(holdResult: HoldResult | null) {
     submitting,
     submitError,
     bookingDone,
+    meetLink,
     onSubmit,
   };
 }

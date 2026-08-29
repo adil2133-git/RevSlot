@@ -42,6 +42,25 @@ export const verifyEmailVerificationToken = (token: string): TokenPayload => {
     return jwt.verify(token, EMAIL_VERIFICATION_SECRET) as TokenPayload;
 }
 
+// Signs the `state` param passed through the Google Calendar OAuth
+// redirect, so the callback can trust the reviewerId it gets back
+// wasn't tampered with.
+interface CalendarStatePayload {
+    reviewerId: number;
+}
+
+export const signCalendarState = (
+    payload: CalendarStatePayload
+): string => {
+    return jwt.sign(payload, ACCESS_SECRET, { expiresIn: "10m" });
+}
+
+export const verifyCalendarState = (
+    state: string
+): CalendarStatePayload => {
+    return jwt.verify(state, ACCESS_SECRET) as CalendarStatePayload;
+}
+
 // Never store the raw refresh token in the DB — only its hash. The raw
 // token lives solely in the httpOnly cookie on the client. This lets
 // the server check "is this specific token still valid/unrevoked"

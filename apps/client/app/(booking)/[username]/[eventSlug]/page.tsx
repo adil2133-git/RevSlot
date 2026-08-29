@@ -18,6 +18,7 @@ import MonthCalendar from "@/features/booking/components/MonthCalender";
 import SlotPicker from "@/features/booking/components/SlotPicker";
 import TimeSelectedCard from "@/features/booking/components/TimeSelectedCard";
 import BookingForm from "@/features/booking/components/BookingForm";
+import PoweredByFooter from "@/features/booking/components/PoweredByFooter";
 
 export default function PublicBookingPage() {
   const params = useParams<{ username: string; eventSlug: string }>();
@@ -61,6 +62,7 @@ export default function PublicBookingPage() {
     submitting,
     submitError,
     bookingDone,
+    meetLink,
     onSubmit,
   } = useBookingForm(holdResult);
 
@@ -77,6 +79,7 @@ export default function PublicBookingPage() {
         heldSlot={heldSlot}
         advisorEmail={advisorEmail}
         use12Hour={use12Hour}
+        meetLink={meetLink}
       />
     );
   }
@@ -139,6 +142,7 @@ export default function PublicBookingPage() {
             </div>
           </div>
         </div>
+        <PoweredByFooter />
       </div>
     </div>
   );

@@ -170,7 +170,17 @@ function computeCandidates(
     current = current.add(1, "day");
   }
 
-  return candidates;
+  // Overlapping/duplicate template time blocks on the same day (e.g. two
+  // blocks both covering 9-10 AM) would otherwise generate the exact same
+  // date+time candidate twice, which breaks React's key uniqueness on the
+  // slot picker. De-dupe by date+startTime, keeping the first occurrence.
+  const seen = new Set<string>();
+  return candidates.filter((c) => {
+    const key = `${c.slotDate}|${c.startTime}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 export const slotService = {

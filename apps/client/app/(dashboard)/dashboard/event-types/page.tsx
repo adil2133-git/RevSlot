@@ -23,7 +23,7 @@ const SearchIcon = () => (
 
 export default function EventTypesPage() {
   const router = useRouter();
-  const { eventTypes, isLoading, error, loadEventTypes, toggleActive } = useEventTypeStore();
+  const { eventTypes, isLoading, error, loadEventTypes, toggleActive, togglePublic } = useEventTypeStore();
   // Defensive fallback — guards against a stale/undefined store value
   // (e.g. leftover state from an HMR reload, or an unexpected API shape)
   // so the page never crashes on .filter() even if the store misbehaves.
@@ -109,6 +109,7 @@ export default function EventTypesPage() {
                 index={index}
                 onEdit={(id) => router.push(`/dashboard/event-types/${id}/edit`)}
                 onToggleActive={toggleActive}
+                onTogglePublic={togglePublic}
               />
             ))
           )}

@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { Suspense } from "react";
+import GoogleCalendarCard from "@/features/calendar/components/GoogleCalendarCard";
 import { useAuthStore } from "@/features/auth/store/authStore";
 
 const QUICK_LINKS = [
@@ -66,6 +68,10 @@ export default function DashboardOverviewPage() {
           New Event Type
         </Link>
       </div>
+
+      <Suspense fallback={null}>
+         <GoogleCalendarCard />
+      </Suspense>
 
       <div className="grid gap-5 sm:grid-cols-3">
         {QUICK_LINKS.map((link) => (

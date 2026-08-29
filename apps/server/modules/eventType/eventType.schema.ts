@@ -22,6 +22,7 @@ export const CreateEventTypeSchema = z.object({
     bufferBeforeMinutes: z.number().int().min(0, "Buffer cannot be negative").default(0),
     bufferAfterMinutes: z.number().int().min(0, "Buffer cannot be negative").default(0),
     meetingLink: z.string().trim().url("Invalid meeting link").max(500, "Meeting link must be at most 500 characters").optional(),
+    isPublic: z.boolean().default(true),
 });
 
 export const UpdateEventTypeSchema = z.object({
@@ -34,6 +35,7 @@ export const UpdateEventTypeSchema = z.object({
   bufferAfterMinutes: z.number().int().min(0, "Buffer cannot be negative").optional(),
   meetingLink: z.string().trim().url("Invalid meeting link").max(500, "Meeting link must be at most 500 characters").nullable().optional(),
   isActive: z.boolean().optional(),
+  isPublic: z.boolean().optional(),
 });
 
 export type BookingPageParamsInput = z.infer<typeof BookingPageParamsSchema>;

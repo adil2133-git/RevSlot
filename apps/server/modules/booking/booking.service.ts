@@ -5,6 +5,12 @@ import { slots } from "../slot/slots.model.js";
 import { bookings } from "./bookings.model.js";
 import { AppError } from "../../core/errors/AppError.js";
 import type { CreateBookingInput } from "./booking.schema.js";
+import { eventTypes } from "../eventType/eventTypes.model.js";
+import { reviewers } from "../auth/reviewers.model.js";
+import { calendarService } from "../calendar/calendar.service.js";
+import { emailService } from "../../services/email.service.js";
+import { bookingConfirmationTemplate } from "../../emails/templates/bookingConfirmation.js";
+
 
 export const bookingService = {
   // Doc section 7: "All booking links for a reviewer share the same calendar"
@@ -109,6 +115,10 @@ export const bookingService = {
         })
         .returning();
 
+        if (!booking) {
+  throw new AppError("Failed to create booking", 500);
+}
+
       // 4. Mark the slot as booked — only after the booking insert
       //    succeeds. Since this is all inside one transaction, if any step
       //    fails, everything rolls back together.
@@ -122,5 +132,145 @@ export const bookingService = {
       return { ...booking, advisorName: data.advisorName };
     });
   },
+
+       // Runs AFTER createBooking's transaction has committed — deliberately
+  // kept out of the transaction. Google Calendar + Resend are both
+  // external services with no rollback semantics here; a slow/failing
+  // Meet-event or email call must never undo an already-confirmed
+  // booking. Both steps are individually best-effort (each has its own
+  // try/catch), so a Calendar hiccup still lets emails go out, and vice
+  // versa.
+  finalizeBooking: async (booking: {
+    id: number;
+    eventTypeId: number;
+    reviewerId: number;
+    internName: string;
+    advisorEmail: string;
+    internEmails: string[] | null;
+    weekStage: string;
+    startTime: Date;
+    endTime: Date;
+    advisorName: string;
+  }) => {
+    const [eventType] = await db
+      .select({
+        name: eventTypes.name,
+        meetingLink: eventTypes.meetingLink,
+      })
+      .from(eventTypes)
+      .where(eq(eventTypes.id, booking.eventTypeId))
+      .limit(1);
+
+    const [reviewer] = await db
+      .select({ name: reviewers.name, email: reviewers.email })
+      .from(reviewers)
+      .where(eq(reviewers.id, booking.reviewerId))
+      .limit(1);
+
+    if (!eventType || !reviewer) return { meetLink: null };
+
+    const timezone = "Asia/Kolkata";
+
+    let meetLink: string | null = null;
+
+    try {
+      const meetEvent = await calendarService.createMeetEvent({
+        reviewerId: booking.reviewerId,
+        summary: `${eventType.name} — ${booking.advisorName}`,
+        description: `RevSlot session: ${eventType.name} (${booking.weekStage})`,
+        startTime: booking.startTime,
+        endTime: booking.endTime,
+        timezone,
+        attendeeEmails: [
+          reviewer.email,
+          booking.advisorEmail,
+          ...(booking.internEmails ?? []),
+        ],
+      });
+
+      if (meetEvent) {
+        meetLink = meetEvent.meetLink;
+
+        await db
+          .update(bookings)
+          .set({
+            meetLink: meetEvent.meetLink,
+            googleEventId: meetEvent.googleEventId,
+          })
+          .where(eq(bookings.id, booking.id));
+      }
+    } catch (err) {
+      console.error(
+        `[Booking] Meet event creation failed for booking ${booking.id}:`,
+        err
+      );
+    }
+
+    // Reviewer hasn't connected Google Calendar — fall back to the
+    // static link they set on the event type itself, if any.
+    if (!meetLink && eventType.meetingLink) {
+      meetLink = eventType.meetingLink;
+    }
+
+    const formattedDate = dayjs(booking.startTime).format("ddd, MMM D");
+
+    const formattedTime = `${dayjs(booking.startTime).format(
+      "h:mm A"
+    )} – ${dayjs(booking.endTime).format("h:mm A")} (${timezone})`;
+
+    const recipients: {
+      email: string;
+      name: string;
+      role: "advisor" | "reviewer" | "intern";
+    }[] = [
+      {
+        email: booking.advisorEmail,
+        name: booking.advisorName,
+        role: "advisor",
+      },
+      {
+        email: reviewer.email,
+        name: reviewer.name,
+        role: "reviewer",
+      },
+      ...(booking.internEmails ?? []).map((email) => ({
+        email,
+        name: booking.internName,
+        role: "intern" as const,
+      })),
+    ];
+
+    await Promise.all(
+      recipients.map(({ email, name, role }) => {
+        const { subject, html } = bookingConfirmationTemplate({
+          recipientName: name,
+          recipientRole: role,
+          eventTypeName: eventType.name,
+          reviewerName: reviewer.name,
+          internName: booking.internName,
+          advisorName: booking.advisorName,
+          formattedDate,
+          formattedTime,
+          meetLink,
+        });
+
+        return emailService
+          .sendEmail({
+            to: email,
+            subject,
+            html,
+          })
+          .catch((err) => {
+            console.error(
+              `[Booking] Failed to send confirmation email to ${email}:`,
+              err
+            );
+          });
+      })
+    );
+
+    return { meetLink };
+  },
+
 };
 

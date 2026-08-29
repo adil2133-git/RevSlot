@@ -19,6 +19,7 @@ export const eventTypes = pgTable(
         bookingWindowDays: smallint("booking_window_days").notNull().default(14),
         meetingLink: varchar("meeting_link", { length: 500 }),
         isActive: boolean('is_active').notNull().default(true),
+        isPublic: boolean('is_public').notNull().default(true),
         createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
         updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
     },

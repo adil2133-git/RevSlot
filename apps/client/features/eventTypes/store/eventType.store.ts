@@ -17,6 +17,7 @@ interface EventTypeState {
   addEventType: (payload: CreateEventTypePayload) => Promise<EventType>;
   editEventType: (id: number, payload: UpdateEventTypePayload) => Promise<void>;
   toggleActive: (id: number, nextIsActive: boolean) => Promise<void>;
+  togglePublic: (id: number, nextIsPublic: boolean) => Promise<void>;
 }
 
 export const useEventTypeStore = create<EventTypeState>((set, get) => ({
@@ -74,6 +75,29 @@ export const useEventTypeStore = create<EventTypeState>((set, get) => ({
       set({
         eventTypes: previous, // roll back
         error: err instanceof Error ? err.message : "Failed to update status",
+      });
+    }
+  },
+
+  // Same optimistic-flip-with-rollback shape as toggleActive, but for the
+  // public-visibility flag — reuses the plain PATCH endpoint since there's
+  // no dedicated activate/deactivate-style route for this field.
+  togglePublic: async (id, nextIsPublic) => {
+    const previous = get().eventTypes;
+    set({
+      eventTypes: previous.map((et) =>
+        et.id === id ? { ...et, isPublic: nextIsPublic } : et
+      ),
+    });
+    try {
+      const updated = await updateEventTypeRequest(id, { isPublic: nextIsPublic });
+      set((state) => ({
+        eventTypes: state.eventTypes.map((et) => (et.id === id ? updated : et)),
+      }));
+    } catch (err) {
+      set({
+        eventTypes: previous, // roll back
+        error: err instanceof Error ? err.message : "Failed to update visibility",
       });
     }
   },

@@ -50,7 +50,7 @@ export const eventTypeService = {
         and(
           eq(eventTypes.reviewerId, reviewer.id),
           eq(eventTypes.slug, eventSlug),
-          eq(eventTypes.isActive, true)
+          eq(eventTypes.isActive, true),
         )
       )
       .limit(1);
@@ -95,7 +95,7 @@ export const eventTypeService = {
         price: eventTypes.price,
       })
       .from(eventTypes)
-      .where(and(eq(eventTypes.reviewerId, reviewer.id), eq(eventTypes.isActive, true)))
+      .where(and(eq(eventTypes.reviewerId, reviewer.id), eq(eventTypes.isActive, true), eq(eventTypes.isPublic, true)))
       .orderBy(desc(eventTypes.createdAt));
 
     return { reviewer, eventTypes: activeEventTypes };
@@ -177,6 +177,7 @@ export const eventTypeService = {
       bufferBeforeMinutes: data.bufferBeforeMinutes,
       bufferAfterMinutes: data.bufferAfterMinutes,
       meetingLink: data.meetingLink,
+      isPublic: data.isPublic,
     })
     .returning();
 
@@ -197,6 +198,7 @@ export const eventTypeService = {
       bufferAfterMinutes: eventTypes.bufferAfterMinutes,
       meetingLink: eventTypes.meetingLink,
       isActive: eventTypes.isActive,
+      isPublic: eventTypes.isPublic,
       createdAt: eventTypes.createdAt,
       updatedAt: eventTypes.updatedAt,
     })
@@ -225,6 +227,7 @@ export const eventTypeService = {
       bufferAfterMinutes: eventTypes.bufferAfterMinutes,
       meetingLink: eventTypes.meetingLink,
       isActive: eventTypes.isActive,
+      isPublic: eventTypes.isPublic,
       createdAt: eventTypes.createdAt,
       updatedAt: eventTypes.updatedAt,
     })
@@ -337,6 +340,10 @@ export const eventTypeService = {
 
       ...(data.isActive !== undefined && {
         isActive: data.isActive,
+      }),
+
+      ...(data.isPublic !== undefined && {
+        isPublic: data.isPublic,
       }),
 
       updatedAt: new Date(),
