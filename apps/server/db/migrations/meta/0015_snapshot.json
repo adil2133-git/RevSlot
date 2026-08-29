@@ -1,5 +1,5 @@
 {
-  "id": "f58859a7-8eb1-4cc3-a3c5-29831309779f",
+  "id": "38ebf7f9-168a-439e-b85b-9b2563ab099a",
   "prevId": "fde1840c-39b7-44d8-838f-5fb834e7c949",
   "version": "7",
   "dialect": "postgresql",
@@ -163,25 +163,6 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": true
-        },
-        "google_calendar_refresh_token": {
-          "name": "google_calendar_refresh_token",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "google_calendar_email": {
-          "name": "google_calendar_email",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "google_calendar_connected": {
-          "name": "google_calendar_connected",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
         },
         "avatar_url": {
           "name": "avatar_url",
@@ -1030,18 +1011,6 @@
           "primaryKey": false,
           "notNull": false,
           "default": "'confirmed'"
-        },
-        "meet_link": {
-          "name": "meet_link",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "google_event_id": {
-          "name": "google_event_id",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": false
         },
         "cancelled_at": {
           "name": "cancelled_at",

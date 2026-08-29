@@ -4,6 +4,7 @@ import { db } from "../../config/db.js";
 
 import { vacationBlocks } from "./vacation.model.js";
 import { bookings } from "../booking/bookings.model.js";
+import { eventTypes } from "../eventType/eventTypes.model.js";
 
 import { AppError } from "../../core/errors/AppError.js";
 
@@ -59,11 +60,22 @@ const checkOverlappingVacation = async (
   return overlapping;
 };
 
-// Finds confirmed bookings for this reviewer that fall inside the given date range
+// Finds confirmed bookings for this reviewer that fall inside the given date range,
+// joined with the event type name so the frontend can display it in the
+// affected-bookings confirmation dialog.
 const findAffectedBookings = async (reviewerId: number, startDate: string, endDate: string) => {
   return db
-    .select()
+    .select({
+      id: bookings.id,
+      internName: bookings.internName,
+      batch: bookings.batch,
+      advisorEmail: bookings.advisorEmail,
+      startTime: bookings.startTime,
+      endTime: bookings.endTime,
+      eventTypeName: eventTypes.name,
+    })
     .from(bookings)
+    .innerJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
     .where(
       and(
         eq(bookings.reviewerId, reviewerId),

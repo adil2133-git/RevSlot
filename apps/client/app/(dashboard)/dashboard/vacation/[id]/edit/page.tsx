@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import dayjs from "dayjs";
 
 import RangeCalendar from "@/features/vacation/components/RangeCalendar";
@@ -11,29 +11,47 @@ import { WarningIcon } from "@/features/vacation/components/icons";
 import { findOverlappingBlock } from "@/features/vacation/utils/dateRangeOverlap";
 import {
   listVacationBlocks,
-  createVacationBlock,
+  updateVacationBlock,
   isConfirmationRequiredError,
   type VacationBlock,
   type AffectedBooking,
 } from "@/features/vacation/api/vacationApi";
 
-export default function NewVacationPage() {
+export default function EditVacationPage() {
   const router = useRouter();
+  const params = useParams();
+  const blockId = Number(params.id);
+
   const [existingBlocks, setExistingBlocks] = useState<VacationBlock[]>([]);
   const [startDate, setStartDate] = useState<string | null>(null);
   const [endDate, setEndDate] = useState<string | null>(null);
   const [reason, setReason] = useState("");
+  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [notFound, setNotFound] = useState(false);
   const [affectedBookings, setAffectedBookings] = useState<AffectedBooking[] | null>(null);
 
   const today = dayjs().format("YYYY-MM-DD");
 
   useEffect(() => {
-    listVacationBlocks().then(setExistingBlocks);
-  }, []);
+    listVacationBlocks().then((blocks) => {
+      setExistingBlocks(blocks);
+      const current = blocks.find((b) => b.id === blockId);
+      if (!current) {
+        setNotFound(true);
+      } else {
+        setStartDate(current.startDate);
+        setEndDate(current.endDate);
+        setReason(current.reason ?? "");
+      }
+      setLoading(false);
+    });
+  }, [blockId]);
 
   const overlap =
-    startDate && endDate ? findOverlappingBlock(startDate, endDate, existingBlocks) : null;
+    startDate && endDate
+      ? findOverlappingBlock(startDate, endDate, existingBlocks, blockId)
+      : null;
 
   const canSubmit = startDate && endDate && !overlap && !submitting;
 
@@ -47,7 +65,7 @@ export default function NewVacationPage() {
 
     setSubmitting(true);
     try {
-      await createVacationBlock({
+      await updateVacationBlock(blockId, {
         startDate,
         endDate,
         reason: reason.trim() || undefined,
@@ -74,10 +92,28 @@ export default function NewVacationPage() {
     submit(true);
   };
 
+  if (loading) {
+    return <div className="container-page py-10 text-slate-400">Loading...</div>;
+  }
+
+  if (notFound) {
+    return (
+      <div className="container-page py-10">
+        <p className="text-error">Vacation block not found.</p>
+        <button
+          onClick={() => router.push("/dashboard/vacation")}
+          className="mt-4 text-primary underline"
+        >
+          Back to Vacation
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="container-page max-w-4xl py-10">
-      <h1 className="text-3xl font-bold text-on-surface">New Vacation</h1>
-      <p className="mt-1 text-slate-400">Block off dates when you're unavailable.</p>
+      <h1 className="text-3xl font-bold text-on-surface">Edit Vacation</h1>
+      <p className="mt-1 text-slate-400">Update the dates or reason for this vacation block.</p>
 
       <div className="mt-8 space-y-8 rounded-xl border border-slate-100 bg-surface-card p-8 shadow-surface">
         <div>
@@ -135,7 +171,7 @@ export default function NewVacationPage() {
           disabled={!canSubmit}
           className="rounded-lg bg-primary px-5 py-2.5 font-semibold text-on-primary transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {submitting ? "Creating..." : "Create Vacation"}
+          {submitting ? "Saving..." : "Save Changes"}
         </button>
       </div>
 
