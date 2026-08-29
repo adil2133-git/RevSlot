@@ -241,6 +241,7 @@ const seed = async () => {
                     reviewerId: testReviewer.id,
                     internName: "Seed Intern",
                     batch: "2026-Batch-A",
+                    advisorName: "Seed Advisor",
                     advisorEmail: "advisor@test.com",
                     internEmails: ["intern@test.com"],
                     weekStage: "Week 4",
