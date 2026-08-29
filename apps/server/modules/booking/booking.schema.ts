@@ -1,12 +1,6 @@
 import { z } from "zod";
 
 // Advisor booking form submission — confirms a held slot.
-//
-// NOTE: the `bookings` table has no `advisorName` column (only
-// advisorEmail). We still collect advisorName here so it can be included
-// in the confirmation response, but it is NOT persisted to the DB.
-// Flagged with Adil — table needs an `advisor_name` column if this should
-// be stored long-term.
 export const CreateBookingSchema = z.object({
   holdToken: z.string().uuid("Invalid hold token"),
   advisorName: z.string().min(1, "Advisor name is required").max(150),
@@ -25,3 +19,20 @@ export const CancelBookingParamsSchema = z.object({
 });
 
 export type CancelBookingParamsInput = z.infer<typeof CancelBookingParamsSchema>;
+
+// Query params for GET /bookings/me — pagination + optional status/scope filters
+export const GetMyBookingsQuerySchema = z.object({
+  page: z.coerce.number().int().positive().optional().default(1),
+  limit: z.coerce.number().int().positive().max(100).optional().default(20),
+  status: z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .transform((val) => {
+      if (!val) return undefined;
+      if (Array.isArray(val)) return val as ("confirmed" | "completed")[];
+      return val.split(",") as ("confirmed" | "completed")[];
+    }),
+  scope: z.enum(["upcoming", "past"]).optional(),
+});
+
+export type GetMyBookingsQueryInput = z.infer<typeof GetMyBookingsQuerySchema>;
