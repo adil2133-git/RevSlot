@@ -1,7 +1,12 @@
 import { Router } from "express";
 import { validate, validateQuery } from "../../core/middlewares/validate.middleware.js";
 import { requireReviewer } from "../../core/middlewares/auth.middleware.js";
-import { CreateBookingSchema, GetMyBookingsQuerySchema } from "./booking.schema.js";
+import {
+  CreateBookingSchema,
+  GetMyBookingsQuerySchema,
+  CancelBookingSchema,
+  RescheduleBookingSchema,
+} from "./booking.schema.js";
 import { catchAsync } from "../../core/utils/catchAsync.js";
 import { bookingController } from "./booking.controller.js";
 
@@ -19,6 +24,20 @@ router.get(
   requireReviewer,
   validateQuery(GetMyBookingsQuerySchema),
   catchAsync(bookingController.getMyBookings)
+);
+
+router.get("/:id", requireReviewer, catchAsync(bookingController.getBookingById));
+router.patch(
+  "/:id/cancel",
+  requireReviewer,
+  validate(CancelBookingSchema),
+  catchAsync(bookingController.cancelBooking)
+);
+router.patch(
+  "/:id/reschedule",
+  requireReviewer,
+  validate(RescheduleBookingSchema),
+  catchAsync(bookingController.rescheduleBooking)
 );
 
 export default router;
