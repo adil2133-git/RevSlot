@@ -1,0 +1,1 @@
+ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "advisor_name" varchar(150) NOT NULL;

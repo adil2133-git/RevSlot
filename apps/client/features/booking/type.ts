@@ -55,3 +55,38 @@ export type BookingFormPayload = {
   internEmails?: string[];
   weekStage: string;
 };
+
+export type MyBooking = {
+  id: number;
+  internName: string;
+  batch: string;
+  advisorName: string;
+  advisorEmail: string;
+  weekStage: string;
+  startTime: string;
+  endTime: string;
+  status: "confirmed" | "completed" | "cancelled" | "no_show" | "rescheduled";
+  meetLink: string | null;
+  cancelledAt: string | null;
+  cancelledReason: string | null;
+  eventTypeName: string;
+};
+
+export type MyBookingsPagination = {
+  page: number;
+  limit: number;
+  totalCount: number;
+  totalPages: number;
+};
+
+export type MyBookingsResponse = {
+  bookings: MyBooking[];
+  pagination: MyBookingsPagination;
+};
+
+export type GetMyBookingsParams = {
+  page?: number;
+  limit?: number;
+  status?: ("confirmed" | "completed")[];
+  scope?: "upcoming" | "past";
+};

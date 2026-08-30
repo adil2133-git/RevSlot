@@ -30,6 +30,17 @@ const NAV_ITEMS = [
     ),
   },
   {
+    href: "/dashboard/bookings",
+    label: "Bookings",
+    icon: (
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="4" width="18" height="17" rx="2" />
+        <path d="M3 9h18" />
+        <path d="m9 15 2 2 4-4" />
+      </svg>
+    ),
+  },
+  {
     href: "/dashboard/event-types",
     label: "Event Types",
     icon: (

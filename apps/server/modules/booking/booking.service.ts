@@ -1,5 +1,5 @@
 import dayjs from "dayjs";
-import { eq, and, ne, sql } from "drizzle-orm";
+import { eq, and, ne, gte, lt, inArray, desc, asc, sql } from "drizzle-orm";
 import { db } from "../../config/db.js";
 import { slots } from "../slot/slots.model.js";
 import { bookings } from "./bookings.model.js";
@@ -11,6 +11,12 @@ import { calendarService } from "../calendar/calendar.service.js";
 import { emailService } from "../../services/email.service.js";
 import { bookingConfirmationTemplate } from "../../emails/templates/bookingConfirmation.js";
 
+export interface GetMyBookingsOptions {
+  page: number;
+  limit: number;
+  status?: ("confirmed" | "completed")[] | undefined;
+  scope?: "upcoming" | "past" | undefined;
+}
 
 export const bookingService = {
   // Doc section 7: "All booking links for a reviewer share the same calendar"
@@ -95,10 +101,6 @@ export const bookingService = {
       ).toDate();
       const endTimestamp = dayjs(`${slot.slotDate}T${slot.endTime}`).toDate();
 
-      // NOTE: advisorName is not persisted — the `bookings` table has no
-      // matching column (flagged with Adil, needs a schema change if this
-      // should be stored). We still include it in the returned object below
-      // so the confirmation response has it.
       const [booking] = await tx
         .insert(bookings)
         .values({
@@ -106,6 +108,7 @@ export const bookingService = {
           reviewerId: slot.reviewerId,
           internName: data.internName,
           batch: data.batch,
+          advisorName: data.advisorName,
           advisorEmail: data.advisorEmail,
           internEmails: data.internEmails,
           weekStage: data.weekStage,
@@ -115,9 +118,9 @@ export const bookingService = {
         })
         .returning();
 
-        if (!booking) {
-  throw new AppError("Failed to create booking", 500);
-}
+      if (!booking) {
+        throw new AppError("Failed to create booking", 500);
+      }
 
       // 4. Mark the slot as booked — only after the booking insert
       //    succeeds. Since this is all inside one transaction, if any step
@@ -127,13 +130,11 @@ export const bookingService = {
         .set({ status: "booked", updatedAt: new Date() })
         .where(eq(slots.id, slot.id));
 
-      // Include advisorName in the response even though it's not stored
-      // in the DB, so the confirmation page/email can display it.
-      return { ...booking, advisorName: data.advisorName };
+      return booking;
     });
   },
 
-       // Runs AFTER createBooking's transaction has committed — deliberately
+  // Runs AFTER createBooking's transaction has committed — deliberately
   // kept out of the transaction. Google Calendar + Resend are both
   // external services with no rollback semantics here; a slow/failing
   // Meet-event or email call must never undo an already-confirmed
@@ -145,12 +146,12 @@ export const bookingService = {
     eventTypeId: number;
     reviewerId: number;
     internName: string;
+    advisorName: string;
     advisorEmail: string;
     internEmails: string[] | null;
     weekStage: string;
     startTime: Date;
     endTime: Date;
-    advisorName: string;
   }) => {
     const [eventType] = await db
       .select({
@@ -272,5 +273,70 @@ export const bookingService = {
     return { meetLink };
   },
 
-};
+  // Reviewer's own bookings — paginated, filterable by status, and scoped
+  // to upcoming/past. Joins eventTypes for the display name so the
+  // frontend doesn't need a second lookup per booking.
+  getMyBookings: async (reviewerId: number, options: GetMyBookingsOptions) => {
+    const { page, limit, status, scope } = options;
+    const offset = (page - 1) * limit;
+    const now = new Date();
 
+    const conditions = [eq(bookings.reviewerId, reviewerId)];
+
+    if (status && status.length > 0) {
+      conditions.push(inArray(bookings.status, status));
+    }
+
+    if (scope === "upcoming") {
+      conditions.push(gte(bookings.startTime, now));
+    } else if (scope === "past") {
+      conditions.push(lt(bookings.startTime, now));
+    }
+
+    // Upcoming bookings make sense soonest-first; past bookings make
+    // sense most-recent-first — auto-flip based on scope rather than
+    // exposing a separate sort param the frontend has to think about.
+    const orderBy = scope === "past" ? desc(bookings.startTime) : asc(bookings.startTime);
+
+    const [rows, countResult] = await Promise.all([
+      db
+        .select({
+          id: bookings.id,
+          internName: bookings.internName,
+          batch: bookings.batch,
+          advisorName: bookings.advisorName,
+          advisorEmail: bookings.advisorEmail,
+          weekStage: bookings.weekStage,
+          startTime: bookings.startTime,
+          endTime: bookings.endTime,
+          status: bookings.status,
+          meetLink: bookings.meetLink,
+          cancelledAt: bookings.cancelledAt,
+          cancelledReason: bookings.cancelledReason,
+          eventTypeName: eventTypes.name,
+        })
+        .from(bookings)
+        .innerJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
+        .where(and(...conditions))
+        .orderBy(orderBy)
+        .limit(limit)
+        .offset(offset),
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(bookings)
+        .where(and(...conditions)),
+    ]);
+
+    const totalCount = countResult[0]?.count ?? 0;
+
+    return {
+      bookings: rows,
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+      },
+    };
+  },
+};

@@ -63,6 +63,13 @@ function GoogleSignInButton() {
         [googleAuth, router]
     );
 
+    const handleCredentialRef = useRef(handleCredential);
+    useEffect(() => {
+        handleCredentialRef.current = handleCredential;
+    }, [handleCredential]);
+
+    const isInitializedRef = useRef(false);
+
     useEffect(() => {
         if (typeof window !== "undefined" && window.google) {
             setScriptLoaded(true);
@@ -76,10 +83,16 @@ function GoogleSignInButton() {
             console.error("NEXT_PUBLIC_GOOGLE_CLIENT_ID is not set");
             return;
         }
-        window.google.accounts.id.initialize({
-            client_id: clientId,
-            callback: handleCredential,
-        });
+
+        if (!isInitializedRef.current) {
+            window.google.accounts.id.initialize({
+                client_id: clientId,
+                callback: (res) => handleCredentialRef.current(res),
+            });
+            isInitializedRef.current = true;
+        }
+
+        buttonRef.current.innerHTML = "";
         window.google.accounts.id.renderButton(buttonRef.current, {
             theme: "outline",
             size: "large",
@@ -87,7 +100,7 @@ function GoogleSignInButton() {
             shape: "pill",
             text: "continue_with",
         });
-    }, [scriptLoaded, handleCredential]);
+    }, [scriptLoaded]);
 
     const submitWhatsapp = async (values: GoogleWhatsappFormValues) => {
         if (!pendingIdToken.current) return;

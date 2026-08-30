@@ -16,6 +16,7 @@ export const bookings = pgTable('bookings', {
 
   internName: varchar('intern_name', { length: 150 }).notNull(),
   batch: varchar('batch', { length: 50 }).notNull(),
+  advisorName: varchar('advisor_name', { length: 150 }).notNull(),
   advisorEmail: varchar('advisor_email', { length: 255 }).notNull(),
   internEmails: text('intern_emails').array(),
   weekStage: varchar('week_stage', { length: 255 }).notNull(),

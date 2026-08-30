@@ -1,5 +1,13 @@
 import api from "@/lib/axios";
-import type {BookingPageInfo, ReviewerProfile, SlotItem, HoldResult, BookingFormPayload} from "../type";
+import type {
+  BookingPageInfo,
+  ReviewerProfile,
+  SlotItem,
+  HoldResult,
+  BookingFormPayload,
+  MyBookingsResponse,
+  GetMyBookingsParams,
+} from "../type";
 
 export async function fetchBookingPageInfo(username: string, eventSlug: string) {
   const { data } = await api.get<{ success: boolean; data: BookingPageInfo }>(
@@ -45,9 +53,26 @@ export async function releaseSlot(holdToken: string) {
 }
 
 export async function createBooking(payload: BookingFormPayload) {
-  const { data } = await api.post<{ success: boolean; data: {meetLink: string | null}; }>(
+  const { data } = await api.post<{ success: boolean; data: { meetLink: string | null }; }>(
     "/bookings",
     payload
+  );
+  return data.data;
+}
+
+// Reviewer's own bookings — paginated, filterable by status/scope.
+// Backs the dashboard Bookings page and the Overview upcoming-bookings widget.
+export async function fetchMyBookings(params: GetMyBookingsParams = {}) {
+  const { data } = await api.get<{ success: boolean; data: MyBookingsResponse }>(
+    "/bookings/me",
+    {
+      params: {
+        page: params.page,
+        limit: params.limit,
+        status: params.status?.join(","),
+        scope: params.scope,
+      },
+    }
   );
   return data.data;
 }
