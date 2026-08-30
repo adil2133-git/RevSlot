@@ -25,14 +25,35 @@ export const GetMyBookingsQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional().default(1),
   limit: z.coerce.number().int().positive().max(100).optional().default(20),
   status: z
-    .union([z.string(), z.array(z.string())])
+    .string()
     .optional()
-    .transform((val) => {
-      if (!val) return undefined;
-      if (Array.isArray(val)) return val as ("confirmed" | "completed")[];
-      return val.split(",") as ("confirmed" | "completed")[];
-    }),
+    .transform((val) => val?.split(",") as ("confirmed" | "completed")[] | undefined),
   scope: z.enum(["upcoming", "past"]).optional(),
 });
 
 export type GetMyBookingsQueryInput = z.infer<typeof GetMyBookingsQuerySchema>;
+
+// Route param validation shared by GET /:id, PATCH /:id/cancel, PATCH /:id/reschedule
+export const BookingIdParamSchema = z.object({
+  id: z.coerce.number().int().positive(),
+});
+
+export type BookingIdParamInput = z.infer<typeof BookingIdParamSchema>;
+
+// Reviewer-initiated cancellation — reason is required so it can be
+// shown to the advisor and stored as an audit trail (bookings.cancelledReason).
+export const CancelBookingSchema = z.object({
+  reason: z.string().min(1, "Cancellation reason is required").max(255),
+});
+
+export type CancelBookingInput = z.infer<typeof CancelBookingSchema>;
+
+// Reviewer-initiated reschedule — new date/time for the SAME event type,
+// re-validated against live availability via slotService.holdSlot.
+export const RescheduleBookingSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD)"),
+  startTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, "Invalid time format (HH:MM)"),
+  endTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, "Invalid time format (HH:MM)"),
+});
+
+export type RescheduleBookingInput = z.infer<typeof RescheduleBookingSchema>;
