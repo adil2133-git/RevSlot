@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, varchar, text, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, serial, integer, varchar, text, timestamp, type AnyPgColumn } from 'drizzle-orm/pg-core';
 import { reviewers } from '../auth/reviewers.model.js';
 import { eventTypes } from '../eventType/eventTypes.model.js';
 import { bookingStatus } from '../../db/schema/enums.js';
@@ -30,6 +30,13 @@ export const bookings = pgTable('bookings', {
 
   cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
   cancelledReason: varchar('cancelled_reason', { length: 255 }),
+
+  // Self-reference: the new booking created by a reschedule points back
+  // to the booking it replaced. Nullable — most bookings are never rescheduled.
+  rescheduledFromBookingId: integer('rescheduled_from_booking_id').references(
+    (): AnyPgColumn => bookings.id,
+    { onDelete: 'set null' }
+  ),
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });

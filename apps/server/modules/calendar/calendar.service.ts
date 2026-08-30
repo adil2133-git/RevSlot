@@ -211,6 +211,43 @@ export const calendarService = {
       return null;
     }
   },
+
+  // Called from booking.service.ts when a booking is cancelled or
+  // rescheduled (before the old event is replaced). Best-effort — if the
+  // reviewer isn't connected, or the event was already removed on
+  // Google's side, this just no-ops rather than throwing.
+  cancelMeetEvent: async (reviewerId: number, googleEventId: string): Promise<void> => {
+    const [reviewer] = await db
+      .select({
+        refreshToken: reviewers.googleCalendarRefreshToken,
+        connected: reviewers.googleCalendarConnected,
+      })
+      .from(reviewers)
+      .where(eq(reviewers.id, reviewerId))
+      .limit(1);
+
+    if (!reviewer?.connected || !reviewer.refreshToken) {
+      return;
+    }
+
+    const client = createOAuthClient();
+    client.setCredentials({ refresh_token: reviewer.refreshToken });
+
+    const calendar = google.calendar({ version: "v3", auth: client });
+
+    try {
+      await calendar.events.delete({
+        calendarId: "primary",
+        eventId: googleEventId,
+        sendUpdates: "all",
+      });
+    } catch (err: any) {
+      console.error(
+        `[Calendar Service] Failed to delete event ${googleEventId} for reviewer ${reviewerId}:`,
+        err.message || err
+      );
+    }
+  },
 };
 
 export { CLIENT_URL };
