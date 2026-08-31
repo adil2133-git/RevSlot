@@ -1,14 +1,18 @@
 import dayjs from "dayjs";
+import bcrypt from "bcryptjs";
 import { eq, and, or, ilike, sql, gte, lte, desc, count } from "drizzle-orm";
 import { db } from "../../config/db.js";
 import { reviewers } from "../auth/reviewers.model.js";
 import { bookings } from "../booking/bookings.model.js";
 import { eventTypes } from "../eventType/eventTypes.model.js";
+import { admins } from "./admins.model.js";
+import { auditLogService } from "../auditLog/auditLog.service.js";
 import { AppError } from "../../core/errors/AppError.js";
 import type {
   ListReviewersQuery,
   UpdateReviewerStatusInput,
   ListBookingsQuery,
+  UpdateAdminProfileInput,
 } from "./admin.schema.js";
 
 export const adminService = {
@@ -55,7 +59,11 @@ export const adminService = {
   },
 
   // Task 7 — PATCH /api/admin/reviewers/:id
-  updateReviewerStatus: async (reviewerId: number, input: UpdateReviewerStatusInput) => {
+  updateReviewerStatus: async (
+    reviewerId: number,
+    input: UpdateReviewerStatusInput,
+    actorId: number
+  ) => {
     const [existing] = await db.select().from(reviewers).where(eq(reviewers.id, reviewerId));
     if (!existing) {
       throw new AppError("Reviewer not found", 404);
@@ -71,6 +79,20 @@ export const adminService = {
         email: reviewers.email,
         isActive: reviewers.isActive,
       });
+
+    // JWT payload only carries { userId, role } — look up the acting
+    // admin's name so the audit log entry is readable without a join.
+    const [actorAdmin] = await db.select({ name: admins.name }).from(admins).where(eq(admins.id, actorId));
+
+    await auditLogService.recordAuditLog({
+      actorId,
+      actorRole: "admin",
+      actorName: actorAdmin?.name ?? "Unknown admin",
+      action: input.isActive ? "reviewer.reactivated" : "reviewer.deactivated",
+      targetType: "reviewer",
+      targetId: reviewerId,
+      metadata: { from: existing.isActive, to: input.isActive },
+    });
 
     return updated;
   },
@@ -183,5 +205,77 @@ export const adminService = {
       bookingsWeekChangePct,
       noShowRatePct,
     };
+  },
+
+  // GET /api/admin/me
+  getProfile: async (adminId: number) => {
+    const [admin] = await db
+      .select({
+        id: admins.id,
+        name: admins.name,
+        email: admins.email,
+        avatarUrl: admins.avatarUrl,
+        bio: admins.bio,
+        createdAt: admins.createdAt,
+      })
+      .from(admins)
+      .where(eq(admins.id, adminId));
+
+    if (!admin) {
+      throw new AppError("Admin not found", 404);
+    }
+
+    return admin;
+  },
+
+  // PATCH /api/admin/me — name/bio/avatar always updatable; password change
+  // requires currentPassword (checked here, not just at the schema level,
+  // since the schema can only confirm both fields were sent together, not
+  // that currentPassword is actually correct).
+  updateProfile: async (adminId: number, input: UpdateAdminProfileInput) => {
+    const [existing] = await db.select().from(admins).where(eq(admins.id, adminId));
+    if (!existing) {
+      throw new AppError("Admin not found", 404);
+    }
+
+    const updates: Partial<typeof admins.$inferInsert> = { updatedAt: new Date() };
+
+    if (input.name !== undefined) updates.name = input.name;
+    if (input.bio !== undefined) updates.bio = input.bio;
+    if (input.avatarUrl !== undefined) updates.avatarUrl = input.avatarUrl;
+
+    if (input.newPassword) {
+      if (!existing.passwordHash) {
+        throw new AppError("This account uses Google Sign-In and has no password to change.", 400);
+      }
+      const isCurrentValid = await bcrypt.compare(input.currentPassword!, existing.passwordHash);
+      if (!isCurrentValid) {
+        throw new AppError("Current password is incorrect", 401);
+      }
+      updates.passwordHash = await bcrypt.hash(input.newPassword, 12);
+    }
+
+    const [updated] = await db
+      .update(admins)
+      .set(updates)
+      .where(eq(admins.id, adminId))
+      .returning({
+        id: admins.id,
+        name: admins.name,
+        email: admins.email,
+        avatarUrl: admins.avatarUrl,
+        bio: admins.bio,
+      });
+
+    await auditLogService.recordAuditLog({
+      actorId: adminId,
+      actorRole: "admin",
+      actorName: updated?.name ?? existing.name,
+      action: input.newPassword ? "admin.password_changed" : "admin.profile_updated",
+      targetType: "admin",
+      targetId: adminId,
+    });
+
+    return updated;
   },
 };

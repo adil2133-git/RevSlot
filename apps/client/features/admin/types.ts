@@ -64,3 +64,47 @@ export type DashboardStats = {
   bookingsWeekChangePct: number | null;
   noShowRatePct: number;
 };
+
+export type AdminProfile = {
+  id: number;
+  name: string;
+  email: string;
+  avatarUrl: string | null;
+  bio: string | null;
+  createdAt: string | null;
+};
+
+export type UpdateAdminProfileInput = {
+  name?: string;
+  bio?: string;
+  avatarUrl?: string;
+  currentPassword?: string;
+  newPassword?: string;
+};
+
+export type AuditLogEntry = {
+  id: number;
+  actorId: number;
+  actorRole: "reviewer" | "admin";
+  actorName: string;
+  action: string;
+  targetType: string | null;
+  targetId: number | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+};
+
+export type ListAuditLogParams = {
+  action?: string;
+  actorId?: number;
+  targetType?: string;
+  fromDate?: string;
+  toDate?: string;
+  page?: number;
+  limit?: number;
+};
+
+export type ListAuditLogResponse = {
+  logs: AuditLogEntry[];
+  pagination: Pagination;
+};
