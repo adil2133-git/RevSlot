@@ -9,6 +9,8 @@ import type {
   ResendVerificationPayload,
   ResetPasswordPayload,
   VerifyEmailPayload,
+  UpdateProfilePayload,
+  ChangePasswordPayload,
 } from "../types";
 import {
   loginReviewer,
@@ -22,6 +24,8 @@ import {
   resendVerification as resendVerificationApi,
   googleAuth as googleAuthApi,
   updateUsername as updateUsernameApi,
+  updateProfile as updateProfileApi,
+  changePassword as changePasswordApi,
 } from "../api/authApi";
 import { setAccessToken, refreshAccessToken, ApiError } from "@/lib/axios";
 
@@ -77,6 +81,11 @@ type AuthState = {
    *  wasn't supplied — caller should catch that and re-call with it. */
   googleAuth: (payload: GoogleAuthPayload) => Promise<void>;
   updateUsername: (username: string) => Promise<void>;
+  updateProfile: (payload: UpdateProfilePayload) => Promise<void>;
+  /** Changes password server-side and revokes ALL sessions (including
+   *  this one) — clears local auth state too, same as logout. Caller
+   *  should redirect to login after this resolves. */
+  changePassword: (payload: ChangePasswordPayload) => Promise<string>;
 };
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -241,4 +250,31 @@ export const useAuthStore = create<AuthState>((set) => ({
       throw err;
     }
   },
+
+  updateProfile: async (payload) => {
+    set({ isLoading: true, error: null });
+    try {
+      const updatedUser = await updateProfileApi(payload);
+      set({ user: updatedUser, isLoading: false });
+    } catch (err) {
+      set({ isLoading: false, error: (err as Error).message });
+      throw err;
+    }
+  },
+
+  changePassword: async (payload) => {
+    set({ isLoading: true, error: null });
+    try {
+      const message = await changePasswordApi(payload);
+      // Server revoked every session for this account — mirror that
+      // locally so the UI doesn't keep acting like it's logged in.
+      setAccessToken(null);
+      set({ user: null, isLoading: false });
+      return message;
+    } catch (err) {
+      set({ isLoading: false, error: (err as Error).message });
+      throw err;
+    }
+  },
+
 }));

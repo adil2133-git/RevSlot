@@ -112,6 +112,22 @@ export const refreshTokenService = {
     });
   },
 
+    // Called when a password changes — revokes every active session for
+  // this user+role so a leaked/old access token can't survive a
+  // password change. Forces re-login on all devices.
+  revokeAllForUser: async (userId: number, role: "reviewer" | "admin") => {
+    await db
+      .update(refreshTokens)
+      .set({ revokedAt: new Date() })
+      .where(
+        and(
+          eq(refreshTokens.userId, userId),
+          eq(refreshTokens.role, role),
+          isNull(refreshTokens.revokedAt),
+        ),
+      );
+  },
+
   // Called on logout — revokes just this one session's refresh token.
   // Silently no-ops on an already-invalid token; logout should always
   // succeed from the client's point of view.

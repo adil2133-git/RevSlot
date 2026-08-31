@@ -126,6 +126,30 @@ export const authController = {
     });
   },
 
+    updateProfile: async (req: Request, res: Response) => {
+    const user = await authService.updateProfile(req.user!.userId, req.user!.role, req.body);
+
+    res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+      data: { user },
+    });
+  },
+
+  changePassword: async (req: Request, res: Response) => {
+    const result = await authService.changePassword(req.user!.userId, req.user!.role, req.body);
+
+    // Every session (including this one) was just revoked server-side —
+    // clear this browser's cookie too so it isn't left holding a dead
+    // refresh token.
+    res.clearCookie('refreshToken', REFRESH_COOKIE_OPTIONS);
+
+    res.status(200).json({
+      success: true,
+      message: result.message,
+    });
+  },
+
   forgotPassword: async (req: Request, res: Response) => {
     const result = await authService.forgotPassword(req.body);
 

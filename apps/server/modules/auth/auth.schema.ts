@@ -57,6 +57,17 @@ export const UpdateUsernameSchema = z.object({
   username: usernameSchema,
 });
 
+export const UpdateProfileSchema = z.object({
+  name: z.string().trim().min(2, "Name must be at least 2 characters").max(50).optional(),
+  bio: z.string().trim().max(300, "Bio must be at most 300 characters").optional(),
+  whatsappNumber: z.string().trim().regex(/^\+?[0-9]{10,15}$/, "Invalid WhatsApp number").optional(),
+});
+
+export const ChangePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Current password is required"),
+  newPassword: z.string().min(8, "New password must be at least 8 characters").max(72),
+});
+
 export type RegisterInput = z.infer<typeof RegisterSchema>;
 export type LoginInput = z.infer<typeof LoginSchema>;
 export type RefreshInput = z.infer<typeof RefreshSchema>;
@@ -66,3 +77,5 @@ export type VerifyEmailInput = z.infer<typeof VerifyEmailSchema>;
 export type ResendVerificationInput = z.infer<typeof ResendVerificationSchema>;
 export type GoogleAuthInput = z.infer<typeof GoogleAuthSchema>;
 export type UpdateUsernameInput = z.infer<typeof UpdateUsernameSchema>;
+export type UpdateProfileInput = z.infer<typeof UpdateProfileSchema>;
+export type ChangePasswordInput = z.infer<typeof ChangePasswordSchema>;

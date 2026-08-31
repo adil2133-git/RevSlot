@@ -1,7 +1,7 @@
 import { Router } from "express";
 
 import { validate } from "../../core/middlewares/validate.middleware.js";
-import { LoginSchema, RegisterSchema, ForgotPasswordSchema, ResetPasswordSchema, VerifyEmailSchema, ResendVerificationSchema, GoogleAuthSchema, UpdateUsernameSchema } from "./auth.schema.js";
+import { LoginSchema, RegisterSchema, ForgotPasswordSchema, ResetPasswordSchema, VerifyEmailSchema, ResendVerificationSchema, GoogleAuthSchema, UpdateUsernameSchema,  UpdateProfileSchema, ChangePasswordSchema } from "./auth.schema.js";
 import { catchAsync } from "../../core/utils/catchAsync.js";
 import { authController } from "./auth.controller.js";
 import { requireAuth, requireAdmin } from "../../core/middlewares/auth.middleware.js";
@@ -16,7 +16,9 @@ router.post("/refresh", refreshLimiter, catchAsync(authController.refreshToken))
 router.post("/logout", catchAsync(authController.logout));
 
 router.get("/me", requireAuth, catchAsync(authController.getMe));
+router.patch("/profile", requireAuth, validate(UpdateProfileSchema), catchAsync(authController.updateProfile));
 router.patch("/profile/username", requireAuth, validate(UpdateUsernameSchema), catchAsync(authController.updateUsername));
+router.patch("/profile/password", requireAuth, validate(ChangePasswordSchema), catchAsync(authController.changePassword));
 
 router.post("/forgot-password", validate(ForgotPasswordSchema), catchAsync(authController.forgotPassword));
 router.post("/reset-password", validate(ResetPasswordSchema), catchAsync(authController.resetPassword));

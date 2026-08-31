@@ -10,6 +10,10 @@ export type AuthUser = {
   email: string;
   avatarUrl: string | null;
   bio: string | null;
+  whatsappNumber: string | null;
+  emailVerified: boolean;
+  hasPassword: boolean;
+  createdAt: string | null;
 };
 
 export type LoginPayload = {
@@ -81,3 +85,15 @@ export type RegisterResponse = ApiDataEnvelope<{
   email: string;
   requiresVerification: boolean;
 }> & { message: string };
+
+
+export type UpdateProfilePayload = {
+  name?: string;
+  bio?: string;
+  whatsappNumber?: string;
+};
+
+export type ChangePasswordPayload = {
+  currentPassword: string;
+  newPassword: string;
+};
