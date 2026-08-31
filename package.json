@@ -36,5 +36,8 @@
   "type": "module",
   "devDependencies": {
     "@types/node": "^26.2.0"
+  },
+  "dependencies": {
+    "lucide-react": "^1.37.0"
   }
 }

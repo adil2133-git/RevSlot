@@ -40,17 +40,29 @@ const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 
 // Common fields required for authentication
-type AuthUser = Pick <
-  InferSelectModel<typeof reviewers>,
-  "id" |
-  "name" |
-  "email" |
-  "passwordHash" |
-  "avatarUrl" |
-  "bio" |
-  "isActive" |
-  "emailVerified"
-> & {
+// type AuthUser = Pick<
+//   InferSelectModel<typeof reviewers>,
+//   "id" |
+//   "name" |
+//   "email" |
+//   "passwordHash" |
+//   "avatarUrl" |
+//   "bio" |
+//   "isActive" |
+//   "emailVerified"
+// > & {
+//   username?: string | null;
+// };
+
+type AuthUser = {
+  id: number;
+  name: string;
+  email: string;
+  passwordHash: string | null;
+  avatarUrl: string | null;
+  bio: string | null;
+  isActive: boolean | null;
+  emailVerified: boolean;
   username?: string | null;
 };
 
@@ -285,21 +297,79 @@ if (existingUsername.length > 0) {
       throw new AppError("User not found", 404);
     }
 
-    return {
-      id: user.id,
-      name: user.name,
-      username: ("username" in user ? user.username : null) ?? null,
-      email: user.email,
-      role,
-      avatarUrl: user.avatarUrl,
-      bio: user.bio,
-      whatsappNumber:"whatsappNumber" in user
-     ? user.whatsappNumber
-     : undefined,
-     emailVerified: user.emailVerified,
-     hasPassword: Boolean(user.passwordHash),
-     createdAt: user.createdAt,
-    };
+  return {
+  id: user.id,
+  name: user.name,
+  username: ("username" in user ? user.username : null) ?? null,
+  email: user.email,
+  role,
+  avatarUrl: user.avatarUrl,
+  bio: user.bio,
+
+  whatsappNumber:
+    "whatsappNumber" in user
+      ? user.whatsappNumber
+      : undefined,
+
+  professionalHeadline:
+    "professionalHeadline" in user
+      ? user.professionalHeadline
+      : undefined,
+
+  skills:
+    "skills" in user
+      ? user.skills
+      : undefined,
+
+  yearsOfExperience:
+    "yearsOfExperience" in user
+      ? user.yearsOfExperience
+      : undefined,
+
+  currentRole:
+    "currentRole" in user
+      ? user.currentRole
+      : undefined,
+
+  currentCompany:
+    "currentCompany" in user
+      ? user.currentCompany
+      : undefined,
+
+  degree:
+    "degree" in user
+      ? user.degree
+      : undefined,
+
+  university:
+    "university" in user
+      ? user.university
+      : undefined,
+
+  graduationYear:
+    "graduationYear" in user
+      ? user.graduationYear
+      : undefined,
+
+  linkedinUrl:
+    "linkedinUrl" in user
+      ? user.linkedinUrl
+      : undefined,
+
+  githubUrl:
+    "githubUrl" in user
+      ? user.githubUrl
+      : undefined,
+
+  portfolioUrl:
+    "portfolioUrl" in user
+      ? user.portfolioUrl
+      : undefined,
+
+  emailVerified: user.emailVerified,
+  hasPassword: Boolean(user.passwordHash),
+  createdAt: user.createdAt,
+};
   },
 
   // Updates username for a logged-in reviewer
@@ -370,6 +440,60 @@ if (existingUsername.length > 0) {
       avatarUrl: updated.avatarUrl,
       bio: updated.bio,
       whatsappNumber: ("whatsappNumber" in updated ? updated.whatsappNumber : null) ?? null,
+      professionalHeadline:
+    "professionalHeadline" in updated
+      ? updated.professionalHeadline
+      : undefined,
+
+  skills:
+    "skills" in updated
+      ? updated.skills
+      : undefined,
+
+  yearsOfExperience:
+    "yearsOfExperience" in updated
+      ? updated.yearsOfExperience
+      : undefined,
+
+  currentRole:
+    "currentRole" in updated
+      ? updated.currentRole
+      : undefined,
+
+  currentCompany:
+    "currentCompany" in updated
+      ? updated.currentCompany
+      : undefined,
+
+  degree:
+    "degree" in updated
+      ? updated.degree
+      : undefined,
+
+  university:
+    "university" in updated
+      ? updated.university
+      : undefined,
+
+  graduationYear:
+    "graduationYear" in updated
+      ? updated.graduationYear
+      : undefined,
+
+  linkedinUrl:
+    "linkedinUrl" in updated
+      ? updated.linkedinUrl
+      : undefined,
+
+  githubUrl:
+    "githubUrl" in updated
+      ? updated.githubUrl
+      : undefined,
+
+  portfolioUrl:
+    "portfolioUrl" in updated
+      ? updated.portfolioUrl
+      : undefined,
       emailVerified: updated.emailVerified,
       hasPassword: updated.passwordHash !== null,
       createdAt: updated.createdAt,

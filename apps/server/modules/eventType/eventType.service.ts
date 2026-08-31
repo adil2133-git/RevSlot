@@ -18,6 +18,17 @@ export const eventTypeService = {
         name: reviewers.name,
         avatarUrl: reviewers.avatarUrl,
         bio: reviewers.bio,
+        professionalHeadline: reviewers.professionalHeadline,
+        skills: reviewers.skills,
+        yearsOfExperience: reviewers.yearsOfExperience,
+        currentRole: reviewers.currentRole,
+        currentCompany: reviewers.currentCompany,
+        degree: reviewers.degree,
+        university: reviewers.university,
+        graduationYear: reviewers.graduationYear,
+        linkedinUrl: reviewers.linkedinUrl,
+        githubUrl: reviewers.githubUrl,
+        portfolioUrl: reviewers.portfolioUrl,
       })
       .from(reviewers)
       .where(and(eq(reviewers.username, username), eq(reviewers.isActive, true)))

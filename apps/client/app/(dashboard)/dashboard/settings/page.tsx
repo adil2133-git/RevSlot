@@ -6,6 +6,7 @@ import dayjs from "dayjs";
 
 import { useAuthStore } from "@/features/auth/store/authStore";
 import GoogleCalendarCard from "@/features/calendar/components/GoogleCalendarCard";
+import ProfileInfoCard from "@/features/auth/components/ProfileInfoCard";
 import { ApiError } from "@/lib/axios";
 
 type Tab = "profile" | "calendar" | "account";
@@ -115,80 +116,9 @@ export default function SettingsPage() {
       </div>
 
             {activeTab === "profile" && (
-        <div className="mt-6 space-y-6">
-          
-          {/* Public profile — visible to anyone who books with this reviewer */}
-          <div className="rounded-xl border border-slate-100 bg-surface-card p-6 shadow-surface">
-            <h2 className="text-base font-semibold text-on-surface">Public Profile</h2>
-            <p className="mb-5 text-sm text-slate-400">
-              Shown to reviewers on your public booking page.
-            </p>
-
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="name" className="mb-2 block text-sm font-semibold text-on-surface">
-                  Name
-                </label>
-                <input
-                  id="name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 p-2.5 text-sm text-on-surface focus:border-primary focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="bio" className="mb-2 block text-sm font-semibold text-on-surface">
-                  Bio
-                </label>
-                <textarea
-                  id="bio"
-                  value={bio}
-                  onChange={(e) => setBio(e.target.value)}
-                  rows={3}
-                  maxLength={300}
-                  placeholder="A short line about your experience and specialities."
-                  className="w-full rounded-lg border border-slate-300 p-2.5 text-sm text-on-surface placeholder:text-slate-400 focus:border-primary focus:outline-none"
-                />
-                <p className="mt-1 text-right text-xs text-slate-400">{bio.length}/300</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Contact info — private, only used for internal coordination */}
-          <div className="rounded-xl border border-slate-100 bg-surface-card p-6 shadow-surface">
-            <h2 className="text-base font-semibold text-on-surface">Contact Info</h2>
-            <p className="mb-5 text-sm text-slate-400">
-              Private — never shown on your public booking page.
-            </p>
-
-            <div>
-              <label htmlFor="whatsapp" className="mb-2 block text-sm font-semibold text-on-surface">
-                WhatsApp Number
-              </label>
-              <input
-                id="whatsapp"
-                value={whatsappNumber}
-                onChange={(e) => setWhatsappNumber(e.target.value)}
-                placeholder="+91XXXXXXXXXX"
-                className="w-full rounded-lg border border-slate-300 p-2.5 text-sm text-on-surface placeholder:text-slate-400 focus:border-primary focus:outline-none"
-              />
-            </div>
-          </div>
-
-          {profileError && <p className="text-sm text-error">{profileError}</p>}
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleProfileSave}
-              disabled={!profileDirty || profileSaving}
-              className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {profileSaving ? "Saving…" : "Save changes"}
-            </button>
-            {profileSaved && <span className="text-sm text-green-600">Saved ✓</span>}
-          </div>
-        </div>
+     <div className="mt-6">
+         <ProfileInfoCard />
+     </div>
       )}
 
       {/* ---- Calendar tab ---- */}
