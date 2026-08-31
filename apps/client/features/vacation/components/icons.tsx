@@ -268,4 +268,84 @@ export function CalendarIcon({ className }: { className?: string }) {
       <line x1="3" y1="10" x2="21" y2="10" />
     </svg>
   );
+}
+
+export function PlaneIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M21 16V8a2 2 0 0 0-2-2h-3L9 3H7.5v6H3v2h4.5v6H9l8-3h3a2 2 0 0 0 2-2z" />
+    </svg>
+  );
+}
+
+export function SnowflakeIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <line x1="2" y1="12" x2="22" y2="12" />
+      <line x1="12" y1="2" x2="12" y2="22" />
+      <path d="m20 16-4-4 4-4" />
+      <path d="m4 8 4 4-4 4" />
+      <path d="m16 4-4 4-4-4" />
+      <path d="m8 20 4-4 4 4" />
+    </svg>
+  );
+}
+
+export function CocktailIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M18 22H6M12 15v7M12 15 22 3H2l10 12Z" />
+      <path d="m15 6.5-6 6" />
+    </svg>
+  );
+}
+
+export function UmbrellaIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 22v-6M12 16a7 7 0 0 0-7-7h14a7 7 0 0 0-7 7z" />
+      <path d="M12 16a7 7 0 0 1-7-7M12 16a7 7 0 0 0 7-7" />
+      <path d="M12 22a2 2 0 0 1-2-2" />
+    </svg>
+  );
 }
