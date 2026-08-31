@@ -77,7 +77,7 @@ export default function LandingPage() {
             Get Started as a Reviewer →
           </Link>
           <Link
-            href="/login/reviewer"
+            href="/reviewer/login"
             className="w-full rounded-lg bg-secondary px-6 py-3 text-sm font-semibold text-primary sm:w-auto"
           >
             I already have an account

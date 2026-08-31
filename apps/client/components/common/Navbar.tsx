@@ -25,7 +25,7 @@ export default function Navbar() {
             </Link>
           ) : (
             <>
-              <Link href="/login/reviewer" className="text-sm font-medium text-on-surface hover:text-primary">
+              <Link href="/reviewer/login" className="text-sm font-medium text-on-surface hover:text-primary">
                 Log in
               </Link>
               <Link href="/register" className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary shadow-surface transition-shadow hover:shadow-raised">
