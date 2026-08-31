@@ -44,11 +44,9 @@ export const bookingController = {
 
   rescheduleBooking: async (req: Request, res: Response) => {
     const { id } = BookingIdParamSchema.parse(req.params);
+    const oldBooking = await bookingService.getBookingById(req.user!.userId, id);
     const newBooking = await bookingService.rescheduleBooking(req.user!.userId, id, req.body);
-    const { meetLink } = await bookingService.finalizeBooking({
-      ...newBooking,
-      advisorName: newBooking.advisorName,
-    });
+    const { meetLink } = await bookingService.finalizeReschedule(oldBooking, newBooking);
     res.status(200).json({ success: true, data: { ...newBooking, meetLink } });
   },
 };
