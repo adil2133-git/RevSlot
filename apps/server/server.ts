@@ -13,6 +13,7 @@ import eventTypeRoutes from "./modules/eventType/eventType.routes.js"
 import adminRoutes from "./modules/admin/admin.routes.js"
 import vacationRoutes from "./modules/vacation/vacation.routes.js";
 import calendarRoutes from "./modules/calendar/calendar.routes.js";
+import dashboardRoutes from "./modules/dashboard/dashboard.routes.js"
 import { notFound, errorMiddleware } from './core/middlewares/error.middleware.js';
 import { pool } from "./config/db.js"
 
@@ -34,7 +35,8 @@ app.use("/api/bookings", bookingRoutes);
 app.use("/api/event-types", eventTypeRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/vacation-blocks", vacationRoutes);
-app.use("/api/calendar", calendarRoutes)
+app.use("/api/calendar", calendarRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 
 app.get('/', (req, res) => {
   res.send('Server is running');
