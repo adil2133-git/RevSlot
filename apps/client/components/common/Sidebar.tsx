@@ -95,7 +95,7 @@ export default function Sidebar() {
 
   const handleLogout = async () => {
     await logout();
-    router.push("/login/reviewer");
+    router.push("/reviewer/login");
   };
 
   return (

@@ -23,9 +23,9 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     onSessionExpired(() => {
       logoutLocal();
       if (pathnameRef.current.startsWith("/admin")) {
-        router.push("/login/admin");
+        router.push("/admin/login");
       } else if (pathnameRef.current.startsWith("/dashboard")) {
-        router.push("/login/reviewer");
+        router.push("/reviewer/login");
       }
     });
       if (!hasHydrated.current) {
