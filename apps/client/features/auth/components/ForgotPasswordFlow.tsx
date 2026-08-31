@@ -54,7 +54,7 @@ export default function ForgotPasswordFlow() {
       // Reset doesn't log the user in — send them to log in with the
       // new password after a moment. replace (not push): the OTP is
       // already consumed, so Back shouldn't return to a stale reset form.
-      setTimeout(() => router.replace("/login/reviewer"), 1800);
+      setTimeout(() => router.replace("/reviewer/login"), 1800);
     } catch {
       // error already captured in store; surfaced below
     }
@@ -227,7 +227,7 @@ export default function ForgotPasswordFlow() {
       </button>
 
       <p className="text-center text-sm text-slate-400">
-        <Link href="/login/reviewer" className="font-medium text-primary hover:underline">
+        <Link href="/reviewer/login" className="font-medium text-primary hover:underline">
           Back to log in
         </Link>
       </p>

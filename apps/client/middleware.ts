@@ -14,17 +14,17 @@ export function middleware(request: NextRequest) {
   const hasSession = request.cookies.has("refreshToken");
 
   const isDashboardRoute = pathname.startsWith("/dashboard");
-  const isAdminRoute = pathname.startsWith("/admin");
-  const isAuthRoute = pathname.startsWith("/login") || pathname.startsWith("/register");
+  const isAdminRoute = pathname.startsWith("/admin") && !pathname.startsWith("/admin/login");
+  const isAuthRoute = pathname === "/admin/login" || pathname === "/reviewer/login" || pathname.startsWith("/register");
 
   if (isDashboardRoute && !hasSession) {
-    const loginUrl = new URL("/login/reviewer", request.url);
+    const loginUrl = new URL("/reviewer/login", request.url);
     loginUrl.searchParams.set("redirectTo", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
   if (isAdminRoute && !hasSession) {
-    const loginUrl = new URL("/login/admin", request.url);
+    const loginUrl = new URL("/admin/login", request.url);
     loginUrl.searchParams.set("redirectTo", pathname);
     return NextResponse.redirect(loginUrl);
   }
@@ -32,9 +32,9 @@ export function middleware(request: NextRequest) {
   if (isAuthRoute && hasSession) {
     // The cookie alone doesn't carry role (no JWT verification at the
     // edge), but the admin login page is a strong-enough signal on its
-    // own: someone already logged in who lands on /login/admin should
+    // own: someone already logged in who lands on /admin/login should
     // go back to the admin console, not the reviewer dashboard.
-    const destination = pathname.startsWith("/login/admin") ? "/admin/dashboard" : "/dashboard";
+    const destination = pathname.startsWith("/admin/login") ? "/admin/dashboard" : "/dashboard";
     return NextResponse.redirect(new URL(destination, request.url));
   }
 
@@ -42,5 +42,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/admin/:path*", "/login/:path*", "/login", "/register"],
+  matcher: ["/dashboard/:path*", "/admin/:path*", "/reviewer/login", "/register"],
 };
