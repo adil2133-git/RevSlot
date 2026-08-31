@@ -12,3 +12,4 @@ export * from '../modules/questionBank/questions.model.js';
 export * from '../modules/availability/templateDateOverrideBlocks.model.js'
 export * from '../modules/availability/templateDateOverrides.model.js'
 export * from '../modules/auth/refreshTokens.model.js'
+export * from '../modules/auditLog/auditLog.model.js'

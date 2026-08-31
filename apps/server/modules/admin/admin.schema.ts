@@ -34,3 +34,19 @@ export const ListBookingsQuerySchema = z.object({
 });
 
 export type ListBookingsQuery = z.infer<typeof ListBookingsQuerySchema>;
+
+// PATCH /api/admin/me — profile/settings update
+export const UpdateAdminProfileSchema = z
+  .object({
+    name: z.string().trim().min(1).max(150).optional(),
+    bio: z.string().trim().max(1000).optional(),
+    avatarUrl: z.string().url().optional(),
+    currentPassword: z.string().min(1).optional(),
+    newPassword: z.string().min(8).max(100).optional(),
+  })
+  .refine((data) => !data.newPassword || !!data.currentPassword, {
+    message: "currentPassword is required to set a new password",
+    path: ["currentPassword"],
+  });
+
+export type UpdateAdminProfileInput = z.infer<typeof UpdateAdminProfileSchema>;
