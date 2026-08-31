@@ -7,6 +7,9 @@ import type {
   BookingFormPayload,
   MyBookingsResponse,
   GetMyBookingsParams,
+  BookingDetail,
+  CancelBookingPayload,
+  RescheduleBookingPayload,
 } from "../type";
 
 export async function fetchBookingPageInfo(username: string, eventSlug: string) {
@@ -73,6 +76,32 @@ export async function fetchMyBookings(params: GetMyBookingsParams = {}) {
         scope: params.scope,
       },
     }
+  );
+  return data.data;
+}
+
+// Single booking, full detail — powers the details modal
+export async function fetchBookingById(id: number) {
+  const { data } = await api.get<{ success: boolean; data: BookingDetail }>(
+    `/bookings/${id}`
+  );
+  return data.data;
+}
+
+// Reviewer-initiated cancellation — reason required, backend enforces the cutoff window
+export async function cancelBooking(id: number, payload: CancelBookingPayload) {
+  const { data } = await api.patch<{ success: boolean; data: BookingDetail }>(
+    `/bookings/${id}/cancel`,
+    payload
+  );
+  return data.data;
+}
+
+// Reviewer-initiated reschedule — new date/time for the same event type
+export async function rescheduleBooking(id: number, payload: RescheduleBookingPayload) {
+  const { data } = await api.patch<{ success: boolean; data: BookingDetail & { meetLink: string | null } }>(
+    `/bookings/${id}/reschedule`,
+    payload
   );
   return data.data;
 }
