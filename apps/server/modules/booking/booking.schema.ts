@@ -27,7 +27,7 @@ export const GetMyBookingsQuerySchema = z.object({
   status: z
     .string()
     .optional()
-    .transform((val) => val?.split(",") as ("confirmed" | "completed")[] | undefined),
+    .transform((val) => val?.split(",") as ("confirmed" | "completed" | "rescheduled" | "cancelled")[] | undefined),
   scope: z.enum(["upcoming", "past"]).optional(),
 });
 

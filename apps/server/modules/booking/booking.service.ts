@@ -14,12 +14,17 @@ import { bookingCancelledTemplate } from "../../emails/templates/bookingCancelle
 import { bookingRescheduledTemplate } from "../../emails/templates/bookingRescheduled.js";
 import { slotService } from "../slot/slot.service.js";
 
-// Same pattern used elsewhere for typing a Drizzle transaction callback
+export interface GetMyBookingsOptions {
+  page: number;
+  limit: number;
+  status?: ("confirmed" | "completed" | "rescheduled" | "cancelled")[] | undefined;
+  scope?: "upcoming" | "past" | undefined;
+}
+
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 const CANCEL_CUTOFF_HOURS = 3;
 
-// Fetches a booking only if it belongs to the given reviewer, else throws 404
 const getOwnedBookingOrThrow = async (reviewerId: number, bookingId: number) => {
   const [booking] = await db
     .select()
@@ -34,7 +39,6 @@ const getOwnedBookingOrThrow = async (reviewerId: number, bookingId: number) => 
   return booking;
 };
 
-// Rejects cancel/reschedule if the session starts within the cutoff window
 const assertOutsideCutoff = (startTime: Date) => {
   const hoursUntilStart = dayjs(startTime).diff(dayjs(), "hour", true);
   if (hoursUntilStart < CANCEL_CUTOFF_HOURS) {
@@ -45,9 +49,6 @@ const assertOutsideCutoff = (startTime: Date) => {
   }
 };
 
-// Frees the slots row backing a confirmed booking. Bookings don't store a
-// slotId, so we match on the same (eventTypeId, date, startTime, endTime)
-// combination createBooking used to claim it in the first place.
 const releaseBookingSlot = async (tx: Transaction, booking: typeof bookings.$inferSelect) => {
   const slotDate = dayjs(booking.startTime).format("YYYY-MM-DD");
   const startTime = dayjs(booking.startTime).format("HH:mm:ss");
@@ -68,12 +69,6 @@ const releaseBookingSlot = async (tx: Transaction, booking: typeof bookings.$inf
 };
 
 export const bookingService = {
-  // Doc section 7: "All booking links for a reviewer share the same calendar"
-  // — a slot booked under one event type must also block the same
-  // reviewer's slots under OTHER event types. No need to touch the
-  // `bookings` table for this — we check the `slots` table directly for
-  // any overlapping 'held'/'booked' slot on the same reviewer + date,
-  // excluding the current slot.
   checkCrossEventConflict: async (
     reviewerId: number,
     slotDate: string,
@@ -97,14 +92,8 @@ export const bookingService = {
     return conflicts.length > 0;
   },
 
-  // Called when the advisor submits the booking form — verifies the
-  // holdToken and confirms the slot. Must run inside a transaction: slot
-  // lookup + cross-conflict check + booking insert + slot status update
-  // all need to be atomic, otherwise we risk a partial state (slot marked
-  // booked with no matching booking row).
   createBooking: async (data: CreateBookingInput) => {
     return db.transaction(async (tx) => {
-      // 1. Look up the slot by holdToken — must still be held and not expired.
       const [slot] = await tx
         .select()
         .from(slots)
@@ -124,9 +113,6 @@ export const bookingService = {
         );
       }
 
-      // 2. Defensive re-check for cross-event-type conflicts. This was
-      //    already checked at hold time, but we check again right before
-      //    confirming in case something else got booked in the race window.
       const hasConflict = await bookingService.checkCrossEventConflict(
         slot.reviewerId,
         slot.slotDate,
@@ -142,9 +128,6 @@ export const bookingService = {
         );
       }
 
-      // 3. The `bookings` table has no slotId column — combine the slot's
-      //    date with its time-only startTime/endTime into a full timestamp
-      //    (bookings.startTime/endTime are timestamptz columns).
       const startTimestamp = dayjs(
         `${slot.slotDate}T${slot.startTime}`
       ).toDate();
@@ -171,9 +154,6 @@ export const bookingService = {
         throw new AppError("Failed to create booking", 500);
       }
 
-      // 4. Mark the slot as booked — only after the booking insert
-      //    succeeds. Since this is all inside one transaction, if any step
-      //    fails, everything rolls back together.
       await tx
         .update(slots)
         .set({ status: "booked", updatedAt: new Date() })
@@ -183,13 +163,6 @@ export const bookingService = {
     });
   },
 
-  // Runs AFTER createBooking's transaction has committed — deliberately
-  // kept out of the transaction. Google Calendar + Resend are both
-  // external services with no rollback semantics here; a slow/failing
-  // Meet-event or email call must never undo an already-confirmed
-  // booking. Both steps are individually best-effort (each has its own
-  // try/catch), so a Calendar hiccup still lets emails go out, and vice
-  // versa.
   finalizeBooking: async (booking: {
     id: number;
     eventTypeId: number;
@@ -256,8 +229,6 @@ export const bookingService = {
       );
     }
 
-    // Reviewer hasn't connected Google Calendar — fall back to the
-    // static link they set on the event type itself, if any.
     if (!meetLink && eventType.meetingLink) {
       meetLink = eventType.meetingLink;
     }
@@ -323,16 +294,11 @@ export const bookingService = {
   },
 
   // Reviewer's own bookings — paginated, filterable by status, and scoped
-  // to upcoming/past. Joins eventTypes for the display name so the
-  // frontend doesn't need a second lookup per booking.
+  // to upcoming/past. Joins eventTypes for name/id/bookingWindowDays so
+  // the frontend can open the reschedule modal without a second fetch.
   getMyBookings: async (
     reviewerId: number,
-    options: {
-      page: number;
-      limit: number;
-      status?: ("confirmed" | "completed")[] | undefined;
-      scope?: "upcoming" | "past" | undefined;
-    }
+    options: GetMyBookingsOptions
   ) => {
     const { page, limit, status, scope } = options;
     const offset = (page - 1) * limit;
@@ -356,6 +322,7 @@ export const bookingService = {
       db
         .select({
           id: bookings.id,
+          eventTypeId: bookings.eventTypeId,
           internName: bookings.internName,
           batch: bookings.batch,
           advisorName: bookings.advisorName,
@@ -368,6 +335,7 @@ export const bookingService = {
           cancelledAt: bookings.cancelledAt,
           cancelledReason: bookings.cancelledReason,
           eventTypeName: eventTypes.name,
+          bookingWindowDays: eventTypes.bookingWindowDays,
         })
         .from(bookings)
         .innerJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
@@ -394,11 +362,11 @@ export const bookingService = {
     };
   },
 
-  // Single booking, full detail — reviewer must own it.
   getBookingById: async (reviewerId: number, bookingId: number) => {
     const [row] = await db
       .select({
         id: bookings.id,
+        eventTypeId: bookings.eventTypeId,
         internName: bookings.internName,
         batch: bookings.batch,
         advisorName: bookings.advisorName,
@@ -413,6 +381,7 @@ export const bookingService = {
         cancelledReason: bookings.cancelledReason,
         rescheduledFromBookingId: bookings.rescheduledFromBookingId,
         eventTypeName: eventTypes.name,
+        bookingWindowDays: eventTypes.bookingWindowDays,
       })
       .from(bookings)
       .innerJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
@@ -426,14 +395,11 @@ export const bookingService = {
     return row;
   },
 
-  // Reviewer-initiated cancellation. Enforces the cutoff window, frees the
-  // slot, best-effort cancels the Calendar event, and best-effort emails
-  // everyone involved with the reviewer's stated reason.
   cancelBooking: async (reviewerId: number, bookingId: number, data: CancelBookingInput) => {
     const booking = await getOwnedBookingOrThrow(reviewerId, bookingId);
 
-    if (booking.status !== "confirmed") {
-      throw new AppError("Only confirmed bookings can be cancelled", 400);
+    if (booking.status !== "confirmed" && booking.status !== "rescheduled") {
+      throw new AppError("Only confirmed or rescheduled bookings can be cancelled", 400);
     }
 
     assertOutsideCutoff(booking.startTime);
@@ -508,14 +474,11 @@ export const bookingService = {
     return updated;
   },
 
-  // Reviewer-initiated reschedule. Cancels the old booking, frees its
-  // slot, claims the new slot via the same hold flow a fresh booking
-  // uses, and creates a new booking row linked back to the old one.
   rescheduleBooking: async (reviewerId: number, bookingId: number, data: RescheduleBookingInput) => {
     const booking = await getOwnedBookingOrThrow(reviewerId, bookingId);
 
-    if (booking.status !== "confirmed") {
-      throw new AppError("Only confirmed bookings can be rescheduled", 400);
+    if (booking.status !== "confirmed" && booking.status !== "rescheduled") {
+      throw new AppError("Only confirmed or rescheduled bookings can be rescheduled", 400);
     }
 
     assertOutsideCutoff(booking.startTime);
@@ -530,46 +493,34 @@ export const bookingService = {
     const newStartTime = dayjs(`${data.date}T${data.startTime}`).toDate();
     const newEndTime = dayjs(`${data.date}T${data.endTime}`).toDate();
 
-    const newBooking = await db.transaction(async (tx) => {
-      await tx
-        .update(bookings)
-        .set({
-          status: "cancelled",
-          cancelledAt: new Date(),
-          cancelledReason: "rescheduled",
-        })
-        .where(eq(bookings.id, bookingId));
-
+    const updatedBooking = await db.transaction(async (tx) => {
+      // Release old slot occupied by previous start/end time
       await releaseBookingSlot(tx, booking);
 
-      const [created] = await tx
-        .insert(bookings)
-        .values({
-          eventTypeId: booking.eventTypeId,
-          reviewerId: booking.reviewerId,
-          internName: booking.internName,
-          batch: booking.batch,
-          advisorName: booking.advisorName,
-          advisorEmail: booking.advisorEmail,
-          internEmails: booking.internEmails,
-          weekStage: booking.weekStage,
+      // Update existing booking row in place with status 'rescheduled'
+      const [updated] = await tx
+        .update(bookings)
+        .set({
           startTime: newStartTime,
           endTime: newEndTime,
-          status: "confirmed",
-          rescheduledFromBookingId: booking.id,
+          status: "rescheduled",
+          meetLink: null,
+          googleEventId: null,
         })
+        .where(eq(bookings.id, bookingId))
         .returning();
 
-      if (!created) {
+      if (!updated) {
         throw new AppError("Failed to reschedule booking", 500);
       }
 
+      // Mark the new slot as booked
       await tx
         .update(slots)
         .set({ status: "booked", holdToken: null, holdExpiresAt: null, updatedAt: new Date() })
         .where(eq(slots.id, hold.slotId));
 
-      return created;
+      return updated;
     });
 
     if (booking.googleEventId) {
@@ -578,12 +529,9 @@ export const bookingService = {
       });
     }
 
-    return newBooking;
+    return updatedBooking;
   },
 
-  // Sends the reschedule-specific email (old time struck through, new
-  // time highlighted) — separate from finalizeBooking's confirmation
-  // email since the wording and Calendar handling differ.
   finalizeReschedule: async (
     oldBooking: { startTime: Date; endTime: Date },
     newBooking: {

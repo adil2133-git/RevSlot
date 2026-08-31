@@ -58,6 +58,7 @@ export type BookingFormPayload = {
 
 export type MyBooking = {
   id: number;
+  eventTypeId: number;
   internName: string;
   batch: string;
   advisorName: string;
@@ -70,6 +71,7 @@ export type MyBooking = {
   cancelledAt: string | null;
   cancelledReason: string | null;
   eventTypeName: string;
+  bookingWindowDays: number;
 };
 
 export type MyBookingsPagination = {
@@ -87,6 +89,21 @@ export type MyBookingsResponse = {
 export type GetMyBookingsParams = {
   page?: number;
   limit?: number;
-  status?: ("confirmed" | "completed")[];
+  status?: ("confirmed" | "completed" | "rescheduled" | "cancelled")[];
   scope?: "upcoming" | "past";
+};
+
+export type BookingDetail = MyBooking & {
+  internEmails: string[] | null;
+  rescheduledFromBookingId: number | null;
+};
+
+export type CancelBookingPayload = {
+  reason: string;
+};
+
+export type RescheduleBookingPayload = {
+  date: string;
+  startTime: string;
+  endTime: string;
 };

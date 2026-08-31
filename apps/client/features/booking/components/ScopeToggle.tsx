@@ -13,18 +13,16 @@ const OPTIONS: { value: Scope; label: string }[] = [
 
 export default function ScopeToggle({ value, onChange }: ScopeToggleProps) {
   return (
-    <div className="flex rounded-lg border border-slate-300">
-      {OPTIONS.map((opt, idx) => (
+    <div className="inline-flex items-center rounded-lg bg-slate-100/90 p-1 border border-slate-200/50">
+      {OPTIONS.map((opt) => (
         <button
           key={opt.value}
           onClick={() => onChange(opt.value)}
-          className={`px-4 py-2 text-sm font-semibold transition ${
-            idx === 0 ? "rounded-l-lg" : idx === OPTIONS.length - 1 ? "rounded-r-lg" : ""
-          } ${
+          className={`rounded-md px-3 py-1 text-xs font-semibold transition-all ${
             value === opt.value
-              ? "bg-primary text-on-primary"
-              : "bg-surface-card text-slate-400 hover:text-on-surface"
-          } ${idx !== 0 ? "border-l border-slate-300" : ""}`}
+              ? "bg-surface-card text-on-surface shadow-xs"
+              : "text-slate-500 hover:text-on-surface"
+          }`}
         >
           {opt.label}
         </button>
