@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import dayjs from "dayjs";
 import { useAvailabilityStore } from "@/features/availability/store/availability.store";
@@ -31,6 +31,18 @@ export default function AvailabilityPage() {
 
   // UI Interactive States
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
+  const lastTapRef = useRef<{ [id: number]: number }>({});
+
+  const handleCardTouchEnd = (templateId: number, e: React.TouchEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest("button")) return;
+    const now = Date.now();
+    const lastTap = lastTapRef.current[templateId] || 0;
+    if (now - lastTap < 350 && now - lastTap > 0) {
+      router.push(`/availability/${templateId}/edit`);
+    }
+    lastTapRef.current[templateId] = now;
+  };
 
   useEffect(() => {
     loadTemplates();
@@ -176,13 +188,16 @@ export default function AvailabilityPage() {
                       return (
                         <div
                           key={template.id}
-                          className="group flex flex-col justify-between rounded-2xl border border-slate-100 bg-white p-5 shadow-surface hover:shadow-raised transition-all duration-200"
+                          onDoubleClick={() => router.push(`/availability/${template.id}/edit`)}
+                          onTouchEnd={(e) => handleCardTouchEnd(template.id, e)}
+                          className="group flex flex-col justify-between rounded-2xl border border-slate-100 bg-white p-5 shadow-surface hover:shadow-raised transition-all duration-200 cursor-pointer select-none"
+                          title="Double-click to edit schedule"
                         >
                           <div>
                             {/* Card Header */}
                             <div className="flex items-start justify-between mb-3 gap-2">
                               <div className="flex items-center gap-2.5 flex-wrap">
-                                <h3 className="text-sm font-bold text-on-surface tracking-tight">
+                                <h3 className="text-sm font-bold text-on-surface tracking-tight group-hover:text-primary transition-colors">
                                   {template.name}
                                 </h3>
                                 {template.isDefault && (
@@ -193,7 +208,12 @@ export default function AvailabilityPage() {
                               </div>
 
                               {/* Dropdown Menu */}
-                              <div className="relative">
+                              <div
+                                className="relative"
+                                onClick={(e) => e.stopPropagation()}
+                                onDoubleClick={(e) => e.stopPropagation()}
+                                onTouchEnd={(e) => e.stopPropagation()}
+                              >
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
