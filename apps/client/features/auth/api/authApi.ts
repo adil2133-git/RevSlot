@@ -13,6 +13,8 @@ import type {
   ResendVerificationPayload,
   ResetPasswordPayload,
   VerifyEmailPayload,
+  UpdateProfilePayload,
+  ChangePasswordPayload,
 } from "../types";
 
 export async function loginReviewer(payload: LoginPayload) {
@@ -91,3 +93,12 @@ export async function updateUsername(username: string) {
   return data.data.user;
 }
 
+export async function updateProfile(payload: UpdateProfilePayload) {
+  const { data } = await api.patch<MeResponse>("/auth/profile", payload);
+  return data.data.user;
+}
+
+export async function changePassword(payload: ChangePasswordPayload) {
+  const { data } = await api.patch<MessageResponse>("/auth/profile/password", payload);
+  return data.message;
+}

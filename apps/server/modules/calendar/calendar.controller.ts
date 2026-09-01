@@ -11,7 +11,7 @@ export const calendarController = {
       data: { url },
     });
   },
-
+ 
   // GET /api/calendar/google/callback
   handleCallback: async (req: Request, res: Response) => {
     const {

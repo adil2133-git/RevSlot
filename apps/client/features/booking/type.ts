@@ -4,6 +4,17 @@ export type BookingPageInfo = {
     name: string;
     avatarUrl: string | null;
     bio: string | null;
+    professionalHeadline: string | null;
+skills: string[];
+yearsOfExperience: number | null;
+currentRole: string | null;
+currentCompany: string | null;
+degree: string | null;
+university: string | null;
+graduationYear: number | null;
+linkedinUrl: string | null;
+githubUrl: string | null;
+portfolioUrl: string | null;
   };
   eventType: {
     id: number;
@@ -22,6 +33,17 @@ export type ReviewerProfile = {
     name: string;
     avatarUrl: string | null;
     bio: string | null;
+    professionalHeadline: string | null;
+    skills: string[];
+    yearsOfExperience: number | null;
+    currentRole: string | null;
+    currentCompany: string | null;
+    degree: string | null;
+    university: string | null;
+    graduationYear: number | null;
+    linkedinUrl: string | null;
+    githubUrl: string | null;
+    portfolioUrl: string | null;
   };
   eventTypes: {
     id: number;

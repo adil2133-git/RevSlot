@@ -17,6 +17,8 @@ import type {
   VerifyEmailInput,
   ResendVerificationInput,
   GoogleAuthInput,
+  UpdateProfileInput,
+  ChangePasswordInput,
 } from "./auth.schema.js";
 import {
   verifyRefreshToken,
@@ -38,17 +40,29 @@ const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 
 // Common fields required for authentication
-type AuthUser = Pick <
-  InferSelectModel<typeof reviewers>,
-  "id" |
-  "name" |
-  "email" |
-  "passwordHash" |
-  "avatarUrl" |
-  "bio" |
-  "isActive" |
-  "emailVerified"
-> & {
+// type AuthUser = Pick<
+//   InferSelectModel<typeof reviewers>,
+//   "id" |
+//   "name" |
+//   "email" |
+//   "passwordHash" |
+//   "avatarUrl" |
+//   "bio" |
+//   "isActive" |
+//   "emailVerified"
+// > & {
+//   username?: string | null;
+// };
+
+type AuthUser = {
+  id: number;
+  name: string;
+  email: string;
+  passwordHash: string | null;
+  avatarUrl: string | null;
+  bio: string | null;
+  isActive: boolean | null;
+  emailVerified: boolean;
   username?: string | null;
 };
 
@@ -283,15 +297,79 @@ if (existingUsername.length > 0) {
       throw new AppError("User not found", 404);
     }
 
-    return {
-      id: user.id,
-      name: user.name,
-      username: ("username" in user ? user.username : null) ?? null,
-      email: user.email,
-      role,
-      avatarUrl: user.avatarUrl,
-      bio: user.bio,
-    };
+  return {
+  id: user.id,
+  name: user.name,
+  username: ("username" in user ? user.username : null) ?? null,
+  email: user.email,
+  role,
+  avatarUrl: user.avatarUrl,
+  bio: user.bio,
+
+  whatsappNumber:
+    "whatsappNumber" in user
+      ? user.whatsappNumber
+      : undefined,
+
+  professionalHeadline:
+    "professionalHeadline" in user
+      ? user.professionalHeadline
+      : undefined,
+
+  skills:
+    "skills" in user
+      ? user.skills
+      : undefined,
+
+  yearsOfExperience:
+    "yearsOfExperience" in user
+      ? user.yearsOfExperience
+      : undefined,
+
+  currentRole:
+    "currentRole" in user
+      ? user.currentRole
+      : undefined,
+
+  currentCompany:
+    "currentCompany" in user
+      ? user.currentCompany
+      : undefined,
+
+  degree:
+    "degree" in user
+      ? user.degree
+      : undefined,
+
+  university:
+    "university" in user
+      ? user.university
+      : undefined,
+
+  graduationYear:
+    "graduationYear" in user
+      ? user.graduationYear
+      : undefined,
+
+  linkedinUrl:
+    "linkedinUrl" in user
+      ? user.linkedinUrl
+      : undefined,
+
+  githubUrl:
+    "githubUrl" in user
+      ? user.githubUrl
+      : undefined,
+
+  portfolioUrl:
+    "portfolioUrl" in user
+      ? user.portfolioUrl
+      : undefined,
+
+  emailVerified: user.emailVerified,
+  hasPassword: Boolean(user.passwordHash),
+  createdAt: user.createdAt,
+};
   },
 
   // Updates username for a logged-in reviewer
@@ -332,6 +410,136 @@ if (existingUsername.length > 0) {
       avatarUrl: updated.avatarUrl,
       bio: updated.bio,
     };
+  },
+
+    // Updates profile fields (name / bio / whatsappNumber) for a logged-in
+  // user. All fields optional — only what's sent in the request gets touched.
+  updateProfile: async (userId: number, role: "reviewer" | "admin", input: UpdateProfileInput) => {
+    if (Object.keys(input).length === 0) {
+      throw new AppError("No fields to update", 400);
+    }
+
+    const table = role === "admin" ? admins : reviewers;
+
+    const [updated] = await db
+      .update(table)
+      .set({ ...input, updatedAt: new Date() })
+      .where(eq(table.id, userId))
+      .returning();
+
+    if (!updated) {
+      throw new AppError("User not found", 404);
+    }
+
+    return {
+      id: updated.id,
+      name: updated.name,
+      username: ("username" in updated ? updated.username : null) ?? null,
+      email: updated.email,
+      role,
+      avatarUrl: updated.avatarUrl,
+      bio: updated.bio,
+      whatsappNumber: ("whatsappNumber" in updated ? updated.whatsappNumber : null) ?? null,
+      professionalHeadline:
+    "professionalHeadline" in updated
+      ? updated.professionalHeadline
+      : undefined,
+
+  skills:
+    "skills" in updated
+      ? updated.skills
+      : undefined,
+
+  yearsOfExperience:
+    "yearsOfExperience" in updated
+      ? updated.yearsOfExperience
+      : undefined,
+
+  currentRole:
+    "currentRole" in updated
+      ? updated.currentRole
+      : undefined,
+
+  currentCompany:
+    "currentCompany" in updated
+      ? updated.currentCompany
+      : undefined,
+
+  degree:
+    "degree" in updated
+      ? updated.degree
+      : undefined,
+
+  university:
+    "university" in updated
+      ? updated.university
+      : undefined,
+
+  graduationYear:
+    "graduationYear" in updated
+      ? updated.graduationYear
+      : undefined,
+
+  linkedinUrl:
+    "linkedinUrl" in updated
+      ? updated.linkedinUrl
+      : undefined,
+
+  githubUrl:
+    "githubUrl" in updated
+      ? updated.githubUrl
+      : undefined,
+
+  portfolioUrl:
+    "portfolioUrl" in updated
+      ? updated.portfolioUrl
+      : undefined,
+      emailVerified: updated.emailVerified,
+      hasPassword: updated.passwordHash !== null,
+      createdAt: updated.createdAt,
+    };
+  },
+
+  // Changes password for a logged-in user. Requires the CURRENT password
+  // (re-auth), and on success revokes every refresh token for this
+  // user — every other device/tab gets logged out and must log back in
+  // with the new password. Google-only accounts (no passwordHash yet)
+  // are rejected here — that would be a "set password" flow, not this one.
+  changePassword: async (userId: number, role: "reviewer" | "admin", input: ChangePasswordInput) => {
+    const table = role === "admin" ? admins : reviewers;
+
+    const [user] = await db
+      .select()
+      .from(table)
+      .where(eq(table.id, userId))
+      .limit(1);
+
+    if (!user) {
+      throw new AppError("User not found", 404);
+    }
+
+    if (!user.passwordHash) {
+      throw new AppError("This account uses Google Sign-In and has no password to change", 400);
+    }
+
+    const isCurrentPasswordValid = await bcrypt.compare(input.currentPassword, user.passwordHash);
+
+    if (!isCurrentPasswordValid) {
+      throw new AppError("Current password is incorrect", 401);
+    }
+
+    const newPasswordHash = await bcrypt.hash(input.newPassword, 12);
+
+    await db
+      .update(table)
+      .set({ passwordHash: newPasswordHash, updatedAt: new Date() })
+      .where(eq(table.id, userId));
+
+    // Force re-login everywhere — a session opened with the old password
+    // shouldn't silently keep working after the password changes.
+    await refreshTokenService.revokeAllForUser(userId, role);
+
+    return { message: "Password changed successfully. Please log in again." };
   },
 
   // Request a password reset — sends an OTP if the email is registered.

@@ -10,6 +10,21 @@ export type AuthUser = {
   email: string;
   avatarUrl: string | null;
   bio: string | null;
+  whatsappNumber: string | null;
+  professionalHeadline: string | null;
+  skills: string[] | null;
+  yearsOfExperience: number | null;
+  currentRole: string | null;
+  currentCompany: string | null;
+  degree: string | null;
+  university: string | null;
+  graduationYear: number | null;
+  linkedinUrl: string | null;
+  githubUrl: string | null;
+  portfolioUrl: string | null;
+  emailVerified: boolean;
+  hasPassword: boolean;
+  createdAt: string | null;
 };
 
 export type LoginPayload = {
@@ -25,6 +40,34 @@ export type RegisterPayload = {
   username: string;
   whatsappNumber: string;
   password: string;
+};
+
+export type RegisterResponse = ApiDataEnvelope<{
+  email: string;
+  requiresVerification: boolean;
+}> & { message: string };
+
+
+export type UpdateProfilePayload = {
+  name?: string;
+  bio?: string;
+  whatsappNumber?: string;
+  professionalHeadline?: string;
+  skills?: string[];
+  yearsOfExperience?: number;
+  currentRole?: string;
+  currentCompany?: string;
+  degree?: string;
+  university?: string;
+  graduationYear?: number;
+  linkedinUrl?: string;
+  githubUrl?: string;
+  portfolioUrl?: string;
+};
+
+export type ChangePasswordPayload = {
+  currentPassword: string;
+  newPassword: string;
 };
 
 export type ForgotPasswordPayload = {
@@ -77,7 +120,3 @@ export type MessageResponse = ApiMessageEnvelope;
 // message lives inside `data` here (ApiDataEnvelope), unlike
 // MessageResponse where it's top-level — matches auth.controller.ts's
 // registerReviewer response shape exactly: { success, message, data }.
-export type RegisterResponse = ApiDataEnvelope<{
-  email: string;
-  requiresVerification: boolean;
-}> & { message: string };
