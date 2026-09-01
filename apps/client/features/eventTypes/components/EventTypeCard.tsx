@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useAuthStore } from "@/features/auth/store/authStore";
 import type { EventType } from "../types";
 
@@ -61,9 +61,20 @@ interface EventTypeCardProps {
 
 export default function EventTypeCard({ eventType, index, onEdit, onToggleActive, onTogglePublic }: EventTypeCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const lastTapRef = useRef<number>(0);
   const iconClass = ICON_BG[index % ICON_BG.length];
-    const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState(false);
   const username = useAuthStore((state) => state.user?.username);
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest("button") || target.closest("label")) return;
+    const now = Date.now();
+    if (now - lastTapRef.current < 350 && now - lastTapRef.current > 0) {
+      onEdit(eventType.id);
+    }
+    lastTapRef.current = now;
+  };
 
   // Works for both public AND hidden event types — isPublic only affects
   // whether it shows up on /username's list, the direct link always works
@@ -81,7 +92,11 @@ export default function EventTypeCard({ eventType, index, onEdit, onToggleActive
     }
   };
   return (
-    <div className="flex items-center gap-4 border-b border-slate-100 px-5 py-4 last:border-b-0 hover:bg-surface-hover">
+    <div
+      onDoubleClick={() => onEdit(eventType.id)}
+      onTouchEnd={handleTouchEnd}
+      className="flex items-center gap-4 border-b border-slate-100 px-5 py-4 last:border-b-0 hover:bg-surface-hover cursor-pointer select-none"
+    >
       <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${iconClass}`}>
         <LinkIcon />
       </div>

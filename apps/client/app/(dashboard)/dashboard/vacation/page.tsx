@@ -213,24 +213,6 @@ export default function VacationPage() {
                 Note: Scheduling limits depend on your department's specific academic calendar guidelines.
               </p>
             </div>
-
-            {/* Quote Card Widget */}
-            <div className="relative overflow-hidden rounded-2xl border border-slate-100 shadow-surface bg-slate-900 aspect-[4/3] flex items-end">
-              <img
-                src="/desk_calendar_quote_bg.jpg"
-                alt="Calendar Desk"
-                className="absolute inset-0 h-full w-full object-cover opacity-75"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-slate-900/10 to-transparent" />
-              
-              <div className="relative w-full p-4 flex justify-center">
-                <div className="w-full rounded-xl bg-white/90 backdrop-blur-md p-3.5 shadow-sm text-center border border-white/20">
-                  <p className="text-[11px] font-medium leading-relaxed text-primary italic">
-                    "Rest is not idleness, it is the key to clarity."
-                  </p>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       )}

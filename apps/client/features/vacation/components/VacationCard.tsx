@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { 
   PencilIcon, 
   TrashIcon, 
@@ -17,8 +18,20 @@ interface VacationCardProps {
 }
 
 export default function VacationCard({ block, onEdit, onDelete }: VacationCardProps) {
+  const lastTapRef = useRef<number>(0);
   const status = getVacationStatus(block.startDate, block.endDate);
   const isPast = status === "past";
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (isPast) return;
+    const target = e.target as HTMLElement;
+    if (target.closest("button")) return;
+    const now = Date.now();
+    if (now - lastTapRef.current < 350 && now - lastTapRef.current > 0) {
+      onEdit(block);
+    }
+    lastTapRef.current = now;
+  };
 
   // Determine icon based on reason
   const reasonText = block.reason || "Time Off";
@@ -43,8 +56,10 @@ export default function VacationCard({ block, onEdit, onDelete }: VacationCardPr
 
   return (
     <div
+      onDoubleClick={() => !isPast && onEdit(block)}
+      onTouchEnd={handleTouchEnd}
       className={`flex items-center justify-between rounded-xl border border-slate-100 p-5 shadow-surface transition-all duration-200 hover:shadow-raised ${
-        isPast ? "bg-surface-hover/80" : "bg-surface-card"
+        isPast ? "bg-surface-hover/80" : "bg-surface-card cursor-pointer select-none"
       }`}
     >
       <div className="flex items-center gap-4">
