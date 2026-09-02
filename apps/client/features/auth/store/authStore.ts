@@ -25,6 +25,7 @@ import {
   googleAuth as googleAuthApi,
   updateUsername as updateUsernameApi,
   updateProfile as updateProfileApi,
+  updateAvatar as updateAvatarApi,
   changePassword as changePasswordApi,
 } from "../api/authApi";
 import { setAccessToken, refreshAccessToken, ApiError } from "@/lib/axios";
@@ -82,6 +83,7 @@ type AuthState = {
   googleAuth: (payload: GoogleAuthPayload) => Promise<void>;
   updateUsername: (username: string) => Promise<void>;
   updateProfile: (payload: UpdateProfilePayload) => Promise<void>;
+  updateAvatar: (file: File) => Promise<void>;
   /** Changes password server-side and revokes ALL sessions (including
    *  this one) — clears local auth state too, same as logout. Caller
    *  should redirect to login after this resolves. */
@@ -256,6 +258,19 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const updatedUser = await updateProfileApi(payload);
       set({ user: updatedUser, isLoading: false });
+    } catch (err) {
+      set({ isLoading: false, error: (err as Error).message });
+      throw err;
+    }
+  },
+
+    updateAvatar: async (file) => {
+    set({ isLoading: true, error: null });
+    try {
+      const avatarUrl = await updateAvatarApi(file);
+      set((state) =>
+        state.user ? { user: { ...state.user, avatarUrl }, isLoading: false } : { isLoading: false }
+      );
     } catch (err) {
       set({ isLoading: false, error: (err as Error).message });
       throw err;

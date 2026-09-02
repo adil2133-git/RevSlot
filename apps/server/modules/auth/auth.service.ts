@@ -29,6 +29,7 @@ import { emailService } from "../../services/email.service.js";
 import { forgotPasswordTemplate } from "../../emails/templates/forgotPassword.js";
 import { verifyEmailTemplate } from "../../emails/templates/verifyEmail.js";
 import { refreshTokenService } from "./refreshToken.service.js";
+import { cloudinary } from "../../config/cloudinary.js";
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID as string;
 
@@ -40,20 +41,6 @@ const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 
 // Common fields required for authentication
-// type AuthUser = Pick<
-//   InferSelectModel<typeof reviewers>,
-//   "id" |
-//   "name" |
-//   "email" |
-//   "passwordHash" |
-//   "avatarUrl" |
-//   "bio" |
-//   "isActive" |
-//   "emailVerified"
-// > & {
-//   username?: string | null;
-// };
-
 type AuthUser = {
   id: number;
   name: string;
@@ -498,6 +485,42 @@ if (existingUsername.length > 0) {
       hasPassword: updated.passwordHash !== null,
       createdAt: updated.createdAt,
     };
+  },
+
+     updateAvatar: async (userId: number, role: "reviewer" | "admin", fileBuffer: Buffer) => {
+    const table = role === "admin" ? admins : reviewers;
+
+    const uploadResult = await new Promise<{ secure_url: string }>((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder: "revslot/avatars",
+          resource_type: "image",
+          transformation: [
+            { width: 400, height: 400, crop: "fill", gravity: "face" },
+          ],
+        },
+        (error, result) => {
+          if (error || !result) {
+            reject(error ?? new Error("Cloudinary upload returned no result"));
+            return;
+          }
+          resolve(result);
+        }
+      );
+      stream.end(fileBuffer);
+    });
+
+    const [updated] = await db
+      .update(table)
+      .set({ avatarUrl: uploadResult.secure_url, updatedAt: new Date() })
+      .where(eq(table.id, userId))
+      .returning();
+
+    if (!updated) {
+      throw new AppError("User not found", 404);
+    }
+
+    return { avatarUrl: updated.avatarUrl };
   },
 
   // Changes password for a logged-in user. Requires the CURRENT password
