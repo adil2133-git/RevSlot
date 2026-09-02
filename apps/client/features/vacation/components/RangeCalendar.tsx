@@ -7,6 +7,7 @@ import { ChevronLeftIcon, ChevronRightIcon } from "./icons";
 interface RangeCalendarProps {
   startDate: string | null;
   endDate: string | null;
+  isSingleDay?: boolean;
   onSelect: (start: string | null, end: string | null) => void;
 }
 
@@ -30,6 +31,7 @@ interface MonthGridProps {
   hoverDate: string | null;
   isDragging: boolean;
   dragAnchorDate: string | null;
+  isSingleDay: boolean;
   today: string;
   onDayMouseDown: (dateStr: string) => void;
   onDayMouseEnter: (dateStr: string) => void;
@@ -44,6 +46,7 @@ function MonthGrid({
   hoverDate,
   isDragging,
   dragAnchorDate,
+  isSingleDay,
   today,
   onDayMouseDown,
   onDayMouseEnter,
@@ -72,7 +75,10 @@ function MonthGrid({
           let effectiveStart = startDate;
           let effectiveEnd = endDate;
 
-          if (isDragging && dragAnchorDate && hoverDate) {
+          if (isSingleDay) {
+            effectiveStart = startDate;
+            effectiveEnd = endDate;
+          } else if (isDragging && dragAnchorDate && hoverDate) {
             effectiveStart = dragAnchorDate < hoverDate ? dragAnchorDate : hoverDate;
             effectiveEnd = dragAnchorDate < hoverDate ? hoverDate : dragAnchorDate;
           } else if (startDate && !endDate && hoverDate) {
@@ -83,6 +89,7 @@ function MonthGrid({
           const isStart = dateStr === effectiveStart;
           const isEnd = dateStr === effectiveEnd;
           const isInRange =
+            !isSingleDay &&
             effectiveStart &&
             effectiveEnd &&
             dateStr > effectiveStart &&
@@ -121,7 +128,12 @@ function MonthGrid({
   );
 }
 
-export default function RangeCalendar({ startDate, endDate, onSelect }: RangeCalendarProps) {
+export default function RangeCalendar({
+  startDate,
+  endDate,
+  isSingleDay = false,
+  onSelect,
+}: RangeCalendarProps) {
   const [visibleMonth, setVisibleMonth] = useState(() =>
     startDate ? dayjs(startDate).startOf("month") : dayjs().startOf("month")
   );
@@ -152,6 +164,13 @@ export default function RangeCalendar({ startDate, endDate, onSelect }: RangeCal
 
   const handleDayMouseEnter = (dateStr: string) => {
     setHoverDate(dateStr);
+    if (isSingleDay) {
+      if (isDragging) {
+        didDragRef.current = true;
+        onSelect(dateStr, dateStr);
+      }
+      return;
+    }
     if (isDragging && dragAnchorDate && dragAnchorDate !== dateStr) {
       didDragRef.current = true;
       const start = dragAnchorDate < dateStr ? dragAnchorDate : dateStr;
@@ -163,6 +182,12 @@ export default function RangeCalendar({ startDate, endDate, onSelect }: RangeCal
   const handleDayClick = (dateStr: string) => {
     if (didDragRef.current) {
       didDragRef.current = false;
+      return;
+    }
+
+    if (isSingleDay) {
+      onSelect(dateStr, dateStr);
+      setHoverDate(null);
       return;
     }
 
@@ -205,6 +230,7 @@ export default function RangeCalendar({ startDate, endDate, onSelect }: RangeCal
             hoverDate={hoverDate}
             isDragging={isDragging}
             dragAnchorDate={dragAnchorDate}
+            isSingleDay={isSingleDay}
             today={today}
             onDayMouseDown={handleDayMouseDown}
             onDayMouseEnter={handleDayMouseEnter}
@@ -218,6 +244,7 @@ export default function RangeCalendar({ startDate, endDate, onSelect }: RangeCal
             hoverDate={hoverDate}
             isDragging={isDragging}
             dragAnchorDate={dragAnchorDate}
+            isSingleDay={isSingleDay}
             today={today}
             onDayMouseDown={handleDayMouseDown}
             onDayMouseEnter={handleDayMouseEnter}

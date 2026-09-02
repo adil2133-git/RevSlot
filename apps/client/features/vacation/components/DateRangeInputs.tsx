@@ -8,6 +8,7 @@ interface DateRangeInputsProps {
   startDate: string | null;
   endDate: string | null;
   minDate: string;
+  isSingleDay?: boolean;
   onChange: (start: string | null, end: string | null) => void;
 }
 
@@ -15,6 +16,7 @@ export default function DateRangeInputs({
   startDate,
   endDate,
   minDate,
+  isSingleDay = false,
   onChange,
 }: DateRangeInputsProps) {
   const [startRaw, setStartRaw] = useState(startDate ?? "");
@@ -34,6 +36,18 @@ export default function DateRangeInputs({
       dayjs(val).isValid() &&
       dayjs(val).format("YYYY-MM-DD") === val
     );
+  };
+
+  const handleSingleDateChange = (val: string) => {
+    setStartRaw(val);
+    setEndRaw(val);
+    if (!val.trim()) {
+      onChange(null, null);
+      return;
+    }
+    if (isValidDateStr(val)) {
+      onChange(val, val);
+    }
   };
 
   const handleStartChange = (val: string) => {
@@ -59,6 +73,27 @@ export default function DateRangeInputs({
       onChange(startDate, val);
     }
   };
+
+  if (isSingleDay) {
+    return (
+      <div className="max-w-md">
+        <label htmlFor="vacationDate" className="mb-2 block text-sm font-semibold text-on-surface">
+          Vacation Date
+        </label>
+        <div className="relative flex items-center">
+          <CalendarIcon className="pointer-events-none absolute left-3.5 text-slate-400" />
+          <input
+            id="vacationDate"
+            type="text"
+            placeholder="YYYY-MM-DD"
+            value={startRaw}
+            onChange={(e) => handleSingleDateChange(e.target.value)}
+            className="w-full rounded-lg border border-slate-300 py-2.5 pl-10 pr-4 text-on-surface placeholder:text-slate-400 focus:border-primary focus:outline-none"
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-2 gap-4">
