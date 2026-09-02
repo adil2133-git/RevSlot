@@ -3,11 +3,11 @@ import dayjs from "dayjs";
 import { admins } from "../modules/admin/admins.model.js";
 import { db, pool } from "../config/db.js";
 import { reviewers } from "../modules/auth/reviewers.model.js";
-import { availabilityTemplates } from "../modules/availability/availabilityTemplates.model.js";
-import { templateTimeBlocks } from "../modules/availability/templateTimeBlocks.model.js";
+import { availabilityTemplates } from "../modules/availability/models/availabilityTemplates.schema.js";
+import { templateTimeBlocks } from "../modules/availability/models/templateTimeBlocks.schema.js";
 import { eventTypes } from "../modules/eventType/eventTypes.model.js";
-import { slots } from "../modules/slot/slots.model.js";
-import { bookings } from "../modules/booking/bookings.model.js";
+import { slots } from "../modules/slot/slots.schema.js";
+import { bookings } from "../modules/booking/bookings.schema.js";
 import { eq, and } from "drizzle-orm";
 
 const seed = async () => {

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { validate, validateQuery } from "../../core/middlewares/validate.middleware.js";
-import { GetAvailableSlotsQuerySchema, HoldSlotSchema, ReleaseSlotSchema } from "./slot.schema.js";
+import { GetAvailableSlotsQuerySchema, HoldSlotSchema, ReleaseSlotSchema } from "./slot.validation.js";
 import { catchAsync } from "../../core/utils/catchAsync.js";
 import { slotController } from "./slot.controller.js";
 

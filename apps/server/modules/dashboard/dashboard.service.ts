@@ -1,15 +1,15 @@
 import { eq, and, gte, lte, desc, count, inArray, sql } from "drizzle-orm";
 import { db } from "../../config/db.js";
 import { reviewers } from "../auth/reviewers.model.js";
-import { bookings } from "../booking/bookings.model.js";
+import { bookings } from "../booking/bookings.schema.js";
 import { eventTypes } from "../eventType/eventTypes.model.js";
-import { vacationBlocks } from "../vacation/vacation.model.js";
-import { availabilityTemplates } from "../availability/availabilityTemplates.model.js";
-import { templateTimeBlocks } from "../availability/templateTimeBlocks.model.js";
+import { vacationBlocks } from "../vacation/vacation.schema.js";
+import { availabilityTemplates } from "../availability/models/availabilityTemplates.schema.js";
+import { templateTimeBlocks } from "../availability/models/templateTimeBlocks.schema.js";
 import { questionBanks } from "../questionBank/questionBanks.model.js";
 import { questions } from "../questionBank/questions.model.js";
 import { AppError } from "../../core/errors/AppError.js";
-import type { GetDashboardSummaryQueryInput } from "./dashboard.schema.js";
+import type { GetDashboardSummaryQueryInput } from "./dashboard.validation.js";
 
 export const dashboardService = {
   getReviewerSummary: async (reviewerId: number, query: GetDashboardSummaryQueryInput) => {
@@ -192,12 +192,15 @@ export const dashboardService = {
 
     let vacationAlert = null;
     if (activeVacation) {
+      const isSingleDay = activeVacation.startDate === activeVacation.endDate;
       vacationAlert = {
         id: activeVacation.id,
         startDate: activeVacation.startDate,
         endDate: activeVacation.endDate,
         reason: activeVacation.reason,
-        message: `Notice: Vacation active from ${activeVacation.startDate} to ${activeVacation.endDate}. All booking links are temporarily paused.`,
+        message: isSingleDay
+          ? `Notice: Vacation active for today (${activeVacation.startDate}). All booking links are temporarily paused.`
+          : `Notice: Vacation active from ${activeVacation.startDate} to ${activeVacation.endDate}. All booking links are temporarily paused.`,
       };
     }
 

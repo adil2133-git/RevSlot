@@ -4,7 +4,7 @@ import { validate } from "../../core/middlewares/validate.middleware.js";
 import { requireReviewer } from "../../core/middlewares/auth.middleware.js";
 import { catchAsync } from "../../core/utils/catchAsync.js";
 
-import { CreateVacationBlockSchema, UpdateVacationBlockSchema } from "./vacation.schema.js";
+import { CreateVacationBlockSchema, UpdateVacationBlockSchema } from "./vacation.validation.js";
 import { vacationController } from "./vacation.controller.js";
 
 const router = Router();

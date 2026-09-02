@@ -1,15 +1,15 @@
 import { eq, and, asc, inArray, ne, sql } from "drizzle-orm";
 import { db } from "../../config/db.js";
 
-import { availabilityTemplates } from "./availabilityTemplates.model.js";
-import { templateTimeBlocks } from "./templateTimeBlocks.model.js";
+import { availabilityTemplates } from "./models/availabilityTemplates.schema.js";
+import { templateTimeBlocks } from "./models/templateTimeBlocks.schema.js";
 
-import { templateDateOverrides } from "./templateDateOverrides.model.js";
-import { templateOverrideBlocks } from "./templateDateOverrideBlocks.model.js";
+import { templateDateOverrides } from "./models/templateDateOverrides.schema.js";
+import { templateOverrideBlocks } from "./models/templateDateOverrideBlocks.schema.js";
 import { eventTypes } from "../eventType/eventTypes.model.js";
-import { bookings } from "../booking/bookings.model.js";
+import { bookings } from "../booking/bookings.schema.js";
 import { reviewers } from "../auth/reviewers.model.js";
-import type { CreateDateOverrideInput } from "./availability.schema.js";
+import type { CreateDateOverrideInput } from "./availability.validation.js";
 
 import { AppError } from "../../core/errors/AppError.js";
 
@@ -17,7 +17,7 @@ import type {
   CreateTemplateInput,
   UpdateTemplateInput,
   ReplaceTimeBlocksInput,
-} from "./availability.schema.js";
+} from "./availability.validation.js";
 import dayjs from "dayjs";
 
 let cachedTimezones: { value: string; label: string }[] | null = null;

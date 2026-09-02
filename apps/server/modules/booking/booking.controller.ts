@@ -4,7 +4,7 @@ import {
   GetMyBookingsQuerySchema,
   type GetMyBookingsQueryInput,
   BookingIdParamSchema,
-} from "./booking.schema.js";
+} from "./booking.validation.js";
 
 export const bookingController = {
   createBooking: async (req: Request, res: Response) => {

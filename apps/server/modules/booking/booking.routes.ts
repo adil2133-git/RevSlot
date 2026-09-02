@@ -6,7 +6,7 @@ import {
   GetMyBookingsQuerySchema,
   CancelBookingSchema,
   RescheduleBookingSchema,
-} from "./booking.schema.js";
+} from "./booking.validation.js";
 import { catchAsync } from "../../core/utils/catchAsync.js";
 import { bookingController } from "./booking.controller.js";
 

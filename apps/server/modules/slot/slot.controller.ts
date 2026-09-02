@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { slotService } from "./slot.service.js";
-import type { GetAvailableSlotsQuery, HoldSlotInput, ReleaseSlotInput } from "./slot.schema.js"
+import type { GetAvailableSlotsQuery, HoldSlotInput, ReleaseSlotInput } from "./slot.validation.js"
 
 export const slotController = {
 

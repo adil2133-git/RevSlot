@@ -23,6 +23,7 @@ export default function EditVacationPage() {
   const blockId = Number(params.id);
 
   const [existingBlocks, setExistingBlocks] = useState<VacationBlock[]>([]);
+  const [mode, setMode] = useState<"single" | "range">("range");
   const [startDate, setStartDate] = useState<string | null>(null);
   const [endDate, setEndDate] = useState<string | null>(null);
   const [reason, setReason] = useState("");
@@ -43,10 +44,24 @@ export default function EditVacationPage() {
         setStartDate(current.startDate);
         setEndDate(current.endDate);
         setReason(current.reason ?? "");
+        if (current.startDate === current.endDate) {
+          setMode("single");
+        } else {
+          setMode("range");
+        }
       }
       setLoading(false);
     });
   }, [blockId]);
+
+  const isSingleDay = mode === "single";
+
+  const handleModeChange = (newMode: "single" | "range") => {
+    setMode(newMode);
+    if (newMode === "single" && startDate) {
+      setEndDate(startDate);
+    }
+  };
 
   const overlap =
     startDate && endDate
@@ -57,7 +72,7 @@ export default function EditVacationPage() {
 
   const handleDateChange = (start: string | null, end: string | null) => {
     setStartDate(start);
-    setEndDate(end);
+    setEndDate(isSingleDay ? start : end);
   };
 
   const submit = async (confirmCancellations: boolean) => {
@@ -116,23 +131,62 @@ export default function EditVacationPage() {
       <p className="mt-1 text-slate-400">Update the dates or reason for this vacation block.</p>
 
       <div className="mt-8 space-y-8 rounded-xl border border-slate-100 bg-surface-card p-8 shadow-surface">
+        {/* Vacation Type Selector Tabs */}
         <div>
-          <p className="mb-3 font-semibold text-on-surface">Select Date Range</p>
+          <p className="mb-2 font-semibold text-on-surface">Vacation Type</p>
+          <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
+            <button
+              type="button"
+              onClick={() => handleModeChange("single")}
+              className={`rounded-md px-4 py-2 text-sm font-semibold transition ${
+                mode === "single"
+                  ? "bg-white text-primary shadow-sm"
+                  : "text-slate-500 hover:text-on-surface"
+              }`}
+            >
+              Single Day
+            </button>
+            <button
+              type="button"
+              onClick={() => handleModeChange("range")}
+              className={`rounded-md px-4 py-2 text-sm font-semibold transition ${
+                mode === "range"
+                  ? "bg-white text-primary shadow-sm"
+                  : "text-slate-500 hover:text-on-surface"
+              }`}
+            >
+              Date Range
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <p className="mb-3 font-semibold text-on-surface">
+            {isSingleDay ? "Select Date" : "Select Date Range"}
+          </p>
           <DateRangeInputs
             startDate={startDate}
             endDate={endDate}
             minDate={today}
+            isSingleDay={isSingleDay}
             onChange={handleDateChange}
           />
         </div>
 
-        <RangeCalendar startDate={startDate} endDate={endDate} onSelect={handleDateChange} />
+        <RangeCalendar
+          startDate={startDate}
+          endDate={endDate}
+          isSingleDay={isSingleDay}
+          onSelect={handleDateChange}
+        />
 
         {overlap && (
           <div className="flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-800">
             <WarningIcon className="mt-0.5 shrink-0" />
             <div>
-              <p className="font-semibold">This range overlaps an existing vacation block.</p>
+              <p className="font-semibold">
+                This {isSingleDay ? "date" : "range"} overlaps an existing vacation block.
+              </p>
               <p className="text-sm">
                 Please adjust the dates or manage existing blocks to prevent conflicts.
               </p>

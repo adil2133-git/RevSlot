@@ -14,6 +14,10 @@ export function formatDateRange(startDate: string, endDate: string): string {
   const start = dayjs(startDate);
   const end = dayjs(endDate);
 
+  if (startDate === endDate) {
+    return start.format("MMM D, YYYY");
+  }
+
   if (start.year() === end.year()) {
     return `${start.format("MMM D")} – ${end.format("MMM D, YYYY")}`;
   }

@@ -1,7 +1,7 @@
 import { pgTable, serial, integer, varchar, text, smallint, boolean, timestamp, unique, index, check } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { reviewers } from '../auth/reviewers.model.js';
-import { availabilityTemplates } from '../availability/availabilityTemplates.model.js';
+import { availabilityTemplates } from '../availability/models/availabilityTemplates.schema.js';
 
 export const eventTypes = pgTable(
     'event_types',

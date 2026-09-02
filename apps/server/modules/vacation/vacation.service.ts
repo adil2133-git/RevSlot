@@ -2,13 +2,13 @@ import dayjs from "dayjs";
 import { eq, and, ne, inArray, sql } from "drizzle-orm";
 import { db } from "../../config/db.js";
 
-import { vacationBlocks } from "./vacation.model.js";
-import { bookings } from "../booking/bookings.model.js";
+import { vacationBlocks } from "./vacation.schema.js";
+import { bookings } from "../booking/bookings.schema.js";
 import { eventTypes } from "../eventType/eventTypes.model.js";
 
 import { AppError } from "../../core/errors/AppError.js";
 
-import type { CreateVacationBlockInput, UpdateVacationBlockInput } from "./vacation.schema.js";
+import type { CreateVacationBlockInput, UpdateVacationBlockInput } from "./vacation.validation.js";
 
 // Extracts the exact transaction type Drizzle passes into db.transaction()'s callback
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];

@@ -4,7 +4,7 @@ import {
   GetDashboardSummaryQuerySchema,
   type GetDashboardSummaryQueryInput,
   BookingIdParamSchema,
-} from "./dashboard.schema.js";
+} from "./dashboard.validation.js";
 
 export const dashboardController = {
   getSummary: async (req: Request, res: Response) => {
