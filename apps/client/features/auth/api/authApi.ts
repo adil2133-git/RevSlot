@@ -98,6 +98,22 @@ export async function updateProfile(payload: UpdateProfilePayload) {
   return data.data.user;
 }
 
+export async function updateAvatar(file: File) {
+  const formData = new FormData();
+  formData.append("avatar", file);
+
+  const { data } = await api.patch<{ data: { avatarUrl: string } }>(
+    "/auth/profile/avatar",
+    formData,
+    {
+      headers: {
+        "Content-Type": undefined, // let the browser set multipart/form-data + boundary itself
+      },
+    }
+  );
+  return data.data.avatarUrl;
+}
+
 export async function changePassword(payload: ChangePasswordPayload) {
   const { data } = await api.patch<MessageResponse>("/auth/profile/password", payload);
   return data.message;

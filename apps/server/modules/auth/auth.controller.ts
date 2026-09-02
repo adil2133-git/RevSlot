@@ -136,6 +136,21 @@ export const authController = {
     });
   },
 
+    updateAvatar: async (req: Request, res: Response) => {
+    if (!req.file) {
+      res.status(400).json({ success: false, message: "No image file provided" });
+      return;
+    }
+
+    const result = await authService.updateAvatar(req.user!.userId, req.user!.role, req.file.buffer);
+
+    res.status(200).json({
+      success: true,
+      message: "Avatar updated successfully",
+      data: result,
+    });
+  },
+
   changePassword: async (req: Request, res: Response) => {
     const result = await authService.changePassword(req.user!.userId, req.user!.role, req.body);
 

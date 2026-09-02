@@ -1,15 +1,21 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
+import AvatarCropModal from "./AvatarCropModal";
+import Image from "next/image";
 import {
   Briefcase,
   GraduationCap,
   Link as LinkIcon,
   Save,
   UserRound,
+  Camera,
 } from "lucide-react";
 
 import { useAuthStore } from "../store/authStore";
+
+const MAX_AVATAR_BYTES = 2 * 1024 * 1024; // 2MB
+const ALLOWED_AVATAR_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 const inputClassName =
   "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-100";
@@ -24,10 +30,16 @@ export default function ProfileInfoCard() {
   const user = useAuthStore((state) => state.user);
   const updateProfile = useAuthStore((state) => state.updateProfile);
   const isLoading = useAuthStore((state) => state.isLoading);
+  const updateAvatar = useAuthStore((state) => state.updateAvatar);
 
   const [name, setName] = useState("");
   const [bio, setBio] = useState("");
   const [whatsappNumber, setWhatsappNumber] = useState("");
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [cropModalSrc, setCropModalSrc] = useState<string | null>(null);
+  const [avatarSaving, setAvatarSaving] = useState(false);
 
   const [professionalHeadline, setProfessionalHeadline] = useState("");
   const [skills, setSkills] = useState("");
@@ -42,8 +54,39 @@ export default function ProfileInfoCard() {
   const [linkedinUrl, setLinkedinUrl] = useState("");
   const [githubUrl, setGithubUrl] = useState("");
   const [portfolioUrl, setPortfolioUrl] = useState("");
-
   const [saved, setSaved] = useState(false);
+
+const handleAvatarSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const file = event.target.files?.[0];
+  event.target.value = "";
+  if (!file) return;
+
+  setAvatarError(null);
+
+  if (!ALLOWED_AVATAR_TYPES.has(file.type)) {
+    setAvatarError("Only JPEG, PNG, or WebP images are allowed");
+    return;
+  }
+  if (file.size > MAX_AVATAR_BYTES) {
+    setAvatarError("Image must be under 2MB");
+    return;
+  }
+
+  setCropModalSrc(URL.createObjectURL(file));
+};
+
+const handleCropConfirm = async (blob: Blob) => {
+  setAvatarSaving(true);
+  try {
+    const croppedFile = new File([blob], "avatar.jpg", { type: "image/jpeg" });
+    await updateAvatar(croppedFile);
+    setCropModalSrc(null);
+  } catch (err) {
+    setAvatarError((err as Error).message || "Upload failed");
+  } finally {
+    setAvatarSaving(false);
+  }
+};
 
   useEffect(() => {
     if (!user) return;
@@ -191,6 +234,63 @@ export default function ProfileInfoCard() {
             </p>
           </div>
         </div>
+
+              <section className={sectionClassName}>
+        <div className="flex items-center gap-5">
+          <div className="group relative h-20 w-20 shrink-0">
+            <button
+              type="button"
+              onClick={() => avatarInputRef.current?.click()}
+              disabled={avatarUploading}
+              className="relative h-20 w-20 overflow-hidden rounded-full border border-slate-200 bg-slate-100 disabled:cursor-not-allowed"
+            >
+              {user.avatarUrl ? (
+                <Image
+                  src={user.avatarUrl}
+                  alt={user.name}
+                  fill
+                  sizes="80px"
+                  className="object-cover"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center">
+                  <UserRound className="h-8 w-8 text-slate-400" />
+                </div>
+              )}
+
+              <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition group-hover:bg-black/40">
+                <Camera className="h-5 w-5 text-white opacity-0 transition group-hover:opacity-100" />
+              </div>
+
+              {avatarUploading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                </div>
+              )}
+            </button>
+
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={handleAvatarSelect}
+              className="hidden"
+            />
+          </div>
+
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">
+              Profile photo
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              JPEG, PNG, or WebP. Up to 2MB.
+            </p>
+            {avatarError && (
+              <p className="mt-1 text-sm text-red-600">{avatarError}</p>
+            )}
+          </div>
+        </div>
+      </section>
 
         <div className="space-y-5">
           <div>
@@ -525,6 +625,15 @@ export default function ProfileInfoCard() {
           {isLoading ? "Saving..." : "Save changes"}
         </button>
       </div>
+
+      {cropModalSrc && (
+        <AvatarCropModal
+          imageSrc={cropModalSrc}
+          onCancel={() => setCropModalSrc(null)}
+          onConfirm={handleCropConfirm}
+          saving={avatarSaving}
+        />
+      )}
     </div>
   );
 }

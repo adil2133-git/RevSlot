@@ -6,6 +6,7 @@ import { catchAsync } from "../../core/utils/catchAsync.js";
 import { authController } from "./auth.controller.js";
 import { requireAuth, requireAdmin } from "../../core/middlewares/auth.middleware.js";
 import { loginLimiter, registerLimiter, refreshLimiter } from "../../core/middlewares/rateLimit.middleware.js";
+import { uploadAvatar } from "../../core/middlewares/upload.middleware.js";
 
 const router = Router();
 
@@ -19,6 +20,7 @@ router.get("/me", requireAuth, catchAsync(authController.getMe));
 router.patch("/profile", requireAuth, validate(UpdateProfileSchema), catchAsync(authController.updateProfile));
 router.patch("/profile/username", requireAuth, validate(UpdateUsernameSchema), catchAsync(authController.updateUsername));
 router.patch("/profile/password", requireAuth, validate(ChangePasswordSchema), catchAsync(authController.changePassword));
+router.patch("/profile/avatar", requireAuth, uploadAvatar, catchAsync(authController.updateAvatar));
 
 router.post("/forgot-password", validate(ForgotPasswordSchema), catchAsync(authController.forgotPassword));
 router.post("/reset-password", validate(ResetPasswordSchema), catchAsync(authController.resetPassword));

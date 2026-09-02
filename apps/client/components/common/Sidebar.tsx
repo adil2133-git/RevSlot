@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAuthStore } from "@/features/auth/store/authStore";
@@ -154,9 +155,14 @@ export default function Sidebar() {
           onClick={() => setMenuOpen((v) => !v)}
           className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-surface-hover"
         >
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-semibold text-primary">
-            {user ? initials(user.name) : "…"}
-          </div>
+          
+          <div className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-secondary text-xs font-semibold text-primary">
+            {user?.avatarUrl ? (
+           <Image src={user.avatarUrl} alt={user.name} fill sizes="32px" className="object-cover" />
+           ) : (
+            user ? initials(user.name) : "…"
+         )}
+        </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium text-on-surface">
               {user?.name ?? "Loading…"}
