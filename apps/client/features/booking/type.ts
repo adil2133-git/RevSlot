@@ -112,7 +112,7 @@ export type GetMyBookingsParams = {
   page?: number;
   limit?: number;
   status?: ("confirmed" | "completed" | "rescheduled" | "cancelled")[];
-  scope?: "upcoming" | "past";
+  scope?: "upcoming" | "past" | "ongoing";
 };
 
 export type BookingDetail = MyBooking & {

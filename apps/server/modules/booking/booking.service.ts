@@ -1,5 +1,5 @@
 import dayjs from "dayjs";
-import { eq, and, ne, sql } from "drizzle-orm";
+import { eq, and, ne, inArray, gte, lte, lt, sql } from "drizzle-orm";
 import { db } from "../../config/db.js";
 import { slots } from "../slot/slots.model.js";
 import { bookings } from "./bookings.model.js";
@@ -18,7 +18,7 @@ export interface GetMyBookingsOptions {
   page: number;
   limit: number;
   status?: ("confirmed" | "completed" | "rescheduled" | "cancelled")[] | undefined;
-  scope?: "upcoming" | "past" | undefined;
+  scope?: "upcoming" | "past" | "ongoing" | undefined;
 }
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -307,13 +307,16 @@ export const bookingService = {
     const conditions = [eq(bookings.reviewerId, reviewerId)];
 
     if (status && status.length > 0) {
-      conditions.push(sql`${bookings.status} IN ${status}`);
+      conditions.push(inArray(bookings.status, status));
     }
 
     if (scope === "upcoming") {
-      conditions.push(sql`${bookings.startTime} >= ${now}`);
+      conditions.push(gte(bookings.startTime, now));
     } else if (scope === "past") {
-      conditions.push(sql`${bookings.startTime} < ${now}`);
+      conditions.push(lt(bookings.startTime, now));
+    } else if (scope === "ongoing") {
+      conditions.push(lte(bookings.startTime, now));
+      conditions.push(gte(bookings.endTime, now));
     }
 
     const orderBy = scope === "past" ? sql`${bookings.startTime} DESC` : sql`${bookings.startTime} ASC`;
