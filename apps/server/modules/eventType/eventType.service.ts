@@ -2,7 +2,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { db } from "../../config/db.js";
 import { reviewers } from "../auth/reviewers.model.js";
 import { eventTypes } from "./eventTypes.model.js";
-import { availabilityTemplates } from "../availability/availabilityTemplates.model.js";
+import { availabilityTemplates } from "../availability/models/availabilityTemplates.schema.js";
 import { AppError } from "../../core/errors/AppError.js";
 
 import type { CreateEventTypeInput, UpdateEventTypeInput } from "./eventType.schema.js";
