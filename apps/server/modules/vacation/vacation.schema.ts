@@ -1,28 +1,21 @@
-import { z } from "zod";
+import { pgTable, serial, integer, date, text, boolean, timestamp, index, check } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { reviewers } from '../auth/reviewers.model.js';
 
-const dateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format");
-
-// Validates input for creating a new vacation block
-export const CreateVacationBlockSchema = z.object({
-  startDate: dateString,
-  endDate: dateString,
-  reason: z.string().trim().max(255).optional(),
-  confirmCancellations: z.boolean().optional().default(false),
-}).refine((data) => data.endDate >= data.startDate, {
-  message: "endDate must be on or after startDate",
-  path: ["endDate"],
-});
-
-// Validates input for updating an existing vacation block
-export const UpdateVacationBlockSchema = z.object({
-  startDate: dateString.optional(),
-  endDate: dateString.optional(),
-  reason: z.string().trim().max(255).optional(),
-  confirmCancellations: z.boolean().optional().default(false),
-}).refine(
-  (data) => !data.startDate || !data.endDate || data.endDate >= data.startDate,
-  { message: "endDate must be on or after startDate", path: ["endDate"] }
+export const vacationBlocks = pgTable(
+  'vacation_blocks',
+  {
+    id: serial('id').primaryKey(),
+    reviewerId: integer('reviewer_id').notNull().references(() => reviewers.id, { onDelete: 'cascade' }),
+    startDate: date('start_date').notNull(),
+    endDate: date('end_date').notNull(),
+    reason: text('reason'),
+    isActive: boolean('is_active').default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    index('idx_vacation_blocks_reviewer_dates').on(table.reviewerId, table.startDate, table.endDate),
+    check('valid_date_range', sql`${table.endDate} >= ${table.startDate}`),
+  ]
 );
-
-export type CreateVacationBlockInput = z.infer<typeof CreateVacationBlockSchema>;
-export type UpdateVacationBlockInput = z.infer<typeof UpdateVacationBlockSchema>;

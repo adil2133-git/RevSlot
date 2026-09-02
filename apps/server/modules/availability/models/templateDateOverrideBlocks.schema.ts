@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm'
 import { pgTable, serial, integer, smallint, time } from 'drizzle-orm/pg-core';
 import { check } from 'drizzle-orm/pg-core';
-import { templateDateOverrides } from './templateDateOverrides.model.js';
+import { templateDateOverrides } from './templateDateOverrides.schema.js';
 
 export const templateOverrideBlocks = pgTable(
   'template_override_blocks',

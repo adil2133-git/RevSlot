@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { eq, and, or, ilike, sql, gte, lte, desc, count } from "drizzle-orm";
 import { db } from "../../config/db.js";
 import { reviewers } from "../auth/reviewers.model.js";
-import { bookings } from "../booking/bookings.model.js";
+import { bookings } from "../booking/bookings.schema.js";
 import { eventTypes } from "../eventType/eventTypes.model.js";
 import { admins } from "./admins.model.js";
 import { auditLogService } from "../auditLog/auditLog.service.js";

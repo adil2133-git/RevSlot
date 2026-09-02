@@ -1,10 +1,10 @@
 import dayjs from "dayjs";
 import { eq, and, ne, inArray, gte, lte, lt, sql } from "drizzle-orm";
 import { db } from "../../config/db.js";
-import { slots } from "../slot/slots.model.js";
-import { bookings } from "./bookings.model.js";
+import { slots } from "../slot/slots.schema.js";
+import { bookings } from "./bookings.schema.js";
 import { AppError } from "../../core/errors/AppError.js";
-import type { CreateBookingInput, CancelBookingInput, RescheduleBookingInput } from "./booking.schema.js";
+import type { CreateBookingInput, CancelBookingInput, RescheduleBookingInput } from "./booking.validation.js";
 import { eventTypes } from "../eventType/eventTypes.model.js";
 import { reviewers } from "../auth/reviewers.model.js";
 import { calendarService } from "../calendar/calendar.service.js";

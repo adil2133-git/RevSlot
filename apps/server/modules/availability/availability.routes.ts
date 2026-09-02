@@ -9,7 +9,7 @@ import {
   UpdateTemplateSchema,
   ReplaceTimeBlocksSchema,
   CreateDateOverrideSchema
-} from "./availability.schema.js";
+} from "./availability.validation.js";
 import { availabilityController } from "./availability.controller.js";
 
 const router = Router();
