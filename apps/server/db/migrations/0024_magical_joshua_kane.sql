@@ -1,0 +1,1 @@
+ALTER TABLE "event_types" ALTER COLUMN "feedback_form_id" SET NOT NULL;

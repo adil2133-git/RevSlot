@@ -2,6 +2,7 @@ export type EventType = {
   id: number;
   reviewerId: number;
   availabilityTemplateId: number;
+  feedbackFormId: number;
   name: string;
   slug: string;
   description: string | null;
@@ -18,6 +19,7 @@ export type EventType = {
 
 export type CreateEventTypePayload = {
   availabilityTemplateId: number;
+  feedbackFormId?: number;
   name: string;
   description?: string;
   durationMinutes: number;

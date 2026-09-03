@@ -2,6 +2,7 @@ import { pgTable, serial, integer, varchar, text, smallint, boolean, timestamp, 
 import { sql } from 'drizzle-orm';
 import { reviewers } from '../auth/reviewers.model.js';
 import { availabilityTemplates } from '../availability/models/availabilityTemplates.schema.js';
+import { feedbackForms } from '../feedback/feedback.model.js';
 
 export const eventTypes = pgTable(
     'event_types',
@@ -9,6 +10,7 @@ export const eventTypes = pgTable(
         id: serial('id').primaryKey(),
         reviewerId: integer('reviewer_id').notNull().references(() => reviewers.id, { onDelete: 'cascade' }),
         availabilityTemplateId: integer('availability_template_id').notNull().references(() => availabilityTemplates.id, { onDelete: 'restrict' }),
+        feedbackFormId: integer('feedback_form_id').notNull().references(() => feedbackForms.id, { onDelete: 'restrict' }),
         name: varchar('name', { length: 150 }).notNull(),
         slug: varchar('slug', { length: 100 }).notNull(),
         durationMinutes: smallint('duration_minutes').notNull(),
@@ -29,5 +31,6 @@ export const eventTypes = pgTable(
         index('idx_event_types_template').on(table.availabilityTemplateId),
         check('valid_duration', sql`${table.durationMinutes} > 0`),
         check('valid_booking_window', sql`${table.bookingWindowDays} > 0`),
+                index('idx_event_types_feedback_form').on(table.feedbackFormId),
     ]
 );
