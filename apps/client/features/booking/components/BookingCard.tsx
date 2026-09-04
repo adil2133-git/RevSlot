@@ -9,6 +9,7 @@ interface BookingCardProps {
   onViewDetails?: (booking: MyBooking) => void;
   onCancel?: (booking: MyBooking) => void;
   onReschedule?: (booking: MyBooking) => void;
+  onLeaveFeedback?: (booking: MyBooking) => void; 
 }
 
 export default function BookingCard({
@@ -16,6 +17,7 @@ export default function BookingCard({
   onViewDetails,
   onCancel,
   onReschedule,
+  onLeaveFeedback,
 }: BookingCardProps) {
   const statusBorderColor =
     booking.status === "confirmed"
@@ -103,6 +105,7 @@ export default function BookingCard({
             onViewDetails={() => onViewDetails?.(booking)}
             onCancel={() => onCancel?.(booking)}
             onReschedule={() => onReschedule?.(booking)}
+            onLeaveFeedback={() => onLeaveFeedback?.(booking)}
           />
         </div>
       </div>

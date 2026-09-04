@@ -15,3 +15,7 @@ export const otpPurposeEnum = pgEnum('otp_purpose', [
 ]);
 
 export const userRole = pgEnum('user_role', ['reviewer', 'admin']);
+
+export const feedbackFieldType = pgEnum('feedback_field_type', [
+  'text', 'textarea', 'number', 'select',
+]);

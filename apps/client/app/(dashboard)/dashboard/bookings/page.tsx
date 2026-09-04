@@ -6,6 +6,7 @@ import BookingCard from "@/features/booking/components/BookingCard";
 import BookingDetailsModal from "@/features/booking/components/BookingDetailsModal";
 import CancelBookingModal from "@/features/booking/components/CancelBookingModal";
 import RescheduleBookingModal from "@/features/booking/components/RescheduleBookingModal";
+import SubmitFeedbackModal from "@/features/feedback/components/SubmitFeedbackModal";
 import Pagination from "@/features/booking/components/Pagination";
 import { fetchMyBookings } from "@/features/booking/api/bookingApi";
 import type { MyBooking } from "@/features/booking/type";
@@ -34,6 +35,7 @@ export default function BookingsPage() {
   const [selectedDetailsBooking, setSelectedDetailsBooking] = useState<MyBooking | null>(null);
   const [selectedCancelBooking, setSelectedCancelBooking] = useState<MyBooking | null>(null);
   const [selectedRescheduleBooking, setSelectedRescheduleBooking] = useState<MyBooking | null>(null);
+  const [selectedFeedbackBooking, setSelectedFeedbackBooking] = useState<MyBooking | null>(null);
 
   const loadBookings = useCallback(async () => {
     try {
@@ -209,6 +211,17 @@ export default function BookingsPage() {
           onClose={() => setSelectedRescheduleBooking(null)}
           onRescheduled={() => {
             setSelectedRescheduleBooking(null);
+            loadBookings();
+          }}
+        />
+      )}
+
+      {selectedFeedbackBooking && (
+        <SubmitFeedbackModal
+          booking={selectedFeedbackBooking}
+          onClose={() => setSelectedFeedbackBooking(null)}
+          onSubmitted={() => {
+            setSelectedFeedbackBooking(null);
             loadBookings();
           }}
         />

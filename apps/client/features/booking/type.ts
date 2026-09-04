@@ -5,16 +5,16 @@ export type BookingPageInfo = {
     avatarUrl: string | null;
     bio: string | null;
     professionalHeadline: string | null;
-skills: string[];
-yearsOfExperience: number | null;
-currentRole: string | null;
-currentCompany: string | null;
-degree: string | null;
-university: string | null;
-graduationYear: number | null;
-linkedinUrl: string | null;
-githubUrl: string | null;
-portfolioUrl: string | null;
+    skills: string[];
+    yearsOfExperience: number | null;
+    currentRole: string | null;
+    currentCompany: string | null;
+    degree: string | null;
+    university: string | null;
+    graduationYear: number | null;
+    linkedinUrl: string | null;
+    githubUrl: string | null;
+    portfolioUrl: string | null;
   };
   eventType: {
     id: number;

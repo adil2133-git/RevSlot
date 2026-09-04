@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MoreVerticalIcon, EyeIcon, XCircleIcon, RotateIcon } from "./icons";
+import { MoreVerticalIcon, EyeIcon, XCircleIcon, RotateIcon, MessageSquareIcon } from "./icons";
 import type { MyBooking } from "../type";
 
 interface BookingActionsMenuProps {
@@ -9,6 +9,7 @@ interface BookingActionsMenuProps {
   onViewDetails: () => void;
   onCancel: () => void;
   onReschedule: () => void;
+  onLeaveFeedback?: () => void;
 }
 
 export default function BookingActionsMenu({
@@ -16,6 +17,7 @@ export default function BookingActionsMenu({
   onViewDetails,
   onCancel,
   onReschedule,
+  onLeaveFeedback,
 }: BookingActionsMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -54,6 +56,19 @@ export default function BookingActionsMenu({
             <EyeIcon />
             View Details
           </button>
+
+          {booking.status === "completed" && onLeaveFeedback && (
+            <button
+              onClick={() => {
+                setOpen(false);
+                onLeaveFeedback();
+              }}
+              className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-on-surface hover:bg-surface-hover"
+            >
+              <MessageSquareIcon />
+              Leave Feedback
+            </button>
+          )}
 
           {canModify && (
             <>

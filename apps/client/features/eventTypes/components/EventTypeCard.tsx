@@ -95,7 +95,7 @@ export default function EventTypeCard({ eventType, index, onEdit, onToggleActive
     <div
       onDoubleClick={() => onEdit(eventType.id)}
       onTouchEnd={handleTouchEnd}
-      className="flex items-center gap-4 border-b border-slate-100 px-5 py-4 last:border-b-0 hover:bg-surface-hover cursor-pointer select-none"
+      className="mb-3 flex items-center gap-4 rounded-xl border border-slate-100 bg-surface-card px-5 py-4 shadow-surface transition-shadow hover:shadow-raised cursor-pointer select-none"
     >
       <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${iconClass}`}>
         <LinkIcon />

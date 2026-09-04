@@ -13,3 +13,4 @@ export * from '../modules/availability/models/templateDateOverrideBlocks.schema.
 export * from '../modules/availability/models/templateDateOverrides.schema.js'
 export * from '../modules/auth/refreshTokens.model.js'
 export * from '../modules/auditLog/auditLog.model.js'
+export * from '../modules/feedback/feedback.model.js';
