@@ -22,8 +22,7 @@ const MARK_OPTIONS = Array.from({ length: 19 }, (_, i) => (1 + i * 0.5).toFixed(
 export default function SubmitFeedbackModal({ booking, onClose, onSubmitted }: SubmitFeedbackModalProps) {
   const { selectedForm, fetchForm, clearSelectedForm } = useFeedbackStore();
 
-  const [isNoShow, setIsNoShow] = useState(false);
-  const [reviewMark, setReviewMark] = useState("");
+  const [reviewMark, setReviewMark] = useState(""); 
   const [taskMark, setTaskMark] = useState("");
   const [comments, setComments] = useState("");
   const [customValues, setCustomValues] = useState<Record<string, string>>({});
@@ -57,13 +56,13 @@ export default function SubmitFeedbackModal({ booking, onClose, onSubmitted }: S
   const handleSubmit = async () => {
     setError(null);
 
-    if (!isNoShow && (!reviewMark || !taskMark)) {
-      setError("Review mark and task mark are required unless marking as no-show.");
+    if(!reviewMark || !taskMark) {
+      setError("Review mark and task mark are required.");
       return;
     }
     if (selectedForm) {
       for (const field of selectedForm.fields) {
-        if (field.required && !isNoShow && !customValues[String(field.id)]?.trim()) {
+        if (field.required && !customValues[String(field.id)]?.trim()) {
           setError(`"${field.label}" is required.`);
           return;
         }
@@ -73,11 +72,10 @@ export default function SubmitFeedbackModal({ booking, onClose, onSubmitted }: S
     setSubmitting(true);
     try {
       await submitFeedback(booking.id, {
-        isNoShow,
-        reviewMark: isNoShow ? undefined : Number(reviewMark),
-        taskMark: isNoShow ? undefined : Number(taskMark),
+        reviewMark: Number(reviewMark),
+        taskMark: Number(taskMark),
         comments: comments.trim() || undefined,
-        customFieldValues: isNoShow ? {} : customValues,
+        customFieldValues: customValues,
       });
       onSubmitted();
     } catch (err) {
@@ -109,14 +107,6 @@ export default function SubmitFeedbackModal({ booking, onClose, onSubmitted }: S
         {resolvingForm && (
           <p className="text-sm text-slate-400">Loading feedback form…</p>
         )}
-
-        <label className="flex items-center gap-2 rounded-lg border border-slate-200 p-3 text-sm">
-          <input type="checkbox" checked={isNoShow} onChange={(e) => setIsNoShow(e.target.checked)} />
-          Mark as no-show — the intern didn't attend this session
-        </label>
-
-        {!isNoShow && (
-          <>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-400">
@@ -208,8 +198,7 @@ export default function SubmitFeedbackModal({ booking, onClose, onSubmitted }: S
                 )}
               </div>
             ))}
-          </>
-        )}
+
 
         {error && <p className="text-sm text-error">{error}</p>}
       </div>

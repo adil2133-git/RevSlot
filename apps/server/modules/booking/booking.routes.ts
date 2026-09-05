@@ -6,6 +6,7 @@ import {
   GetMyBookingsQuerySchema,
   CancelBookingSchema,
   RescheduleBookingSchema,
+  MarkOutcomeSchema,
 } from "./booking.validation.js";
 import { catchAsync } from "../../core/utils/catchAsync.js";
 import { bookingController } from "./booking.controller.js";
@@ -38,6 +39,12 @@ router.patch(
   requireReviewer,
   validate(RescheduleBookingSchema),
   catchAsync(bookingController.rescheduleBooking)
+);
+router.patch(
+  "/:id/status",
+  requireReviewer,
+  validate(MarkOutcomeSchema),
+  catchAsync(bookingController.markOutcome)
 );
 
 export default router;

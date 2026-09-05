@@ -7,7 +7,7 @@ import type {
   UpdateFormInput,
   FormFieldInput,
   SubmitFeedbackInput,
-} from "./Feedback.schema.js";
+} from "./feedback.schema.js";
 
 // ── Feedback forms (design-time) ──────────────────────────────────────
 
@@ -125,17 +125,8 @@ async function getOwnedBooking(bookingId: number, reviewerId: number) {
 export async function submitFeedback(bookingId: number, reviewerId: number, input: SubmitFeedbackInput) {
   const booking = await getOwnedBooking(bookingId, reviewerId);
 
-  // NOTE: nothing else in the codebase currently transitions a booking to
-  // 'completed' or 'no_show' (no cron, no manual "mark done" action) — so
-  // this endpoint does double duty: submitting feedback (or marking
-  // no-show) is *what* moves the booking out of 'confirmed'/'rescheduled'.
-  // If a separate completion step gets added later, swap this check to
-  // require status === 'completed' instead.
-  if (booking.status !== "confirmed" && booking.status !== "rescheduled") {
+  if (booking.status !== "completed") {
     throw new AppError("Feedback can only be submitted for confirmed sessions", 400);
-  }
-  if (booking.endTime.getTime() > Date.now()) {
-    throw new AppError("Feedback can only be submitted after the session has ended", 400);
   }
 
   const [existing] = await db.select().from(feedback).where(eq(feedback.bookingId, bookingId));
@@ -165,9 +156,9 @@ export async function submitFeedback(bookingId: number, reviewerId: number, inpu
       bookingId,
       reviewerId,
       formId: form.id,
-      isNoShow: input.isNoShow,
-      reviewMark: input.isNoShow ? null : String(input.reviewMark),
-      taskMark: input.isNoShow ? null : String(input.taskMark),
+      isNoShow: false,
+      reviewMark: String(input.reviewMark),
+      taskMark: String(input.taskMark),
       comments: input.comments ?? null,
       customFieldValues: input.customFieldValues ?? {},
     })
@@ -176,11 +167,6 @@ export async function submitFeedback(bookingId: number, reviewerId: number, inpu
   if (!created) {
     throw new AppError("Failed to save feedback", 500);
   }
-
-  await db
-    .update(bookings)
-    .set({ status: input.isNoShow ? "no_show" : "completed" })
-    .where(eq(bookings.id, bookingId));
 
   return created;
 }

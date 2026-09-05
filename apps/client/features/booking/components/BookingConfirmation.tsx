@@ -11,7 +11,6 @@ type BookingConfirmationProps = {
   heldSlot: SlotItem | null;
   advisorEmail: string;
   use12Hour: boolean;
-  meetLink: string | null;
 };
 
 export default function BookingConfirmation({
@@ -19,7 +18,6 @@ export default function BookingConfirmation({
   heldSlot,
   advisorEmail,
   use12Hour,
-  meetLink
 }: BookingConfirmationProps) {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-surface px-4">
@@ -39,36 +37,30 @@ export default function BookingConfirmation({
           with {pageInfo.reviewer.name}
         </p>
         <p className="mt-3 text-sm text-slate-600">
-          A confirmation has been sent to {advisorEmail}.
+          A confirmation email has been sent to {advisorEmail}.
         </p>
-
-        {meetLink && (
-            <a
-               href={meetLink}
-               target="_blank"
-               rel="noopener noreferrer"
-               className="mt-4 inline-block w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary"
-            >
-              Join Google Meet
-          </a>
-       )}
+         
+         <div className="mt-6 flex flex-col gap-2">
+          <button
+             type="button"
+             onClick={() => window.location.reload()}
+             className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary transition-colors hover:bg-primary/90"
+           >
+           Check My Bookings
+        </button>
 
         <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
           <button
-            onClick={() => window.location.reload()}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary"
+             type="button"
+             onClick={() => window.location.reload()}
+             className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-on-surface transition-colors hover:bg-surface-hover"
           >
-            Book another slot
-          </button>
-          <Link
-            href="/"
-            className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-on-surface"
-          >
-            Go to homepage
-          </Link>
+           Book Another Slot
+         </button>
         </div>
       </div>
       <PoweredByFooter />
     </div>
+  </div>
   );
-}
+};

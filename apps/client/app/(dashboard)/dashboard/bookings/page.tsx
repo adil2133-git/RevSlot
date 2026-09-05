@@ -8,10 +8,10 @@ import CancelBookingModal from "@/features/booking/components/CancelBookingModal
 import RescheduleBookingModal from "@/features/booking/components/RescheduleBookingModal";
 import SubmitFeedbackModal from "@/features/feedback/components/SubmitFeedbackModal";
 import Pagination from "@/features/booking/components/Pagination";
-import { fetchMyBookings } from "@/features/booking/api/bookingApi";
+import { fetchMyBookings, markBookingOutcome } from "@/features/booking/api/bookingApi";
 import type { MyBooking } from "@/features/booking/type";
 
-type BookingFilterTab = "all" | "ongoing" | "upcoming" | "completed" | "rescheduled" | "cancelled";
+type BookingFilterTab = "all" | "ongoing" | "upcoming" | "completed" | "no_show" | "rescheduled" | "cancelled";
 
 const FILTER_TABS: { id: BookingFilterTab; label: string }[] = [
   { id: "all", label: "All Bookings" },
@@ -20,6 +20,7 @@ const FILTER_TABS: { id: BookingFilterTab; label: string }[] = [
   { id: "completed", label: "Completed" },
   { id: "rescheduled", label: "Rescheduled" },
   { id: "cancelled", label: "Cancelled" },
+  { id: "no_show", label: "No-show" },
 ];
 
 export default function BookingsPage() {
@@ -36,13 +37,14 @@ export default function BookingsPage() {
   const [selectedCancelBooking, setSelectedCancelBooking] = useState<MyBooking | null>(null);
   const [selectedRescheduleBooking, setSelectedRescheduleBooking] = useState<MyBooking | null>(null);
   const [selectedFeedbackBooking, setSelectedFeedbackBooking] = useState<MyBooking | null>(null);
+  const [markingOutcomeId, setMarkingOutcomeId] = useState<number | null>(null);
 
   const loadBookings = useCallback(async () => {
     try {
       setLoading(true);
 
       let scopeParam: "upcoming" | "past" | "ongoing" | undefined = undefined;
-      let statusParam: ("confirmed" | "completed" | "rescheduled" | "cancelled")[] | undefined = undefined;
+      let statusParam: ("confirmed" | "completed" | "rescheduled" | "cancelled" | "no_show")[] | undefined = undefined;
 
       if (activeTab === "ongoing") {
         scopeParam = "ongoing";
@@ -52,8 +54,8 @@ export default function BookingsPage() {
         statusParam = ["completed"];
       } else if (activeTab === "rescheduled") {
         statusParam = ["rescheduled"];
-      } else if (activeTab === "cancelled") {
-        statusParam = ["cancelled"];
+      } else if (activeTab === "no_show") {
+        statusParam = ["no_show"];
       }
 
       const result = await fetchMyBookings({
@@ -81,6 +83,19 @@ export default function BookingsPage() {
     setActiveTab(tab);
     setPage(1);
   };
+
+  const handleMarkOutcome = async (booking: MyBooking, outcome: "completed" | "no_show") => {
+  if (markingOutcomeId) return;
+  setMarkingOutcomeId(booking.id);
+  try {
+    await markBookingOutcome(booking.id, {outcome});
+    await loadBookings();
+  } catch (err) {
+    setError(err instanceof Error ? err.message : `Failed to mark booking as ${outcome === "completed" ? "completed" : "no-show"}.`);
+  } finally {
+    setMarkingOutcomeId(null);
+  }
+};
 
   return (
     <div>
@@ -159,6 +174,8 @@ export default function BookingsPage() {
               ? "No rescheduled bookings found."
               : activeTab === "cancelled"
               ? "No cancelled bookings found."
+              : activeTab === "no_show"
+              ? "No no-show bookings found."
               : "No bookings match your filter."}
           </p>
         </div>
@@ -175,6 +192,9 @@ export default function BookingsPage() {
                 onViewDetails={(b) => setSelectedDetailsBooking(b)}
                 onCancel={(b) => setSelectedCancelBooking(b)}
                 onReschedule={(b) => setSelectedRescheduleBooking(b)}
+                onMarkCompleted={(b) => handleMarkOutcome(b, "completed")}
+                onMarkNoShow={(b) => handleMarkOutcome(b, "no_show")}
+                onLeaveFeedback={(b) => setSelectedFeedbackBooking(b)}
               />
             ))}
           </div>

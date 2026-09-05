@@ -13,11 +13,12 @@ import { bookingConfirmationTemplate } from "../../emails/templates/bookingConfi
 import { bookingCancelledTemplate } from "../../emails/templates/bookingCancelled.js";
 import { bookingRescheduledTemplate } from "../../emails/templates/bookingRescheduled.js";
 import { slotService } from "../slot/slot.service.js";
+import { feedback } from "../feedback/feedback.model.js";
 
 export interface GetMyBookingsOptions {
   page: number;
   limit: number;
-  status?: ("confirmed" | "completed" | "rescheduled" | "cancelled")[] | undefined;
+  status?: ("confirmed" | "completed" | "rescheduled" | "cancelled" | "no_show")[] | undefined;
   scope?: "upcoming" | "past" | "ongoing" | undefined;
 }
 
@@ -339,9 +340,11 @@ export const bookingService = {
           cancelledReason: bookings.cancelledReason,
           eventTypeName: eventTypes.name,
           bookingWindowDays: eventTypes.bookingWindowDays,
+          hasFeedback: sql<boolean>`${feedback.id} is not null`,
         })
         .from(bookings)
         .innerJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
+        .leftJoin(feedback, eq(feedback.bookingId, bookings.id))
         .where(and(...conditions))
         .orderBy(orderBy)
         .limit(limit)
@@ -385,9 +388,11 @@ export const bookingService = {
         rescheduledFromBookingId: bookings.rescheduledFromBookingId,
         eventTypeName: eventTypes.name,
         bookingWindowDays: eventTypes.bookingWindowDays,
+        hasFeedback: sql<boolean>`${feedback.id} is not null`,
       })
       .from(bookings)
       .innerJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
+      .leftJoin(feedback, eq(feedback.bookingId, bookings.id))
       .where(and(eq(bookings.id, bookingId), eq(bookings.reviewerId, reviewerId)))
       .limit(1);
 
@@ -534,6 +539,76 @@ export const bookingService = {
 
     return updatedBooking;
   },
+
+  markOutcome: async (
+  reviewerId: number,
+  bookingId: number,
+  outcome: "completed" | "no_show"
+) => {
+  const booking = await getOwnedBookingOrThrow(reviewerId, bookingId);
+
+   if (booking.status === outcome) {
+    throw new AppError(
+      `Booking is already marked as ${outcome === "completed" ? "completed" : "no-show"}`,
+      400
+    );
+  }
+  const [existingFeedback] = await db
+    .select({ id: feedback.id })
+    .from(feedback)
+    .where(eq(feedback.bookingId, bookingId))
+    .limit(1);
+
+  if (booking.status === "completed" && existingFeedback) {
+    throw new AppError(
+      "Booking outcome cannot be changed after feedback has been submitted",
+      400
+    );
+  }
+
+  if (
+    booking.status !== "confirmed" &&
+    booking.status !== "rescheduled" &&
+    booking.status !== "completed" &&
+    booking.status !== "no_show"
+  ) {
+    throw new AppError("This booking outcome cannot be changed", 400);
+  }
+
+  const now = Date.now();
+  const graceEnd =
+    booking.startTime.getTime() + 10 * 60 * 1000; // 10-min no-show grace period
+  const sessionEnd = booking.endTime.getTime();
+
+  if (outcome === "no_show" && now < graceEnd) {
+    throw new AppError(
+      "No-show can only be marked after the 10-minute grace period",
+      400
+    );
+  }
+
+  if (outcome === "completed" && now < sessionEnd) {
+    throw new AppError(
+      "This session can only be marked completed after it has ended",
+      400
+    );
+  }
+
+   const [updated] = await db
+    .update(bookings)
+    .set({ status: outcome })
+    .where(and(eq(bookings.id, bookingId), eq(bookings.status, booking.status)))
+    .returning();
+
+  if (!updated) {
+    throw new AppError(
+      "This booking was just updated elsewhere. Please refresh and try again.",
+      409
+    );
+  }
+
+  return updated;
+},
 
   finalizeReschedule: async (
     oldBooking: { startTime: Date; endTime: Date },

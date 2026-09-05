@@ -61,7 +61,6 @@ export type Feedback = {
 };
 
 export type SubmitFeedbackPayload = {
-  isNoShow?: boolean;
   reviewMark?: number; // 1–10, half-point steps
   taskMark?: number;
   comments?: string;

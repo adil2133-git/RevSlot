@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MoreVerticalIcon, EyeIcon, XCircleIcon, RotateIcon, MessageSquareIcon } from "./icons";
+import { MoreVerticalIcon, EyeIcon, XCircleIcon, RotateIcon } from "./icons";
 import type { MyBooking } from "../type";
 
 interface BookingActionsMenuProps {
@@ -9,7 +9,7 @@ interface BookingActionsMenuProps {
   onViewDetails: () => void;
   onCancel: () => void;
   onReschedule: () => void;
-  onLeaveFeedback?: () => void;
+  onChangeOutcome: () => void;
 }
 
 export default function BookingActionsMenu({
@@ -17,7 +17,7 @@ export default function BookingActionsMenu({
   onViewDetails,
   onCancel,
   onReschedule,
-  onLeaveFeedback,
+  onChangeOutcome,
 }: BookingActionsMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -33,6 +33,14 @@ export default function BookingActionsMenu({
   }, []);
 
   const canModify = booking.status === "confirmed" || booking.status === "rescheduled";
+  const now = Date.now();
+  const startTime = new Date(booking.startTime).getTime();
+  const RESCHEDULE_CANCEL_CUTOFF_HOURS = 3;
+  const cutoffTime = startTime - RESCHEDULE_CANCEL_CUTOFF_HOURS * 60 * 60 * 1000;
+  const canRescheduleOrCancel = canModify && now < cutoffTime;
+  const canChangeOutcome =
+  booking.status === "no_show" ||
+  (booking.status === "completed" && !booking.hasFeedback);
 
   return (
     <div className="relative" ref={ref}>
@@ -57,44 +65,33 @@ export default function BookingActionsMenu({
             View Details
           </button>
 
-          {booking.status === "completed" && onLeaveFeedback && (
+          {canChangeOutcome && (
             <button
-              onClick={() => {
-                setOpen(false);
-                onLeaveFeedback();
-              }}
-              className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-on-surface hover:bg-surface-hover"
-            >
-              <MessageSquareIcon />
-              Leave Feedback
-            </button>
-          )}
+               onClick={() => {
+                   setOpen(false);
+                   onChangeOutcome();
+          }}
+         className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-on-surface hover:bg-surface-hover"
+         >
+          <RotateIcon />
+              Change Outcome
+          </button>
+        )}
 
-          {canModify && (
-            <>
-              <button
-                onClick={() => {
-                  setOpen(false);
-                  onReschedule();
-                }}
-                className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-on-surface hover:bg-surface-hover"
-              >
-                <RotateIcon />
-                Reschedule
-              </button>
-              <button
-                onClick={() => {
-                  setOpen(false);
-                  onCancel();
-                }}
-                className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-error hover:bg-error-container"
-              >
-                <XCircleIcon />
-                Cancel Booking
-              </button>
-            </>
-          )}
-        </div>
+ {canRescheduleOrCancel && (
+    <>
+    <button onClick={() => { setOpen(false); onReschedule(); }} className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-on-surface hover:bg-surface-hover">
+      <RotateIcon />
+      Reschedule
+    </button>
+
+    <button onClick={() => { setOpen(false); onCancel(); }} className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-error hover:bg-error-container">
+      <XCircleIcon />
+      Cancel Booking
+    </button>
+  </>
+)}
+  </div>
       )}
     </div>
   );
