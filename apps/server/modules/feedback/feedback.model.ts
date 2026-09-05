@@ -53,33 +53,23 @@ export const feedback = pgTable(
   'feedback',
   {
     id: serial('id').primaryKey(),
-
     bookingId: integer('booking_id')
       .notNull()
       .unique() // one feedback (or no-show record) per booking
       .references(() => bookings.id, { onDelete: 'cascade' }),
-
     reviewerId: integer('reviewer_id')
       .notNull()
       .references(() => reviewers.id, { onDelete: 'cascade' }),
-
     formId: integer('form_id')
       .notNull()
       .references(() => feedbackForms.id, { onDelete: 'restrict' }),
-
     isNoShow: boolean('is_no_show').notNull().default(false),
-
-    // Null when isNoShow is true. 1.0–10.0, half-point steps (6.5, 8.5
-    // etc. per doc section 3.6/3.8).
     reviewMark: numeric('review_mark', { precision: 3, scale: 1 }),
     taskMark: numeric('task_mark', { precision: 3, scale: 1 }),
-
     comments: text('comments'),
-
-    // Answers to the selected form's custom fields, keyed by
-    // feedback_form_fields.id (as a string — JSON object keys are strings).
-    customFieldValues: jsonb('custom_field_values').$type<Record<string, string>>().default({}),
-
+    customFieldValues: jsonb('custom_field_values')
+      .$type<Record<string, { label: string; fieldType: string; value: string; options?: string[] }>>()
+      .default({}),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   },

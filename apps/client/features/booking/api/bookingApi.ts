@@ -10,6 +10,7 @@ import type {
   BookingDetail,
   CancelBookingPayload,
   RescheduleBookingPayload,
+  MarkOutcomePayload,
 } from "../type";
 
 export async function fetchBookingPageInfo(username: string, eventSlug: string) {
@@ -101,6 +102,14 @@ export async function cancelBooking(id: number, payload: CancelBookingPayload) {
 export async function rescheduleBooking(id: number, payload: RescheduleBookingPayload) {
   const { data } = await api.patch<{ success: boolean; data: BookingDetail & { meetLink: string | null } }>(
     `/bookings/${id}/reschedule`,
+    payload
+  );
+  return data.data;
+}
+
+export async function markBookingOutcome(id: number, payload: MarkOutcomePayload) {
+  const { data } = await api.patch<{ success: boolean; data: BookingDetail }>(
+    `/bookings/${id}/status`,
     payload
   );
   return data.data;

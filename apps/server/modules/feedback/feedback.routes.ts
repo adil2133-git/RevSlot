@@ -3,7 +3,7 @@ import * as feedbackController from "./feedback.controller.js";
 import { validate } from "../../core/middlewares/validate.middleware.js";
 import { requireReviewer } from "../../core/middlewares/auth.middleware.js";
 import { catchAsync } from "../../core/utils/catchAsync.js";
-import { CreateFormSchema, UpdateFormSchema, SubmitFeedbackSchema } from "./Feedback.schema.js";
+import { CreateFormSchema, UpdateFormSchema, SubmitFeedbackSchema, UpdateFeedbackSchema } from "./feedback.schema.js";
 
 // Feedback form CRUD — mount at /api/feedback-forms in server.ts.
 const formRouter = Router();
@@ -19,10 +19,16 @@ formRouter.delete("/:formId", catchAsync(feedbackController.deleteForm));
 // multiple routers mounted on the same base path).
 const bookingFeedbackRouter = Router();
 bookingFeedbackRouter.use(requireReviewer);
+
 bookingFeedbackRouter.post(
   "/:id/feedback",
   validate(SubmitFeedbackSchema),
   catchAsync(feedbackController.submitFeedback)
+);
+bookingFeedbackRouter.patch(
+  "/:id/feedback",
+  validate(UpdateFeedbackSchema),
+  catchAsync(feedbackController.updateFeedback)
 );
 bookingFeedbackRouter.get("/:id/feedback", catchAsync(feedbackController.getFeedback));
 

@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import * as feedbackService from "./feedback.service.js";
-import { InternHistoryQuerySchema } from "./Feedback.schema.js";
+import { InternHistoryQuerySchema } from "./feedback.schema.js";
 
 function reviewerId(req: Request): number {
   return req.user!.userId;
@@ -44,9 +44,15 @@ export async function submitFeedback(req: Request, res: Response) {
   res.status(201).json({ success: true, data: { feedback: result } });
 }
 
+export async function updateFeedback(req: Request, res: Response) {
+  const bookingId = Number(req.params.id);
+  const result = await feedbackService.updateFeedback(bookingId, reviewerId(req), req.body);
+  res.status(200).json({ success: true, data: { feedback: result } });
+}
+
 export async function getFeedback(req: Request, res: Response) {
   const bookingId = Number(req.params.id);
-  const result = await feedbackService.getFeedbackForBooking(bookingId, reviewerId(req));
+  const result = await feedbackService.getFeedbackDetailsForBooking(bookingId, reviewerId(req));   // ✅
   res.status(200).json({ success: true, data: { feedback: result } });
 }
 

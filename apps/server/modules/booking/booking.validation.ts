@@ -27,7 +27,7 @@ export const GetMyBookingsQuerySchema = z.object({
   status: z
     .string()
     .optional()
-    .transform((val) => val?.split(",") as ("confirmed" | "completed" | "rescheduled" | "cancelled")[] | undefined),
+    .transform((val) => val?.split(",") as ("confirmed" | "completed" | "rescheduled" | "cancelled" | "no_show")[] | undefined),
   scope: z.enum(["upcoming", "past", "ongoing"]).optional(),
 });
 
@@ -56,4 +56,9 @@ export const RescheduleBookingSchema = z.object({
   endTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, "Invalid time format (HH:MM)"),
 });
 
+export const MarkOutcomeSchema = z.object({
+  outcome: z.enum(["completed", "no_show"]),
+});
+
+export type MarkOutcomeInput = z.infer<typeof MarkOutcomeSchema>;
 export type RescheduleBookingInput = z.infer<typeof RescheduleBookingSchema>;
