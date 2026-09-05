@@ -10,6 +10,7 @@ interface BookingActionsMenuProps {
   onCancel: () => void;
   onReschedule: () => void;
   onChangeOutcome: () => void;
+  onViewFeedback: () => void;
 }
 
 export default function BookingActionsMenu({
@@ -18,6 +19,7 @@ export default function BookingActionsMenu({
   onCancel,
   onReschedule,
   onChangeOutcome,
+  onViewFeedback,
 }: BookingActionsMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -64,6 +66,19 @@ export default function BookingActionsMenu({
             <EyeIcon />
             View Details
           </button>
+
+          {booking.status === "completed" && booking.hasFeedback && (
+            <button
+              onClick={() => {
+                setOpen(false);
+                onViewFeedback();
+              }}
+              className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-on-surface hover:bg-surface-hover"
+            >
+              <EyeIcon />
+              View Feedback
+            </button>
+          )}
 
           {canChangeOutcome && (
             <button

@@ -7,6 +7,7 @@ import type {
   UpdateFormInput,
   FormFieldInput,
   SubmitFeedbackInput,
+  UpdateFeedbackInput,
 } from "./feedback.schema.js";
 
 // ── Feedback forms (design-time) ──────────────────────────────────────
@@ -134,20 +135,25 @@ export async function submitFeedback(bookingId: number, reviewerId: number, inpu
     throw new AppError("Feedback has already been submitted for this booking", 400);
   }
 
-  const [eventType] = await db
-    .select({ feedbackFormId: eventTypes.feedbackFormId })
-    .from(eventTypes)
-    .where(eq(eventTypes.id, booking.eventTypeId));
-  if (!eventType?.feedbackFormId) {
-    throw new AppError("This event type has no feedback form configured", 400);
-  }
-
-  const [form] = await db
+  // Reviewer picks the form at submission time now — no more deriving it
+  // from the booking's event type. getOwnedForm throws if the form
+  // doesn't exist or isn't this reviewer's.
+  const form = await getOwnedForm(input.formId, reviewerId);
+  const fields = await db
     .select()
-    .from(feedbackForms)
-    .where(and(eq(feedbackForms.id, eventType.feedbackFormId), eq(feedbackForms.reviewerId, reviewerId)));
-  if (!form) {
-    throw new AppError("Selected feedback form not found", 404);
+    .from(feedbackFormFields)
+    .where(eq(feedbackFormFields.formId, form.id));
+
+  const snapshotValues: Record<string, { label: string; fieldType: string; value: string }> = {};
+  for (const field of fields) {
+    const value = input.customFieldValues?.[String(field.id)];
+    if (value === undefined) continue;
+    snapshotValues[String(field.id)] = {
+      label: field.label,
+      fieldType: field.fieldType,
+      value,
+      ...(field.fieldType === "select" && { options: field.options ?? [] }),
+    };
   }
 
   const [created] = await db
@@ -160,7 +166,7 @@ export async function submitFeedback(bookingId: number, reviewerId: number, inpu
       reviewMark: String(input.reviewMark),
       taskMark: String(input.taskMark),
       comments: input.comments ?? null,
-      customFieldValues: input.customFieldValues ?? {},
+      customFieldValues: snapshotValues,
     })
     .returning();
 
@@ -171,10 +177,107 @@ export async function submitFeedback(bookingId: number, reviewerId: number, inpu
   return created;
 }
 
+
+export const EDIT_WINDOW_HOURS = 24;
+export async function updateFeedback(bookingId: number, reviewerId: number, input: UpdateFeedbackInput) {
+  await getOwnedBooking(bookingId, reviewerId);
+
+  const [existing] = await db.select().from(feedback).where(eq(feedback.bookingId, bookingId));
+  if (!existing) {
+    throw new AppError("Feedback not found for this booking", 404);
+  }
+
+  if (existing.reviewerId !== reviewerId) {
+    throw new AppError("You can only edit your own feedback", 403);
+  }
+
+  const submittedAt = existing.createdAt ?? new Date();
+  const editableUntil = submittedAt.getTime() + EDIT_WINDOW_HOURS * 60 * 60 * 1000;
+  if (Date.now() > editableUntil) {
+    throw new AppError(`Feedback is locked — the ${EDIT_WINDOW_HOURS}-hour edit window has passed`, 403);
+  }
+
+  const fields = await db
+    .select()
+    .from(feedbackFormFields)
+    .where(eq(feedbackFormFields.formId, existing.formId));
+
+  const snapshotValues: Record<string, { label: string; fieldType: string; value: string }> = {};
+  for (const field of fields) {
+    const value = input.customFieldValues?.[String(field.id)];
+    if (value === undefined) continue;
+    snapshotValues[String(field.id)] = { label: field.label, fieldType: field.fieldType, value };
+  }
+
+  const [updated] = await db
+    .update(feedback)
+    .set({
+      reviewMark: String(input.reviewMark),
+      taskMark: String(input.taskMark),
+      comments: input.comments ?? null,
+      customFieldValues: snapshotValues,
+      updatedAt: new Date(),
+    })
+    .where(eq(feedback.bookingId, bookingId))
+    .returning();
+
+  if (!updated) {
+    throw new AppError("Failed to update feedback", 500);
+  }
+
+  return updated;
+}
+
 export async function getFeedbackForBooking(bookingId: number, reviewerId: number) {
   await getOwnedBooking(bookingId, reviewerId);
   const [row] = await db.select().from(feedback).where(eq(feedback.bookingId, bookingId));
   return row ?? null;
+}
+
+export async function getFeedbackDetailsForBooking(bookingId: number, reviewerId: number) {
+  const booking = await getOwnedBooking(bookingId, reviewerId);
+
+  const [row] = await db.select().from(feedback).where(eq(feedback.bookingId, bookingId));
+  if (!row) return null;
+
+  const [form] = await db
+    .select({ id: feedbackForms.id, name: feedbackForms.name })
+    .from(feedbackForms)
+    .where(eq(feedbackForms.id, row.formId));
+
+  const [eventType] = await db
+    .select({ name: eventTypes.name })
+    .from(eventTypes)
+    .where(eq(eventTypes.id, booking.eventTypeId));
+
+  const customFields = Object.entries(row.customFieldValues ?? {}).map(([fieldId, entry]) => ({
+    id: Number(fieldId),
+    label: entry.label,
+    fieldType: entry.fieldType,
+    value: entry.value,
+    options: entry.options ?? null,
+  }));
+
+  const submittedAt = row.createdAt ?? new Date();
+  const editableUntil = new Date(submittedAt.getTime() + EDIT_WINDOW_HOURS * 60 * 60 * 1000);
+
+  return {
+    id: row.id,
+    bookingId: row.bookingId,
+    clientName: booking.internName || booking.advisorName,
+    eventTypeName: eventType?.name ?? null,
+    sessionDate: booking.startTime,
+    formName: form?.name ?? null,
+    isNoShow: row.isNoShow,
+    reviewMark: row.reviewMark,
+    taskMark: row.taskMark,
+    comments: row.comments,
+    customFields,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    editableUntil: editableUntil.toISOString(),
+    canEdit: Date.now() <= editableUntil.getTime(),
+  };
 }
 
 // Doc section 3.7 — exact intern-name + batch match only, scoped to this

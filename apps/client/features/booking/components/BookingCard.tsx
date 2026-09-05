@@ -13,7 +13,29 @@ interface BookingCardProps {
   onMarkCompleted?: (booking: MyBooking) => void;
   onMarkNoShow?: (booking: MyBooking) => void;
   onLeaveFeedback?: (booking: MyBooking) => void;
+  onViewFeedback?: (booking: MyBooking) => void;
 }
+
+function formatCountdown(ms: number) {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+
+  const days = Math.floor(totalSeconds / (24 * 60 * 60));
+  const hours = Math.floor(
+    (totalSeconds % (24 * 60 * 60)) / (60 * 60)
+  );
+  const minutes = Math.floor(
+    (totalSeconds % (60 * 60)) / 60
+  );
+  const seconds = totalSeconds % 60;
+  if (days > 0) {
+    return `${days}d ${hours}h`;
+  }
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  return `${minutes}m ${seconds}s`;
+}
+
 
 export default function BookingCard({
   booking,
@@ -23,6 +45,7 @@ export default function BookingCard({
   onMarkCompleted,
   onMarkNoShow,
   onLeaveFeedback,
+  onViewFeedback,
 }: BookingCardProps) {
 
   const displayName = booking.internName || booking.advisorName;
@@ -60,7 +83,12 @@ export default function BookingCard({
   const isCompleted = booking.status === "completed";
   const isNoShow = booking.status === "no_show";
 
-    const statusBorderColor = isOutcomeRequired
+  const isUpcoming = isActiveBooking && now < startTime;
+  const msUntilStart = startTime - now;
+  const isJoinAvailable = isActiveBooking && now >= startTime - 10 * 60 * 1000 && now < endTime;
+  const isUrgent = isUpcoming && msUntilStart <= 10 * 60 * 1000; // last 10 minutes
+
+  const statusBorderColor = isOutcomeRequired
     ? "border-l-orange-500"
     : isInProgress
     ? "border-l-blue-500"
@@ -128,10 +156,11 @@ export default function BookingCard({
 
       {/* Right Actions & Status */}
       <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-3 md:border-t-0 md:pt-0">
-        <StatusBadge status = { isOutcomeRequired? "outcome_required"
-                    : isInProgress ? "in_progress" : booking.status
-           }
-        />
+        {!isOutcomeRequired && (
+          <StatusBadge
+            status={isInProgress ? "in_progress" : booking.status}
+          />
+        )}
 
         <div className="flex items-center gap-2">
 
@@ -167,29 +196,67 @@ export default function BookingCard({
             </button>
           )}
 
+          {isCompleted && booking.hasFeedback && onViewFeedback && (
+            <button
+              type="button"
+              onClick={() => onViewFeedback(booking)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-surface px-3 py-1.5 text-xs font-semibold text-on-surface transition-colors hover:bg-surface-hover"
+            >
+              View Feedback
+            </button>
+          )}
+
           {isNoShow && (
             <span className="text-xs font-medium text-slate-400">
               No feedback available
             </span>
           )}
-            {booking.meetLink && (booking.status === "confirmed" || booking.status === "rescheduled") && now < endTime && (
-              <a
-                href={booking.meetLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-on-primary shadow-2xs hover:shadow-surface transition-shadow"
-              >
-                Join Meet
-              </a>
-            )}
+            
+          {booking.meetLink && isActiveBooking && now < endTime && (
+              <div className="flex items-center gap-2">
+                {isUpcoming ? (
+                  <span
+                    className={`inline-flex items-center gap-1 whitespace-nowrap rounded-lg border px-3 py-1.5 text-xs font-semibold ${
+                      isUrgent
+                        ? "animate-pulse border-rose-200 bg-rose-50 text-rose-600"
+                        : "border-slate-200 bg-surface text-slate-500"
+                    }`}
+                  >
+                    {isUrgent ? "🔴" : "🕐"} Starts in {formatCountdown(msUntilStart)}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600">
+                    🟢 Live now
+                  </span>
+                )}
 
+            {isJoinAvailable ? (
+                <a
+                  href={booking.meetLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-on-primary shadow-2xs hover:shadow-surface transition-shadow"
+                 >
+                 Join Meet
+               </a>
+              ) : (
+           <span className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg bg-primary/40 px-3 py-1.5 text-xs font-semibold text-on-primary/70">
+              Join Meet
+           </span>
+           )}
+       </div>
+       )}
           <BookingActionsMenu
             booking={booking}
             onViewDetails={() => onViewDetails?.(booking)}
             onCancel={() => onCancel?.(booking)}
             onReschedule={() => onReschedule?.(booking)}
             onChangeOutcome={() => setIsChangeOutcomeOpen(true)}
+            onViewFeedback={() => onViewFeedback?.(booking)}
           />
+     </div>
+   </div>
+
 {outcomeToConfirm && (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
     <div className="w-full max-w-md rounded-xl bg-surface-card p-6 shadow-raised">
@@ -294,7 +361,5 @@ export default function BookingCard({
   </div>
 )}
   </div>
- </div>
-</div>
 );
 };

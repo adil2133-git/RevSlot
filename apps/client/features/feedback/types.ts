@@ -55,14 +55,48 @@ export type Feedback = {
   reviewMark: string | null; // numeric column comes back as string over JSON
   taskMark: string | null;
   comments: string | null;
-  customFieldValues: Record<string, string>;
+  customFieldValues: Record<string, { label: string; fieldType: FeedbackFieldType; value: string }>;
   createdAt: string;
   updatedAt: string;
 };
 
 export type SubmitFeedbackPayload = {
+  formId: number;
   reviewMark?: number; // 1–10, half-point steps
   taskMark?: number;
   comments?: string;
   customFieldValues?: Record<string, string>;
+};
+
+export type UpdateFeedbackPayload = {
+  reviewMark?: number;
+  taskMark?: number;
+  comments?: string;
+  customFieldValues?: Record<string, string>;
+};
+
+export type FeedbackDetailsField = {
+  id: number;
+  label: string;
+  fieldType: FeedbackFieldType;
+  value: string;
+  options: string[] | null;
+};
+
+export type FeedbackDetails = {
+  id: number;
+  bookingId: number;
+  clientName: string;
+  eventTypeName: string | null;
+  sessionDate: string;
+  formName: string | null;
+  isNoShow: boolean;
+  reviewMark: string | null;
+  taskMark: string | null;
+  comments: string | null;
+  customFields: FeedbackDetailsField[];
+  createdAt: string;
+  updatedAt: string;
+  editableUntil: string;
+  canEdit: boolean;
 };

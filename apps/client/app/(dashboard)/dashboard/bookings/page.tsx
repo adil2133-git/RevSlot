@@ -10,6 +10,7 @@ import SubmitFeedbackModal from "@/features/feedback/components/SubmitFeedbackMo
 import Pagination from "@/features/booking/components/Pagination";
 import { fetchMyBookings, markBookingOutcome } from "@/features/booking/api/bookingApi";
 import type { MyBooking } from "@/features/booking/type";
+import FeedbackDetailsModal from "@/features/feedback/components/FeedbackDetailsModal";
 
 type BookingFilterTab = "all" | "ongoing" | "upcoming" | "completed" | "no_show" | "rescheduled" | "cancelled";
 
@@ -37,6 +38,7 @@ export default function BookingsPage() {
   const [selectedCancelBooking, setSelectedCancelBooking] = useState<MyBooking | null>(null);
   const [selectedRescheduleBooking, setSelectedRescheduleBooking] = useState<MyBooking | null>(null);
   const [selectedFeedbackBooking, setSelectedFeedbackBooking] = useState<MyBooking | null>(null);
+  const [selectedViewFeedbackBooking, setSelectedViewFeedbackBooking] = useState<MyBooking | null>(null);
   const [markingOutcomeId, setMarkingOutcomeId] = useState<number | null>(null);
 
   const loadBookings = useCallback(async () => {
@@ -195,6 +197,7 @@ export default function BookingsPage() {
                 onMarkCompleted={(b) => handleMarkOutcome(b, "completed")}
                 onMarkNoShow={(b) => handleMarkOutcome(b, "no_show")}
                 onLeaveFeedback={(b) => setSelectedFeedbackBooking(b)}
+                onViewFeedback={(b) => setSelectedViewFeedbackBooking(b)}
               />
             ))}
           </div>
@@ -246,6 +249,14 @@ export default function BookingsPage() {
           }}
         />
       )}
+
+      {selectedViewFeedbackBooking && (
+        <FeedbackDetailsModal
+          bookingId={selectedViewFeedbackBooking.id}
+          onClose={() => setSelectedViewFeedbackBooking(null)}
+        />
+      )}
+      
     </div>
   );
 }

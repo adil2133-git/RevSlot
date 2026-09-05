@@ -27,6 +27,15 @@ export const UpdateFormSchema = z.object({
 
 export const SubmitFeedbackSchema = z
   .object({
+    formId: z.number().int().positive("Please select a feedback form"),
+    reviewMark: z.number().min(1).max(10).multipleOf(0.5),
+    taskMark: z.number().min(1).max(10).multipleOf(0.5),
+    comments: z.string().trim().max(3000).optional(),
+    customFieldValues: z.record(z.string(), z.string().max(1000)).optional().default({}),
+  });
+
+export const UpdateFeedbackSchema = z
+  .object({
     reviewMark: z.number().min(1).max(10).multipleOf(0.5),
     taskMark: z.number().min(1).max(10).multipleOf(0.5),
     comments: z.string().trim().max(3000).optional(),
@@ -43,4 +52,5 @@ export type FormFieldInput = z.infer<typeof FormFieldSchema>;
 export type CreateFormInput = z.infer<typeof CreateFormSchema>;
 export type UpdateFormInput = z.infer<typeof UpdateFormSchema>;
 export type SubmitFeedbackInput = z.infer<typeof SubmitFeedbackSchema>;
+export type UpdateFeedbackInput = z.infer<typeof UpdateFeedbackSchema>;
 export type InternHistoryQueryInput = z.infer<typeof InternHistoryQuerySchema>;

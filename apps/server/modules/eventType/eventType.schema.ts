@@ -15,7 +15,6 @@ export const ReviewerProfileParamsSchema = z.object({
 
 export const CreateEventTypeSchema = z.object({
     availabilityTemplateId: z.number().int().positive(),
-    feedbackFormId: z.number().int().positive("Please select a feedback form"),
     name: z.string().trim().min(1, "Event name is required").max(150, "Event name must be at most 150 characters"),
     description: z.string().trim().max(1000, "Description must be at most 1000 characters").optional(),
     durationMinutes: z.number().int().positive("Duration must be greater than 0"),
@@ -28,7 +27,6 @@ export const CreateEventTypeSchema = z.object({
 
 export const UpdateEventTypeSchema = z.object({
   availabilityTemplateId: z.number().int().positive().optional(),
-  feedbackFormId: z.number().int().positive().optional(),
   name: z.string().trim().min(1, "Event name is required").max(150, "Event name must be at most 150 characters").optional(),
   description: z.string().trim().max(1000, "Description must be at most 1000 characters").nullable().optional(),
   durationMinutes: z.number().int().positive("Duration must be greater than 0").optional(),

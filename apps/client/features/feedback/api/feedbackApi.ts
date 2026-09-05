@@ -6,6 +6,8 @@ import type {
   UpdateFormPayload,
   Feedback,
   SubmitFeedbackPayload,
+  UpdateFeedbackPayload,
+  FeedbackDetails,
 } from "../types";
 
 type DataEnvelope<T> = { success: true; data: T };
@@ -55,8 +57,16 @@ export async function submitFeedback(bookingId: number, payload: SubmitFeedbackP
   return data.data.feedback;
 }
 
+export async function updateFeedback(bookingId: number, payload: UpdateFeedbackPayload) {
+  const { data } = await api.patch<DataEnvelope<{ feedback: Feedback }>>(
+    `/bookings/${bookingId}/feedback`,
+    payload
+  );
+  return data.data.feedback;
+}
+
 export async function getFeedback(bookingId: number) {
-  const { data } = await api.get<DataEnvelope<{ feedback: Feedback | null }>>(
+  const { data } = await api.get<DataEnvelope<{ feedback: FeedbackDetails | null }>>(
     `/bookings/${bookingId}/feedback`
   );
   return data.data.feedback;
