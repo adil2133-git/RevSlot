@@ -2,7 +2,7 @@ import {
   pgTable, serial, integer, varchar, text, boolean, smallint,
   numeric, jsonb, timestamp, unique, index,
 } from 'drizzle-orm/pg-core';
-import { feedbackFieldType, understandingLevel  } from '../../db/schema/enums.js';
+import { feedbackFieldType, understandingLevel, pendingQuestionStatus } from '../../db/schema/enums.js';
 import { reviewers } from '../auth/reviewers.model.js';
 import { bookings } from '../booking/bookings.schema.js';
 import { questions } from '../questionBank/questions.model.js';
@@ -15,6 +15,7 @@ export const feedbackForms = pgTable(
       .notNull()
       .references(() => reviewers.id, { onDelete: 'cascade' }),
     name: varchar('name', { length: 150 }).notNull(),
+    description: varchar('description', { length: 200 }),
     isDefault: boolean('is_default').notNull().default(false),
     taskMarkEnabled: boolean('task_mark_enabled').notNull().default(false),
     isActive: boolean('is_active').notNull().default(true),
@@ -93,4 +94,25 @@ export const feedback = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   },
   (table) => [index('idx_feedback_booking').on(table.bookingId)]
+);
+
+
+export const feedbackPendingQuestions = pgTable(
+  'feedback_pending_questions',
+  {
+    id: serial('id').primaryKey(),
+    feedbackId: integer('feedback_id')
+      .notNull()
+      .references(() => feedback.id, { onDelete: 'cascade' }),
+    questionId: integer('question_id')
+      .notNull()
+      .references(() => questions.id, { onDelete: 'cascade' }),
+    status: pendingQuestionStatus('status').notNull().default('pending'),
+    assignedAt: timestamp('assigned_at', { withTimezone: true }).defaultNow(),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+  },
+  (table) => [
+    unique('unique_feedback_question').on(table.feedbackId, table.questionId),
+    index('idx_feedback_pending_questions_feedback').on(table.feedbackId),
+  ]
 );

@@ -3,7 +3,7 @@ import * as feedbackController from "./feedback.controller.js";
 import { validate } from "../../core/middlewares/validate.middleware.js";
 import { requireReviewer } from "../../core/middlewares/auth.middleware.js";
 import { catchAsync } from "../../core/utils/catchAsync.js";
-import { CreateFormSchema, UpdateFormSchema, SubmitFeedbackSchema, UpdateFeedbackSchema } from "./feedback.schema.js";
+import { CreateFormSchema, UpdateFormSchema, SubmitFeedbackSchema, UpdateFeedbackSchema, UpdatePendingQuestionStatusSchema } from "./feedback.schema.js";
 
 // Feedback form CRUD — mount at /api/feedback-forms in server.ts.
 const formRouter = Router();
@@ -30,9 +30,12 @@ bookingFeedbackRouter.patch(
 );
 bookingFeedbackRouter.get("/:id/feedback", catchAsync(feedbackController.getFeedback));
 
-// Intern review history — kept at its own top-level path (/api/intern-history)
-// rather than under /api/bookings, so it never risks colliding with a
-// GET /api/bookings/:id route depending on registration order.
+bookingFeedbackRouter.patch(
+  "/:id/feedback/pending-questions/:pendingQuestionId",
+  validate(UpdatePendingQuestionStatusSchema),
+  catchAsync(feedbackController.updatePendingQuestionStatus)
+);
+
 const internHistoryRouter = Router();
 internHistoryRouter.use(requireReviewer);
 internHistoryRouter.get("/", catchAsync(feedbackController.getInternHistory));

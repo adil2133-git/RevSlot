@@ -23,6 +23,7 @@ export type FeedbackForm = {
   id: number;
   reviewerId: number;
   name: string;
+  description: string | null;
   isDefault: boolean;
   taskMarkEnabled: boolean;
   isActive: boolean;
@@ -46,6 +47,7 @@ export type FormFieldInput = {
 
 export type CreateFormPayload = {
   name: string;
+  description?: string;
   taskMarkEnabled?: boolean;
   fields?: FormFieldInput[];
   questionIds?: number[];
@@ -53,6 +55,7 @@ export type CreateFormPayload = {
 
 export type UpdateFormPayload = {
   name?: string;
+  description?: string;
   taskMarkEnabled?: boolean;
   fields?: FormFieldInput[];
   questionIds?: number[];
@@ -87,6 +90,21 @@ export type SubmitFeedbackPayload = {
   taskMark?: number;
   comments?: string;
   customFieldValues?: Record<string, string>;
+  pendingQuestionIds?: number[];
+};
+
+
+export type PendingQuestionStatus = "pending" | "reviewed";
+
+export type PendingQuestion = {
+  id: number;
+  questionId: number;
+  questionText: string;
+  description: string | null;
+  status: PendingQuestionStatus;
+  assignedAt: string | null;
+  completedAt: string | null;
+  pendingQuestions: PendingQuestion[];
 };
 
 export type UpdateFeedbackPayload = {
@@ -95,6 +113,7 @@ export type UpdateFeedbackPayload = {
   taskMark?: number;
   comments?: string;
   customFieldValues?: Record<string, string>;
+  pendingQuestionIds?: number[];
 };
 
 export type FeedbackDetailsField = {
@@ -120,6 +139,7 @@ export type FeedbackDetails = {
   taskMarkApplicable: boolean;
   comments: string | null;
   customFields: FeedbackDetailsField[];
+  pendingQuestions: PendingQuestion[]; 
   createdAt: string;
   updatedAt: string;
   editableUntil: string;

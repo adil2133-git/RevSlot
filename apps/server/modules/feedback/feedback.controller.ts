@@ -65,6 +65,19 @@ export async function getFeedback(req: Request, res: Response) {
   res.status(200).json({ success: true, data: { feedback: result } });
 }
 
+export async function updatePendingQuestionStatus(req: Request, res: Response) {
+  const bookingId = Number(req.params.id);
+  const pendingQuestionId = Number(req.params.pendingQuestionId);
+  const { status } = req.body as { status: "pending" | "reviewed" };
+  const result = await feedbackService.updatePendingQuestionStatus(
+    bookingId,
+    pendingQuestionId,
+    reviewerId(req),
+    status
+  );
+  res.status(200).json({ success: true, data: { pendingQuestion: result } });
+}
+
 export async function getInternHistory(req: Request, res: Response) {
   const { internName, batch, excludeBookingId } = InternHistoryQuerySchema.parse(req.query);
   const history = await feedbackService.getInternHistory(

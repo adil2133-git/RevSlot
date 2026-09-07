@@ -6,7 +6,6 @@ import { useFeedbackStore } from "@/features/feedback/store/feedbackStore";
 import FeedbackDetailsModal from "@/features/feedback/components/FeedbackDetailsModal";
 import type { FeedbackFieldType, FormFieldInput, FeedbackFormField } from "@/features/feedback/types";
 import SubmitFeedbackModal from "@/features/feedback/components/SubmitFeedbackModal";
-import { useQuestionBankStore } from "@/features/questionBanks/store/questionBankStore";
 
 const FIELD_TYPES: { value: FeedbackFieldType; label: string }[] = [
   { value: "text", label: "Short text" },
@@ -30,20 +29,98 @@ const FormBubbleIcon = ({ className }: { className?: string }) => (
 const SYSTEM_FIELDS = [
   { label: "Review Mark", description: "Required · 1–10 in 0.5 steps" },
   { label: "Understanding Level", description: "Required · Excellent to Needs Improvement" },
-  { label: "Strengths", description: "Long text · Optional" },
+  { label: "Communication Level", description: "Excellent · Good · Average · Needs Improvement" },
+  { label: "Overall Performance", description: "Excellent · Good · Average · Needs Improvement" },
   { label: "Areas for Improvement", description: "Long text · Optional" },
   { label: "Recommendations / Next Steps", description: "Long text · Optional" },
-  { label: "Comments", description: "Long text · Optional" },
 ] as const;
 
 const SYSTEM_FIELD_LABELS = new Set([
   "Review Mark",
   "Understanding Level",
-  "Strengths",
+  "Communication Level",
+  "Overall Performance",
   "Areas for Improvement",
   "Recommendations / Next Steps",
-  "Comments",
 ]);
+
+const SuggestionIcon = ({
+  path,
+  className = "h-4 w-4",
+}: {
+  path: ReactNode;
+  className?: string;
+}) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.9"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    {path}
+  </svg>
+);
+
+const SUGGESTED_CUSTOM_FIELDS: {
+  label: string;
+  description: string;
+  icon: ReactNode;
+}[] = [
+  {
+    label: "Code Quality",
+    description: "Quality, readability and best practices",
+    icon: <path d="M16 18l6-6-6-6M8 6l-6 6 6 6" />,
+  },
+  {
+    label: "Problem Solving",
+    description: "Approach to solving problems",
+    icon: <path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.3h6c0-1 .4-1.8 1-2.3A7 7 0 0 0 12 2z" />,
+  },
+  {
+    label: "Team Collaboration",
+    description: "Working with others and team mindset",
+    icon: (
+      <>
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+      </>
+    ),
+  },
+  {
+    label: "Time Management",
+    description: "Utilization of time and meeting deadlines",
+    icon: (
+      <>
+        <circle cx="12" cy="12" r="10" />
+        <path d="M12 6v6l4 2" />
+      </>
+    ),
+  },
+  {
+    label: "Learning Attitude",
+    description: "Willingness to learn and adapt",
+    icon: <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />,
+  },
+  {
+    label: "Initiative",
+    description: "Proactiveness and ownership",
+    icon: <path d="M12 2l2.9 6.9 7.1.6-5.4 4.6 1.6 6.9-6.2-3.7-6.2 3.7 1.6-6.9L2 9.5l7.1-.6z" />,
+  },
+  {
+    label: "Technical Knowledge",
+    description: "Depth of subject knowledge",
+    icon: (
+      <>
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+      </>
+    ),
+  },
+];
 
 const TEMPLATES = [
   {
@@ -54,8 +131,8 @@ const TEMPLATES = [
     fields: [
       {
         label: "Technical Depth",
-        fieldType: "select" as const,
-        optionsText: "Excellent, Good, Average, Needs Work",
+        fieldType: "text" as const,
+        optionsText: "",
         required: false,
       },
       {
@@ -289,10 +366,6 @@ function PreviewModal({
                     : "Short text response"}
             </PreviewField>
           ))}
-
-          <PreviewField label="Comments">
-            Additional notes for this session
-          </PreviewField>
         </div>
 
         <div className="border-t border-slate-100 bg-slate-50/60 px-6 py-4 text-right">
@@ -336,27 +409,17 @@ export default function FeedbackFormsPage() {
     fetchPendingFeedback,
   } = useFeedbackStore();
 
-  const {
-  banks,
-  selectedBank,
-  isLoading: isBankLoading,
-  fetchBanks,
-  fetchBank,
-  clearSelectedBank,
-} = useQuestionBankStore();
-
-  const totalForms = forms.length;
-
+const totalForms = forms.length;
 const customFormsCount = forms.filter(
   (form) => !form.isDefault
 ).length;
 
   const [editingId, setEditingId] = useState<number | "new" | null>(null);
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [fields, setFields] = useState<DraftField[]>([]);
   const [taskMarkEnabled, setTaskMarkEnabled] = useState(false);
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<number[]>([]);
-  const [selectedBankId, setSelectedBankId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
@@ -386,6 +449,7 @@ const customFormsCount = forms.filter(
     selectedForm?.id === editingId
   ) {
     setName(selectedForm.name);
+    setDescription(selectedForm.description ?? "");
     setTaskMarkEnabled(selectedForm.taskMarkEnabled);
 
     setSelectedQuestionIds(
@@ -404,20 +468,6 @@ const customFormsCount = forms.filter(
     );
   }
 }, [selectedForm, editingId]);
-
- useEffect(() => {
-  if (editingId !== null) {
-    fetchBanks();
-  }
-}, [editingId, fetchBanks]);
-
- useEffect(() => {
-  if (selectedBankId !== null) {
-    fetchBank(selectedBankId);
-  } else {
-    clearSelectedBank();
-  }
-}, [selectedBankId, fetchBank, clearSelectedBank]);
 
     const openAllFeedback = () => {
     setViewingAllFeedback(true);
@@ -448,25 +498,24 @@ const customFormsCount = forms.filter(
   const startCreate = () => {
   setEditingId("new");
   setName("");
+  setDescription("");
   setFields([]);
   setTaskMarkEnabled(false);
   setSelectedQuestionIds([]);
-  setSelectedBankId(null);
   setFormError(null);
 };
 
   const applyTemplate = (template: (typeof TEMPLATES)[number]) => {
   setName(template.name);
+  setDescription(template.description ?? "");
   setTaskMarkEnabled(template.taskMarkEnabled);
   setFields(template.fields.map((field) => ({ ...field })));
   setSelectedQuestionIds([]);
-  setSelectedBankId(null);
   setFormError(null);
 };
 
   const startEdit = (formId: number) => {
     setEditingId(formId);
-    setSelectedBankId(null);
     setFormError(null);
     fetchForm(formId);
   };
@@ -474,8 +523,6 @@ const customFormsCount = forms.filter(
   const cancelEdit = () => {
   setEditingId(null);
   clearSelectedForm();
-  clearSelectedBank();
-  setSelectedBankId(null);
   setPreviewOpen(false);
   setFormError(null);
 };
@@ -494,6 +541,30 @@ const customFormsCount = forms.filter(
 
   const removeField = (index: number) => {
     setFields((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const toggleSuggestedField = (suggestion: (typeof SUGGESTED_CUSTOM_FIELDS)[number]) => {
+    setFields((prev) => {
+      const existingIndex = prev.findIndex(
+        (f) => f.label.trim().toLowerCase() === suggestion.label.toLowerCase()
+      );
+      if (existingIndex !== -1) {
+        return prev.filter((_, i) => i !== existingIndex);
+      }
+      if (prev.length >= 20) {
+        setFormError("You can add up to 20 custom fields.");
+        return prev;
+      }
+      return [
+        ...prev,
+        {
+          label: suggestion.label,
+          fieldType: "text",
+          required: false,
+          optionsText: "",
+        },
+      ];
+    });
   };
 
   const moveField = (
@@ -517,39 +588,6 @@ const customFormsCount = forms.filter(
     ];
     return next;
   });
-};
-
-  const toggleQuestion = (questionId: number) => {
-  setSelectedQuestionIds((prev) =>
-    prev.includes(questionId)
-      ? prev.filter((id) => id !== questionId)
-      : [...prev, questionId]
-  );
-};
-
-const selectAllQuestions = () => {
-  const ids =
-    selectedBank?.questions.map(
-      (question) => question.id
-    ) ?? [];
-
-  setSelectedQuestionIds((prev) =>
-    Array.from(
-      new Set([...prev, ...ids])
-    ).slice(0, 100)
-  );
-};
-
-const clearBankQuestions = () => {
-  const ids = new Set(
-    selectedBank?.questions.map(
-      (question) => question.id
-    ) ?? []
-  );
-
-  setSelectedQuestionIds((prev) =>
-    prev.filter((id) => !ids.has(id))
-  );
 };
 
    const handleSave = async () => {
@@ -645,6 +683,7 @@ const clearBankQuestions = () => {
     if (editingId === "new") {
       await createForm({
         name: name.trim(),
+        description: description.trim() || undefined,
         fields: payloadFields,
         taskMarkEnabled,
         questionIds: selectedQuestionIds,
@@ -652,6 +691,7 @@ const clearBankQuestions = () => {
     } else if (typeof editingId === "number") {
       await updateForm(editingId, {
         name: name.trim(),
+        description: description.trim(),
         fields: payloadFields,
         taskMarkEnabled,
         questionIds: selectedQuestionIds,
@@ -701,331 +741,327 @@ const totalPages = Math.max(
   Math.ceil(feedbackListTotal / feedbackListPageSize)
 );
 
-  return (
-    <div className="mx-auto max-w-4xl py-2">
+    return (
+    <div className={`mx-auto py-2 ${isEditorOpen ? "max-w-6xl" : "max-w-4xl"}`}>
       {/* Header */}
-      <div className="mb-6 flex items-start justify-between">
-        <div>
-          <h1 className="mb-1 text-2xl font-bold tracking-tight text-on-surface sm:text-3xl">
-            Feedback & Forms
-          </h1>
-          <p className="text-sm text-slate-500">
-            Create reusable feedback forms and review your recent submissions.
-          </p>
+      {isEditorOpen ? (
+        <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <button
+              onClick={cancelEdit}
+              className="mb-2 flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-on-surface"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M19 12H5M12 19l-7-7 7-7" />
+              </svg>
+              Back to Feedback Forms
+            </button>
+            <h1 className="text-2xl font-bold tracking-tight text-on-surface sm:text-3xl">
+              {editingId === "new" ? "Create Feedback Form" : "Edit Feedback Form"}
+            </h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Design a feedback form to evaluate your sessions. Standard fields are enabled by default. Add Task Mark (optional) and custom fields.
+            </p>
+          </div>
+
+          
+
         </div>
-      {!isEditorOpen && !viewingAllFeedback && (
-          <button
-            onClick={startCreate}
-            className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary shadow-surface transition-all duration-200 hover:bg-primary/95 hover:shadow-raised hover:-translate-y-[1px] active:translate-y-0"
-          >
-            <PlusIcon />
-            New Form
-          </button>
-        )}
-      </div>
+      ) : (
+        <div className="mb-6 flex items-start justify-between">
+          <div>
+            <h1 className="mb-1 text-2xl font-bold tracking-tight text-on-surface sm:text-3xl">
+              Feedback & Forms
+            </h1>
+            <p className="text-sm text-slate-500">
+              Create reusable feedback forms and review your recent submissions.
+            </p>
+          </div>
+          {!viewingAllFeedback && (
+            <button
+              onClick={startCreate}
+              className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary shadow-surface transition-all duration-200 hover:bg-primary/95 hover:shadow-raised hover:-translate-y-[1px] active:translate-y-0"
+            >
+              <PlusIcon />
+              New Form
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Editor */}
       {isEditorOpen && (
-        <div className="mb-6 rounded-xl border border-slate-100 bg-surface-card p-5 shadow-surface">
-          <h2 className="mb-4 text-sm font-bold text-on-surface">
-            {editingId === "new" ? "New Feedback Form" : "Edit Feedback Form"}
-          </h2>
-
-          <div className="mb-4">
-            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-400">
-              Form name
-            </label>
-            <input
-              autoFocus
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Standard Review, Mock Interview Feedback"
-              className="w-full rounded-lg border border-slate-200 bg-slate-50/50 px-3.5 py-2 text-sm outline-none transition-all focus:border-primary focus:bg-surface-card focus:ring-4 focus:ring-secondary/60"
-            />
-          </div>
-
-          <div className="mb-5">
-  <div className="mb-3">
-    <p className="text-sm font-semibold text-on-surface">
-      Standard Fields
-    </p>
-
-    <p className="mt-1 text-xs text-slate-500">
-      These fields are included automatically in every feedback form.
-    </p>
-  </div>
-
-  <div className="space-y-2">
-    {SYSTEM_FIELDS.map((field) => (
-      <div
-        key={field.label}
-        className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-3"
-      >
-        <div>
-          <p className="text-sm font-medium text-on-surface">
-            {field.label}
-          </p>
-
-          <p className="mt-0.5 text-xs text-slate-500">
-            {field.description}
-          </p>
-        </div>
-
-        <span className="rounded-full bg-secondary px-2.5 py-1 text-[10px] font-semibold text-primary">
-          Included
-        </span>
-      </div>
-    ))}
-  </div>
-</div>
-
-<div className="mb-4 rounded-lg border border-slate-200 p-4">
-  <div className="flex items-center justify-between gap-4">
-    <div>
-      <p className="text-sm font-semibold text-on-surface">
-        Enable Task Mark
-      </p>
-
-      <p className="mt-1 text-xs text-slate-500">
-        Use this when the session includes a specific task or assignment to evaluate.
-      </p>
-    </div>
-
-    <button
-      type="button"
-      role="switch"
-      aria-checked={taskMarkEnabled}
-      onClick={() => setTaskMarkEnabled((prev) => !prev)}
-      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-        taskMarkEnabled ? "bg-primary" : "bg-slate-200"
-      }`}
-    >
-      <span
-        className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
-          taskMarkEnabled ? "translate-x-6" : "translate-x-1"
-        }`}
-      />
-    </button>
-  </div>
-</div>
-
-       <div className="mb-5 rounded-lg border border-slate-200 p-4">
-  <div className="mb-3">
-    <p className="text-sm font-semibold text-on-surface">
-      Question Bank
-    </p>
-
-    <p className="mt-1 text-xs text-slate-500">
-      Attach questions from a question bank to this feedback form.
-    </p>
-  </div>
-
-  {isBankLoading ? (
-    <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-3 text-xs text-slate-400">
-      Loading question banks…
-    </div>
-  ) : banks.length === 0 ? (
-    <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/50 p-4">
-      <p className="text-xs font-semibold text-slate-600">
-        No question banks available.
-      </p>
-
-      <p className="mt-1 text-xs text-slate-400">
-        Create a question bank first to attach questions to this form.
-      </p>
-    </div>
-  ) : (
-    <>
-      <select
-        value={selectedBankId ?? ""}
-        onChange={(e) => {
-          const value = e.target.value;
-
-          setSelectedBankId(value ? Number(value) : null);
-        }}
-        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-secondary/60"
-      >
-        <option value="">Select a question bank</option>
-
-        {banks.map((bank) => (
-          <option key={bank.id} value={bank.id}>
-            {bank.name}
-          </option>
-        ))}
-      </select>
-
-      {selectedBank && (
-        <div className="mt-4">
-          <div className="mb-2 flex items-center justify-between">
-            <p className="text-xs font-semibold text-slate-600">
-              Questions
-            </p>
-
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={selectAllQuestions}
-                className="text-xs font-semibold text-primary hover:underline"
-              >
-                Select all
-              </button>
-
-              <button
-                type="button"
-                onClick={clearBankQuestions}
-                className="text-xs font-semibold text-slate-500 hover:underline"
-              >
-                Clear
-              </button>
-            </div>
-          </div>
-
-          {selectedBank.questions.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-slate-200 p-4 text-center">
-              <p className="text-xs text-slate-400">
-                This question bank has no questions yet.
+        <div className="mb-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
+          {/* ── Left: form builder ─────────────────────────────── */}
+          <div className="space-y-5 lg:col-span-2">
+            {/* Basic Information */}
+            <div className="rounded-xl border border-slate-100 bg-surface-card p-5 shadow-surface">
+              <h2 className="text-sm font-bold text-on-surface">Basic Information</h2>
+              <p className="mt-1 text-xs text-slate-500">
+                Provide a name and description for your feedback form.
               </p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {selectedBank.questions.map((question) => {
-                const checked = selectedQuestionIds.includes(question.id);
 
-                return (
-                  <label
-                    key={question.id}
-                    className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-3 transition-colors hover:bg-slate-50"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggleQuestion(question.id)}
-                      className="mt-0.5"
-                    />
-
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-on-surface">
-                        {question.questionText}
-                      </p>
-
-                      {question.description && (
-                        <p className="mt-1 text-xs text-slate-500">
-                          {question.description}
-                        </p>
-                      )}
-                    </div>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-400">
+                    Form Name <span className="text-error">*</span>
                   </label>
-                );
-              })}
-            </div>
-          )}
-
-          <p className="mt-3 text-xs text-slate-400">
-            {selectedQuestionIds.length} question
-            {selectedQuestionIds.length === 1 ? "" : "s"} selected
-          </p>
-        </div>
-      )}
-    </>
-  )}
-</div>
-
-     <div className="mb-3">
-  <p className="text-sm font-semibold text-on-surface">
-    Custom Fields
-  </p>
-
-  <p className="mt-1 text-xs text-slate-500">
-    Add extra fields specific to this type of review.
-  </p>
-</div>
-
-          <div className="space-y-3">
-            {fields.map((field, index) => (
-              <div key={index} className="rounded-lg border border-slate-200 p-3">
-                <div className="flex items-start gap-2">
                   <input
-                    value={field.label}
-                    onChange={(e) => updateField(index, { label: e.target.value })}
-                    placeholder="Field label"
-                    className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-secondary/60"
+                    autoFocus
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. Technical Review, HR Interview, Mock Interview"
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50/50 px-3.5 py-2 text-sm outline-none transition-all focus:border-primary focus:bg-surface-card focus:ring-4 focus:ring-secondary/60"
                   />
-                  <select
-                    value={field.fieldType}
-                    onChange={(e) => updateField(index, { fieldType: e.target.value as FeedbackFieldType })}
-                    className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-primary"
-                  >
-                    {FIELD_TYPES.map((t) => (
-                      <option key={t.value} value={t.value}>
-                        {t.label}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={() => removeField(index)}
-                    className="rounded-lg p-2 text-slate-400 hover:bg-error-container hover:text-error"
-                    aria-label="Remove field"
-                    type="button"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                      <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                    </svg>
-                  </button>
                 </div>
 
-                {field.fieldType === "select" && (
-                  <input
-                    value={field.optionsText}
-                    onChange={(e) => updateField(index, { optionsText: e.target.value })}
-                    placeholder="Options, comma separated — e.g. Excellent, Good, Needs Work"
-                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-secondary/60"
+                <div>
+                  <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-400">
+                    Description
+                  </label>
+                  <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value.slice(0, 200))}
+                    placeholder="Briefly describe the purpose of this feedback form..."
+                    rows={1}
+                    maxLength={200}
+                    className="w-full resize-none rounded-lg border border-slate-200 bg-slate-50/50 px-3.5 py-2 text-sm outline-none transition-all focus:border-primary focus:bg-surface-card focus:ring-4 focus:ring-secondary/60"
                   />
-                )}
-
-                <label className="mt-2 flex items-center gap-2 text-xs text-slate-500">
-                  <input
-                    type="checkbox"
-                    checked={field.required}
-                    onChange={(e) => updateField(index, { required: e.target.checked })}
-                  />
-                  Required
-                </label>
+                  <p className="mt-1 text-right text-[10px] text-slate-400">{description.length}/200</p>
+                </div>
               </div>
-            ))}
+            </div>
 
-            <button
-              onClick={addField}
-              type="button"
-              className="flex w-full items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-slate-200 py-2.5 text-xs font-semibold text-slate-500 hover:border-primary/30 hover:bg-slate-50/50"
-            >
-              + Add custom field
-            </button>
+         {/* Standard Fields */}
+            <div className="rounded-xl border border-slate-100 bg-surface-card p-5 shadow-surface">
+              <h2 className="text-sm font-bold text-on-surface">Standard Fields</h2>
+              <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+                These core fields are always included in every feedback form.
+              </p>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {SYSTEM_FIELDS.map((field) => (
+                  <div key={field.label}>
+                    <p className="text-sm font-medium text-on-surface">{field.label}</p>
+                    <p className="mt-0.5 text-xs text-slate-500">{field.description}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Task Mark */}
+            <div className="rounded-xl border border-slate-100 bg-surface-card p-5 shadow-surface">
+              <h2 className="text-sm font-bold text-on-surface">
+                Task Mark <span className="font-normal text-slate-400">(Optional)</span>
+              </h2>
+              <p className="mt-1 text-xs text-slate-500">
+                Include a section to evaluate specific tasks or assignments.
+              </p>
+
+              <div className="mt-4 flex items-center justify-between gap-4 rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+                <div>
+                  <p className="text-sm font-semibold text-on-surface">Task Mark</p>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    Allow reviewers to give marks for completed tasks or assignments.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={taskMarkEnabled}
+                  onClick={() => setTaskMarkEnabled((prev) => !prev)}
+                  className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+                    taskMarkEnabled ? "bg-primary" : "bg-slate-200"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
+                      taskMarkEnabled ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+
+            {/* Custom Fields */}
+            <div className="rounded-xl border border-slate-100 bg-surface-card p-5 shadow-surface">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-sm font-bold text-on-surface">
+                    Custom Fields <span className="font-normal text-slate-400">(Optional)</span>
+                  </h2>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Add your own custom questions or fields to collect specific feedback.
+                  </p>
+                </div>
+
+                <div className="flex shrink-0 gap-2">
+                  <button
+                    type="button"
+                    onClick={addField}
+                    className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-surface-hover"
+                  >
+                    <PlusIcon />
+                    Create Custom Field
+                  </button>
+                </div>
+              </div>
+
+              {fields.length === 0 ? (
+                <div className="mt-4 flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 py-10 text-center">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mb-2 text-slate-300">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <path d="M14 2v6h6" />
+                  </svg>
+                  <p className="text-sm font-semibold text-slate-500">No custom fields added yet</p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Choose from suggestions on the right or create your own.
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-4 space-y-3">
+                  {fields.map((field, index) => (
+                    <div key={index} className="rounded-lg border border-slate-200 p-3">
+                      <div className="flex items-start gap-2">
+                        <input
+                          value={field.label}
+                          onChange={(e) => updateField(index, { label: e.target.value })}
+                          placeholder="Field label"
+                          className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-secondary/60"
+                        />
+                        <select
+                          value={field.fieldType}
+                          onChange={(e) => updateField(index, { fieldType: e.target.value as FeedbackFieldType })}
+                          className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-primary"
+                        >
+                          {FIELD_TYPES.map((t) => (
+                            <option key={t.value} value={t.value}>
+                              {t.label}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() => removeField(index)}
+                          className="rounded-lg p-2 text-slate-400 hover:bg-error-container hover:text-error"
+                          aria-label="Remove field"
+                          type="button"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                            <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                          </svg>
+                        </button>
+                      </div>
+
+                    {field.fieldType === "select" && (
+                        <input
+                          value={field.optionsText}
+                          onChange={(e) => updateField(index, { optionsText: e.target.value })}
+                          placeholder="Options, comma separated — e.g. Excellent, Good, Needs Work"
+                          className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-secondary/60"
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {(formError || error) && (
+                <p className="mt-4 text-xs font-semibold text-error">{formError ?? error}</p>
+              )}
+            </div>
           </div>
 
-          {(formError || error) && (
-            <p className="mt-4 text-xs font-semibold text-error">{formError ?? error}</p>
-          )}
+          {/* ── Right: suggested custom fields ────────────────────── */}
+          <div className="lg:col-span-1">
+            <div className="sticky top-4 rounded-xl border border-slate-100 bg-surface-card p-5 shadow-surface">
+              <h2 className="text-sm font-bold text-primary">Suggested Custom Fields</h2>
+              <p className="mt-1 text-xs text-slate-500">
+                Add commonly used fields to make feedback more effective.
+              </p>
 
-          <div className="mt-5 flex gap-2.5">
+              <div className="mt-4 space-y-2">
+                {SUGGESTED_CUSTOM_FIELDS.map((suggestion) => {
+                  const added = fields.some(
+                    (f) => f.label.trim().toLowerCase() === suggestion.label.toLowerCase()
+                  );
+                  return (
+                    <div
+                      key={suggestion.label}
+                      className="flex items-start justify-between gap-3 rounded-lg border border-slate-200 p-3"
+                    >
+                      <div className="flex items-start gap-2.5">
+                        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-secondary/60 text-primary">
+                          <SuggestionIcon path={suggestion.icon} className="h-3.5 w-3.5" />
+                        </span>
+                        <div>
+                          <p className="text-xs font-semibold text-on-surface">{suggestion.label}</p>
+                          <p className="mt-0.5 text-[11px] leading-snug text-slate-500">
+                            {suggestion.description}
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => toggleSuggestedField(suggestion)}
+                        className={`shrink-0 rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                          added
+                            ? "border-primary/20 bg-secondary/60 text-primary"
+                            : "border-slate-200 text-slate-600 hover:bg-surface-hover"
+                        }`}
+                      >
+                        {added ? "Added" : "+ Add"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-4 border-t border-slate-100 pt-4">
+                <p className="mb-2 text-xs text-slate-400">Or create your own custom field</p>
+                <button
+                  type="button"
+                  onClick={addField}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-slate-200 py-2.5 text-xs font-semibold text-slate-500 hover:border-primary/30 hover:bg-slate-50/50"
+                >
+                  <PlusIcon />
+                  Create Custom Field
+                </button>
+              </div>
+            </div>
+          </div>
+           {/* Form Actions */}
+          <div className="col-span-full flex justify-start gap-3 border-t border-slate-200 pt-5">
             <button
-              onClick={handleSave}
-              disabled={submitting}
-              className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-on-primary shadow-surface disabled:opacity-60"
-            >
-              {submitting ? "Saving…" : "Save Form"}
-            </button>
-            <button
+              type="button"
               onClick={cancelEdit}
-              className="rounded-lg px-4 py-2 text-xs font-medium text-slate-600 hover:bg-surface-hover"
+              className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-surface-hover"
             >
               Cancel
             </button>
+
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={submitting}
+              className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary shadow-surface disabled:opacity-60"
+            >
+              {submitting
+                ? "Saving…"
+                : editingId === "new"
+                  ? "Create Form"
+                  : "Save Form"}
+            </button>
           </div>
         </div>
       )}
 
-
-            {!isEditorOpen && viewingAllFeedback ? (
+      {!isEditorOpen && viewingAllFeedback ? (
         /* ── All Submitted Feedback (expanded "View all" view) ─────────── */
         <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-surface">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">

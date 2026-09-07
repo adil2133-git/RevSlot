@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, useMemo, type ReactNode } from "react";
 import Modal from "@/components/common/Modal";
-import { XIcon } from "@/features/booking/components/icons";
+import { XIcon, SearchIcon, BookmarkIcon, InfoIcon } from "@/features/booking/components/icons";
 import { useFeedbackStore } from "../store/feedbackStore";
 import { submitFeedback } from "../api/feedbackApi";
+import { useQuestionBankStore } from "@/features/questionBanks/store/questionBankStore";
 import type { MyBooking } from "@/features/booking/type";
 import type { UnderstandingLevel } from "../types";
 
@@ -25,9 +26,94 @@ const UNDERSTANDING_LEVELS: { value: UnderstandingLevel; label: string }[] = [
   { value: "needs_improvement", label: "Needs Improvement" },
 ];
 
+function Field({
+  label,
+  required,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-400">
+        {label} {required && <span className="text-error">*</span>}
+      </label>
+
+      {children}
+    </div>
+  );
+}
+
+function CustomField({
+  field,
+  disabled,
+  value,
+  onChange,
+}: {
+  field: {
+    id: number;
+    label: string;
+    fieldType: "text" | "textarea" | "number" | "select";
+    options: string[] | null;
+    required: boolean;
+  };
+  disabled: boolean;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+  <div className="rounded-xl border border-slate-200 bg-white p-3.5">
+    <Field label={field.label} required={field.required}>
+      {field.fieldType === "textarea" ? (
+        <textarea
+          disabled={disabled}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          rows={3}
+          placeholder="Enter your feedback..."
+          className="input w-full resize-none bg-white"
+        />
+      ) : field.fieldType === "select" ? (
+        <select
+          disabled={disabled}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="input w-full bg-white"
+        >
+          <option value="">Select an option</option>
+
+          {(field.options ?? []).map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <input
+          disabled={disabled}
+          type={field.fieldType === "number" ? "number" : "text"}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Enter your feedback..."
+          className="input w-full bg-white"
+        />
+      )}
+    </Field>
+  </div>
+);
+}
+
 export default function SubmitFeedbackModal({ booking, onClose, onSubmitted }: SubmitFeedbackModalProps) {
   const { forms, selectedForm, isLoading, fetchForms, fetchForm, clearSelectedForm } = useFeedbackStore();
-
+  const {
+    banks: questionBanks,
+    selectedBank: questionBank,
+    fetchBanks,
+    fetchBank: fetchQuestionBank,
+    clearSelectedBank,
+  } = useQuestionBankStore();
   const [selectedFormId, setSelectedFormId] = useState<number | null>(null);
   const [isNoShow, setIsNoShow] = useState(false);
   const [reviewMark, setReviewMark] = useState("");
@@ -38,18 +124,42 @@ export default function SubmitFeedbackModal({ booking, onClose, onSubmitted }: S
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [selectedBankId, setSelectedBankId] = useState<number | null>(null);
+  const [checkedQuestionIds, setCheckedQuestionIds] = useState<number[]>([]);
+  const [questionSearch, setQuestionSearch] = useState("");
+
+    const filteredBankQuestions = useMemo(() => {
+    if (!questionBank) return [];
+    const term = questionSearch.trim().toLowerCase();
+    if (!term) return questionBank.questions;
+    return questionBank.questions.filter((q) =>
+      q.questionText.toLowerCase().includes(term)
+    );
+  }, [questionBank, questionSearch]);
+
+  const toggleQuestion = (questionId: number) => {
+    setCheckedQuestionIds((prev) =>
+      prev.includes(questionId)
+        ? prev.filter((id) => id !== questionId)
+        : [...prev, questionId]
+    );
+  };
+
   // Load the reviewer's form library once when the modal opens.
   useEffect(() => {
     fetchForms();
-    return () => clearSelectedForm();
+    fetchBanks();
+    return () => {
+    clearSelectedForm();
+    clearSelectedBank();
+    }
   }, []);
 
-  useEffect(() => {
-    if (forms.length === 0 || selectedFormId !== null) return;
-    const preferred = forms.find((f) => f.isDefault) ?? forms[0];
-    handleSelectForm(preferred.id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [forms]);
+   useEffect(() => {
+    if (selectedBankId !== null) {
+      fetchQuestionBank(selectedBankId);
+    }
+  }, [selectedBankId]);
 
     const handleSelectForm = (formId: number) => {
     setSelectedFormId(formId);
@@ -60,8 +170,18 @@ export default function SubmitFeedbackModal({ booking, onClose, onSubmitted }: S
     setCustomValues({});
     setIsNoShow(false);
     setError(null);
+    setSelectedBankId(null);
+    setCheckedQuestionIds([]);
+    setQuestionSearch("");
     fetchForm(formId);
   };
+
+  useEffect(() => {
+    if (forms.length === 0 || selectedFormId !== null) return;
+    const preferred = forms.find((f) => f.isDefault) ?? forms[0];
+    handleSelectForm(preferred.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forms]);
 
     const handleSubmit = async () => {
     setError(null);
@@ -107,6 +227,7 @@ export default function SubmitFeedbackModal({ booking, onClose, onSubmitted }: S
             : Number(taskMark),
         comments: isNoShow ? undefined : comments.trim() || undefined,
         customFieldValues: isNoShow ? {} : customValues,
+        pendingQuestionIds: isNoShow ? [] : checkedQuestionIds,
       });
       onSubmitted();
     } catch (err) {
@@ -116,86 +237,11 @@ export default function SubmitFeedbackModal({ booking, onClose, onSubmitted }: S
     }
   };
 
-  function Field({
-  label,
-  required,
-  children,
-}: {
-  label: string;
-  required?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <div>
-      <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-400">
-        {label} {required && <span className="text-error">*</span>}
-      </label>
-
-      {children}
-    </div>
-  );
-}
-
-function CustomField({
-  field,
-  disabled,
-  value,
-  onChange,
-}: {
-  field: {
-    id: number;
-    label: string;
-    fieldType: "text" | "textarea" | "number" | "select";
-    options: string[] | null;
-    required: boolean;
-  };
-  disabled: boolean;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <Field label={field.label} required={field.required}>
-      {field.fieldType === "textarea" ? (
-        <textarea
-          disabled={disabled}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          rows={3}
-          className="input resize-none"
-        />
-      ) : field.fieldType === "select" ? (
-        <select
-          disabled={disabled}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="input"
-        >
-          <option value="">Select an option</option>
-
-          {(field.options ?? []).map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
-      ) : (
-        <input
-          disabled={disabled}
-          type={field.fieldType === "number" ? "number" : "text"}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="input"
-        />
-      )}
-    </Field>
-  );
-}
-
   const showPicker = forms.length > 1;
   const noFormsYet = !isLoading && forms.length === 0;
 
     return (
-    <Modal onClose={onClose}>
+    <Modal onClose={onClose} widthClassName="max-w-5xl">
       <div className="flex items-center justify-between border-b border-slate-100 p-6">
         <div>
           <h2 className="text-xl font-bold text-on-surface">
@@ -233,11 +279,7 @@ function CustomField({
           </p>
         </div>
       ) : (
-        <div
-          className={`flex max-h-[70vh] ${
-            showPicker ? "divide-x divide-slate-100" : ""
-          }`}
-        >
+         <div className="flex max-h-[70vh] divide-x divide-slate-100">
           {/* FORM PICKER */}
           {showPicker && (
             <div className="w-52 shrink-0 overflow-y-auto p-4">
@@ -305,6 +347,9 @@ function CustomField({
                         setUnderstandingLevel("");
                         setTaskMark("");
                         setCustomValues({});
+                        setSelectedBankId(null);
+                        setCheckedQuestionIds([]);
+                        setQuestionSearch("");
                       }
                     }}
                     className="h-4 w-4 rounded border-slate-300"
@@ -460,17 +505,18 @@ function CustomField({
                   </>
                 )}
 
-                {/* COMMENTS */}
                 <Field label="Comments">
-                  <textarea
-                    value={comments}
-                    onChange={(e) => setComments(e.target.value)}
-                    rows={4}
-                    disabled={submitting}
-                    placeholder="Notes for this session"
-                    className="input w-full resize-none"
-                  />
-                </Field>
+                  <div className="rounded-xl border border-slate-200 bg-white p-3.5">
+                    <textarea
+                      value={comments}
+                      onChange={(e) => setComments(e.target.value)}
+                      rows={4}
+                      disabled={submitting}
+                      placeholder="Notes for this session"
+                      className="input w-full resize-none border-0 bg-transparent p-0 focus:ring-0"
+                     />
+                 </div>
+               </Field>
 
                 {/* ERROR */}
                 {error && (
@@ -488,6 +534,102 @@ function CustomField({
               </p>
             )}
           </div>
+           
+          {/* ASSIGN PENDING QUESTIONS */}
+          {selectedForm && !isNoShow && (
+            <div className="w-80 shrink-0 overflow-y-auto p-6">
+              <div className="mb-1 flex items-center justify-between">
+                <h4 className="flex items-center gap-1.5 text-sm font-bold text-on-surface">
+                  <BookmarkIcon className="text-primary" />
+                  Assign Pending Questions
+                </h4>
+
+                <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-semibold text-primary">
+                  Optional
+                </span>
+              </div>
+
+              <p className="mb-4 text-xs leading-5 text-slate-400">
+                Select questions from your question bank to send to the
+                client as preparation for their next session.
+              </p>
+
+              <Field label="Select Question Bank">
+                <select
+                  value={selectedBankId ?? ""}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setSelectedBankId(value ? Number(value) : null);
+                    setQuestionSearch("");
+                  }}
+                  className="input w-full"
+                >
+                  <option value="">Choose a bank</option>
+
+                  {questionBanks.map((bank) => (
+                    <option key={bank.id} value={bank.id}>
+                      {bank.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              {selectedBankId && (
+                <>
+                  <div className="relative mt-3">
+                    <SearchIcon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      value={questionSearch}
+                      onChange={(e) => setQuestionSearch(e.target.value)}
+                      placeholder="Search questions..."
+                      className="input w-full pl-9"
+                    />
+                  </div>
+
+                  <div className="mt-3 space-y-2">
+                    {!questionBank || questionBank.id !== selectedBankId ? (
+                      <p className="text-xs text-slate-400">
+                        Loading questions…
+                      </p>
+                    ) : filteredBankQuestions.length === 0 ? (
+                      <p className="text-xs text-slate-400">
+                        No questions found.
+                      </p>
+                    ) : (
+                      filteredBankQuestions.map((question) => {
+                        const checked = checkedQuestionIds.includes(question.id);
+                        return (
+                          <label
+                            key={question.id}
+                            className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-slate-200 px-3 py-2.5 text-sm transition-colors hover:bg-surface-hover"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleQuestion(question.id)}
+                              className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
+                            />
+                            <span className="text-on-surface">
+                              {question.questionText}
+                            </span>
+                          </label>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {checkedQuestionIds.length > 0 && (
+                    <div className="mt-4 flex items-start gap-2 rounded-lg bg-secondary/60 px-3 py-2.5 text-xs leading-5 text-primary">
+                      <InfoIcon className="mt-0.5 shrink-0" />
+                      Selected questions will be shared with the client as
+                      pending preparation questions.
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
       )}
 

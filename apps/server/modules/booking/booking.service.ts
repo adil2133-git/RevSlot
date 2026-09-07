@@ -320,8 +320,9 @@ export const bookingService = {
       conditions.push(gte(bookings.endTime, now));
     }
 
-    const orderBy = scope === "past" ? sql`${bookings.startTime} DESC` : sql`${bookings.startTime} ASC`;
-
+const orderBy = scope === "upcoming" || scope === "ongoing"
+  ? sql`${bookings.startTime} ASC`
+  : sql`${bookings.createdAt} DESC`;
     const [rows, countResult] = await Promise.all([
       db
         .select({

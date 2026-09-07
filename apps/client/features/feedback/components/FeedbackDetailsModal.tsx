@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import Modal from "@/components/common/Modal";
 import { XIcon } from "@/features/booking/components/icons";
-import { getFeedback, updateFeedback } from "../api/feedbackApi";
+import { getFeedback, updateFeedback, updatePendingQuestionStatus } from "../api/feedbackApi";
 import { formatBookingDate } from "@/features/booking/utils/bookingDisplay";
 import type { FeedbackDetails, UnderstandingLevel } from "../types";
+import { useQuestionBankStore } from "@/features/questionBanks/store/questionBankStore";
+
 
 interface FeedbackDetailsModalProps {
   bookingId: number;
@@ -29,6 +31,15 @@ const UNDERSTANDING_LEVELS: {
 ];
 
 export default function FeedbackDetailsModal({ bookingId, onClose }: FeedbackDetailsModalProps) {
+
+  const {
+  banks: questionBanks,
+  selectedBank: questionBank,
+  fetchBanks,
+  fetchBank: fetchQuestionBank,
+  clearSelectedBank,
+} = useQuestionBankStore();
+
   const [details, setDetails] = useState<FeedbackDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -40,8 +51,12 @@ export default function FeedbackDetailsModal({ bookingId, onClose }: FeedbackDet
   const [taskMark, setTaskMark] = useState("");
   const [comments, setComments] = useState("");
   const [customValues, setCustomValues] = useState<Record<string, string>>({});
+  const [pendingQuestionIds, setPendingQuestionIds] =
+  useState<number[]>([]);
+  const [selectedBankId, setSelectedBankId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<number | null>(null);
 
   const loadDetails = () => {
     setLoading(true);
@@ -51,6 +66,14 @@ export default function FeedbackDetailsModal({ bookingId, onClose }: FeedbackDet
       .catch(() => setError("Failed to load feedback."))
       .finally(() => setLoading(false));
   };
+
+  useEffect(() => {
+  fetchBanks();
+
+  return () => {
+    clearSelectedBank();
+  };
+}, [fetchBanks, clearSelectedBank]);
 
   useEffect(() => {
     loadDetails();
@@ -70,7 +93,19 @@ export default function FeedbackDetailsModal({ bookingId, onClose }: FeedbackDet
     setCustomValues(values);
     setSaveError(null);
     setMode("edit");
+    setPendingQuestionIds(
+     details.pendingQuestions
+    .filter((question) => question.status === "pending")
+    .map((question) => question.questionId));
   };
+
+  const togglePendingQuestion = (questionId: number) => {
+  setPendingQuestionIds((prev) =>
+    prev.includes(questionId)
+      ? prev.filter((id) => id !== questionId)
+      : [...prev, questionId]
+  );
+};
 
   const handleSave = async () => {
     setSaveError(null);
@@ -94,6 +129,7 @@ export default function FeedbackDetailsModal({ bookingId, onClose }: FeedbackDet
             : undefined,
         comments: comments.trim() || undefined,
         customFieldValues: customValues,
+        pendingQuestionIds,
     });
       await loadDetails();
       setMode("view");
@@ -101,6 +137,19 @@ export default function FeedbackDetailsModal({ bookingId, onClose }: FeedbackDet
       setSaveError(err instanceof Error ? err.message : "Failed to update feedback.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const toggleQuestionStatus = async (pendingQuestionId: number, currentStatus: "pending" | "reviewed") => {
+    setTogglingId(pendingQuestionId);
+    try {
+      const nextStatus = currentStatus === "pending" ? "reviewed" : "pending";
+      await updatePendingQuestionStatus(bookingId, pendingQuestionId, nextStatus);
+      await loadDetails();
+    } catch {
+      // silently ignore — details will just show the unchanged status
+    } finally {
+      setTogglingId(null);
     }
   };
 
@@ -202,6 +251,86 @@ export default function FeedbackDetailsModal({ bookingId, onClose }: FeedbackDet
                 <p className="text-sm text-on-surface">{field.value || "—"}</p>
               </div>
             ))}
+
+            <div className="mt-6 border-t border-slate-100 pt-5">
+  <h4 className="text-sm font-semibold text-on-surface">
+    Pending Questions
+  </h4>
+
+  <p className="mt-1 text-xs text-slate-400">
+    Select questions to send to the client for preparation.
+  </p>
+
+  <select
+    className="mt-3 w-full rounded-lg border border-slate-200 px-3.5 py-2 text-sm outline-none focus:border-primary"
+    defaultValue=""
+    onChange={(e) => {
+      const bankId = Number(e.target.value);
+      if (bankId) fetchQuestionBank(bankId);
+    }}
+  >
+    <option value="">Choose a question bank</option>
+
+    {questionBanks.map((bank) => (
+      <option key={bank.id} value={bank.id}>
+        {bank.name}
+      </option>
+    ))}
+  </select>
+
+  {questionBank?.questions?.map((question) => (
+    <label
+      key={question.id}
+      className="mt-2 flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-3"
+    >
+      <input
+        type="checkbox"
+        checked={pendingQuestionIds.includes(question.id)}
+        onChange={() => togglePendingQuestion(question.id)}
+        className="mt-1"
+      />
+
+      <span className="text-sm text-on-surface">
+        {question.questionText}
+      </span>
+    </label>
+  ))}
+</div>
+
+            {details.pendingQuestions.length > 0 && (
+              <div>
+                <p className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400">
+                  Pending Topics
+                </p>
+                <div className="space-y-1.5">
+                  {details.pendingQuestions.map((pq) => (
+                    <div
+                      key={pq.id}
+                      className="flex items-start justify-between gap-3 rounded-lg border border-slate-200 bg-surface px-3 py-2"
+                    >
+                      <div>
+                        <p className="text-sm text-on-surface">{pq.questionText}</p>
+                        {pq.description && (
+                          <p className="mt-0.5 text-xs text-slate-400">{pq.description}</p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        disabled={togglingId === pq.id}
+                        onClick={() => toggleQuestionStatus(pq.id, pq.status)}
+                        className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                          pq.status === "reviewed"
+                            ? "bg-green-100 text-green-700"
+                            : "bg-amber-100 text-amber-700"
+                        } disabled:cursor-not-allowed disabled:opacity-50`}
+                      >
+                        {togglingId === pq.id ? "…" : pq.status === "reviewed" ? "Reviewed" : "Pending"}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div>
               <p className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400">
@@ -367,6 +496,77 @@ export default function FeedbackDetailsModal({ bookingId, onClose }: FeedbackDet
                 )}
               </div>
             ))}
+
+              {/* Pending Questions */}
+<div className="mt-6 border-t border-slate-100 pt-5">
+  <h4 className="mb-3 text-sm font-semibold text-slate-900">
+    Pending Questions
+  </h4>
+
+  {questionBanks.length === 0 ? (
+    <p className="text-sm text-slate-500">
+      No question banks available.
+    </p>
+  ) : (
+    <>
+     <select
+  value={selectedBankId ?? ""}
+  onChange={(e) => {
+    const bankId = Number(e.target.value);
+
+    setSelectedBankId(bankId || null);
+
+    if (bankId) {
+      fetchQuestionBank(bankId);
+    }
+  }}
+  className="mb-3 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+>
+        <option value="">Select a question bank</option>
+
+        {questionBanks.map((bank) => (
+          <option key={bank.id} value={bank.id}>
+            {bank.name}
+          </option>
+        ))}
+      </select>
+
+      {selectedBankId && questionBank && (
+        <div className="space-y-2">
+          {questionBank.questions?.length ? (
+            questionBank.questions.map((question) => (
+              <label
+                key={question.id}
+                className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-3"
+              >
+                <input
+                  type="checkbox"
+                  checked={pendingQuestionIds.includes(question.id)}
+                  onChange={() => {
+                    setPendingQuestionIds((prev) =>
+                      prev.includes(question.id)
+                        ? prev.filter((id) => id !== question.id)
+                        : [...prev, question.id]
+                    );
+                  }}
+                  className="mt-1"
+                />
+
+                <span className="text-sm text-slate-700">
+                  {question.questionText}
+                </span>
+              </label>
+            ))
+          ) : (
+            <p className="text-sm text-slate-500">
+              No questions in this question bank.
+            </p>
+          )}
+        </div>
+      )}
+    </>
+  )}
+</div>
 
             {saveError && <p className="text-sm text-error">{saveError}</p>}
           </>

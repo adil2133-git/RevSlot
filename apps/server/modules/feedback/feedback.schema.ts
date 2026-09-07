@@ -20,6 +20,7 @@ export const FormFieldSchema = z
 
 export const CreateFormSchema = z.object({
   name: z.string().trim().min(1).max(150),
+  description: z.string().trim().max(200).optional(),
   taskMarkEnabled: z.boolean().optional().default(false),
   fields: z.array(FormFieldSchema).max(20).optional().default([]),
   questionIds: z.array(z.number().int().positive()).max(100).optional(),
@@ -27,6 +28,7 @@ export const CreateFormSchema = z.object({
 
 export const UpdateFormSchema = z.object({
   name: z.string().trim().min(1).max(150).optional(),
+  description: z.string().trim().max(200).optional(),
   taskMarkEnabled: z.boolean().optional(),
   fields: z.array(FormFieldSchema).max(20).optional(),
   questionIds: z.array(z.number().int().positive()).max(100).optional(),
@@ -41,6 +43,7 @@ export const SubmitFeedbackSchema = z
     taskMark: z.number().min(1).max(10).multipleOf(0.5).optional(),
     comments: z.string().trim().max(3000).optional(),
     customFieldValues: z.record(z.string(), z.string().max(1000)).optional().default({}),
+    pendingQuestionIds: z.array(z.number().int().positive()).max(100).optional().default([]),
   })
   .refine(
     (data) => data.isNoShow || (data.reviewMark !== undefined && data.understandingLevel !== undefined),
@@ -54,12 +57,21 @@ export const UpdateFeedbackSchema = z
     taskMark: z.number().min(1).max(10).multipleOf(0.5).optional(),
     comments: z.string().trim().max(3000).optional(),
     customFieldValues: z.record(z.string(), z.string().max(1000)).optional().default({}),
+    pendingQuestionIds: z
+    .array(z.number().int().positive())
+    .max(50)
+    .optional()
+    .default([]),
   });
 
 export const InternHistoryQuerySchema = z.object({
   internName: z.string().trim().min(1),
   batch: z.string().trim().min(1),
   excludeBookingId: z.coerce.number().int().optional(),
+});
+
+export const UpdatePendingQuestionStatusSchema = z.object({
+  status: z.enum(["pending", "reviewed"]),
 });
 
 export const ListFeedbackQuerySchema = z.object({
@@ -77,4 +89,5 @@ export type UpdateFormInput = z.infer<typeof UpdateFormSchema>;
 export type SubmitFeedbackInput = z.infer<typeof SubmitFeedbackSchema>;
 export type UpdateFeedbackInput = z.infer<typeof UpdateFeedbackSchema>;
 export type InternHistoryQueryInput = z.infer<typeof InternHistoryQuerySchema>;
+export type UpdatePendingQuestionStatusInput = z.infer<typeof UpdatePendingQuestionStatusSchema>;
 export type ListFeedbackQueryInput = z.infer<typeof ListFeedbackQuerySchema>;

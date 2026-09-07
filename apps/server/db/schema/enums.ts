@@ -23,3 +23,7 @@ export const feedbackFieldType = pgEnum('feedback_field_type', [
 export const understandingLevel = pgEnum('understanding_level', [
   'excellent', 'good', 'average', 'needs_improvement',
 ]);
+
+export const pendingQuestionStatus = pgEnum('pending_question_status', [
+  'pending', 'reviewed',
+]);

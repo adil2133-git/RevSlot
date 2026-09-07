@@ -1,6 +1,6 @@
 import { eq, and, ne, asc, desc, ilike, or, gte, lte, sql, inArray, isNull } from "drizzle-orm";
 import { db } from "../../config/db.js";
-import { bookings, eventTypes, feedback, feedbackForms, feedbackFormFields, feedbackFormQuestions, } from "../../db/index.js";
+import { bookings, eventTypes, feedback, feedbackForms, feedbackFormFields, feedbackFormQuestions, feedbackPendingQuestions, } from "../../db/index.js";
 import { questions } from "../questionBank/questions.model.js";
 import { questionBanks } from "../questionBank/questionBanks.model.js";
 import { AppError } from "../../core/errors/AppError.js";
@@ -16,9 +16,32 @@ import type {
 // ── Feedback forms (design-time) ──────────────────────────────────────
 
 const DEFAULT_FORM_FIELDS: FormFieldInput[] = [
-  { label: "Strengths", fieldType: "textarea", required: false, displayOrder: 0 },
-  { label: "Areas for Improvement", fieldType: "textarea", required: false, displayOrder: 1 },
-  { label: "Recommendations / Next Steps", fieldType: "textarea", required: false, displayOrder: 2 },
+  {
+    label: "Communication Level",
+    fieldType: "select",
+    options: ["Excellent", "Good", "Average", "Needs Improvement"],
+    required: false,
+    displayOrder: 0,
+  },
+  {
+    label: "Overall Performance",
+    fieldType: "select",
+    options: ["Excellent", "Good", "Average", "Needs Improvement"],
+    required: false,
+    displayOrder: 1,
+  },
+  {
+    label: "Areas for Improvement",
+    fieldType: "textarea",
+    required: false,
+    displayOrder: 2,
+  },
+  {
+    label: "Recommendations / Next Steps",
+    fieldType: "textarea",
+    required: false,
+    displayOrder: 3,
+  },
 ] as FormFieldInput[];
 
 async function getOwnedForm(formId: number, reviewerId: number) {
@@ -60,6 +83,14 @@ async function validateOwnedQuestions(reviewerId: number, questionIds: number[])
   if (owned.length !== new Set(questionIds).size) {
     throw new AppError("One or more questions were not found in your question banks", 400);
   }
+}
+
+async function assignPendingQuestions(feedbackId: number, reviewerId: number, questionIds: number[]) {
+  if (!questionIds.length) return;
+  await validateOwnedQuestions(reviewerId, questionIds);
+  await db.insert(feedbackPendingQuestions).values(
+    questionIds.map((questionId) => ({ feedbackId, questionId }))
+  );
 }
 
 async function replaceFormQuestions(formId: number, questionIds: number[]) {
@@ -115,7 +146,7 @@ export async function createForm(reviewerId: number, input: CreateFormInput) {
   const isFirstForm = reviewerForms.length === 0;   
 
   const [form] = await db.insert(feedbackForms)
-    .values({ reviewerId, name: input.name, isDefault: isFirstForm, taskMarkEnabled: input.taskMarkEnabled ?? false, })  
+        .values({ reviewerId, name: input.name, description: input.description ?? null, isDefault: isFirstForm, taskMarkEnabled: input.taskMarkEnabled ?? false, })
     .returning();
 
   if (!form) {
@@ -145,6 +176,7 @@ export async function updateForm(formId: number, reviewerId: number, input: Upda
 
   const updates: Partial<typeof feedbackForms.$inferInsert> = {};
   if (input.name) updates.name = input.name;
+  if (input.description !== undefined) updates.description = input.description || null;
   if (input.taskMarkEnabled !== undefined) updates.taskMarkEnabled = input.taskMarkEnabled;
 
   if (Object.keys(updates).length) {
@@ -301,6 +333,9 @@ export async function submitFeedback(bookingId: number, reviewerId: number, inpu
   if (!created) {
     throw new AppError("Failed to save feedback", 500);
   }
+    if (!input.isNoShow && input.pendingQuestionIds?.length) {
+    await assignPendingQuestions(created.id, reviewerId, input.pendingQuestionIds);
+  }
 
   return created;
 }
@@ -374,6 +409,42 @@ export async function updateFeedback(bookingId: number, reviewerId: number, inpu
     throw new AppError("Failed to update feedback", 500);
   }
 
+  if (input.pendingQuestionIds !== undefined) {
+  await validateOwnedQuestions(reviewerId, input.pendingQuestionIds);
+
+  await db
+    .delete(feedbackPendingQuestions)
+    .where(eq(feedbackPendingQuestions.feedbackId, existing.id));
+
+  if (input.pendingQuestionIds.length > 0) {
+    await db.insert(feedbackPendingQuestions).values(
+      input.pendingQuestionIds.map((questionId) => ({
+        feedbackId: existing.id,
+        questionId,
+      }))
+    );
+  }
+}
+  return updated;
+}
+
+export async function updatePendingQuestionStatus(
+  bookingId: number,
+  pendingQuestionId: number,
+  reviewerId: number,
+  status: "pending" | "reviewed"
+) {
+  await getOwnedBooking(bookingId, reviewerId);
+  const [row] = await db.select().from(feedback).where(eq(feedback.bookingId, bookingId));
+  if (!row) throw new AppError("Feedback not found for this booking", 404);
+
+  const [updated] = await db
+    .update(feedbackPendingQuestions)
+    .set({ status, completedAt: status === "reviewed" ? new Date() : null })
+    .where(and(eq(feedbackPendingQuestions.id, pendingQuestionId), eq(feedbackPendingQuestions.feedbackId, row.id)))
+    .returning();
+
+  if (!updated) throw new AppError("Pending question not found", 404);
   return updated;
 }
 
@@ -410,6 +481,21 @@ export async function getFeedbackDetailsForBooking(bookingId: number, reviewerId
   const submittedAt = row.createdAt ?? new Date();
   const editableUntil = new Date(submittedAt.getTime() + EDIT_WINDOW_HOURS * 60 * 60 * 1000);
 
+  const pendingQuestions = await db
+    .select({
+      id: feedbackPendingQuestions.id,
+      questionId: questions.id,
+      questionText: questions.questionText,
+      description: questions.description,
+      status: feedbackPendingQuestions.status,
+      assignedAt: feedbackPendingQuestions.assignedAt,
+      completedAt: feedbackPendingQuestions.completedAt,
+    })
+    .from(feedbackPendingQuestions)
+    .innerJoin(questions, eq(feedbackPendingQuestions.questionId, questions.id))
+    .where(eq(feedbackPendingQuestions.feedbackId, row.id))
+    .orderBy(asc(feedbackPendingQuestions.id));
+
   return {
     id: row.id,
     bookingId: row.bookingId,
@@ -425,6 +511,7 @@ export async function getFeedbackDetailsForBooking(bookingId: number, reviewerId
     taskMarkApplicable: form?.taskMarkEnabled ?? false,
     comments: row.comments,
     customFields,
+    pendingQuestions, 
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     editableUntil: editableUntil.toISOString(),

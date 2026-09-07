@@ -12,6 +12,8 @@ import type {
   ListFeedbackResponse,
   PendingFeedbackItem,
   DeleteFormResult,
+  PendingQuestion,    
+  PendingQuestionStatus, 
 } from "../types";
 
 type DataEnvelope<T> = { success: true; data: T };
@@ -91,6 +93,18 @@ export async function getFeedback(bookingId: number) {
 export async function listFeedback(params: ListFeedbackParams = {}) {
   const { data } = await api.get<DataEnvelope<ListFeedbackResponse>>("/feedback", { params });
   return data.data;
+}
+
+export async function updatePendingQuestionStatus(
+  bookingId: number,
+  pendingQuestionId: number,
+  status: PendingQuestionStatus
+) {
+  const { data } = await api.patch<DataEnvelope<{ pendingQuestion: PendingQuestion }>>(
+    `/bookings/${bookingId}/feedback/pending-questions/${pendingQuestionId}`,
+    { status }
+  );
+  return data.data.pendingQuestion;
 }
 
 export async function listPendingFeedback() {
