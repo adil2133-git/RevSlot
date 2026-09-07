@@ -13,10 +13,8 @@ formRouter.post("/", validate(CreateFormSchema), catchAsync(feedbackController.c
 formRouter.get("/:formId", catchAsync(feedbackController.getForm));
 formRouter.patch("/:formId", validate(UpdateFormSchema), catchAsync(feedbackController.updateForm));
 formRouter.delete("/:formId", catchAsync(feedbackController.deleteForm));
+formRouter.post("/:formId/reactivate", catchAsync(feedbackController.reactivateForm));
 
-// Feedback submit/fetch, nested under bookings — mount at /api/bookings
-// in server.ts, alongside the existing booking routes (Express merges
-// multiple routers mounted on the same base path).
 const bookingFeedbackRouter = Router();
 bookingFeedbackRouter.use(requireReviewer);
 
@@ -39,5 +37,10 @@ const internHistoryRouter = Router();
 internHistoryRouter.use(requireReviewer);
 internHistoryRouter.get("/", catchAsync(feedbackController.getInternHistory));
 
-export { bookingFeedbackRouter, internHistoryRouter };
+const feedbackListRouter = Router();
+feedbackListRouter.use(requireReviewer);
+feedbackListRouter.get("/pending", catchAsync(feedbackController.listPendingFeedback));
+feedbackListRouter.get("/", catchAsync(feedbackController.listFeedback));
+
+export { bookingFeedbackRouter, internHistoryRouter, feedbackListRouter };
 export default formRouter;

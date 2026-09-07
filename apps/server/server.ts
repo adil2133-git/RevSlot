@@ -14,7 +14,7 @@ import adminRoutes from "./modules/admin/admin.routes.js"
 import vacationRoutes from "./modules/vacation/vacation.routes.js";
 import calendarRoutes from "./modules/calendar/calendar.routes.js";
 import dashboardRoutes from "./modules/dashboard/dashboard.routes.js";
-import feedbackFormRoutes, { bookingFeedbackRouter, internHistoryRouter } from "./modules/feedback/feedback.routes.js";
+import feedbackFormRoutes, { bookingFeedbackRouter, internHistoryRouter, feedbackListRouter } from "./modules/feedback/feedback.routes.js";
 import { notFound, errorMiddleware } from './core/middlewares/error.middleware.js';
 import { pool } from "./config/db.js"
 
@@ -34,7 +34,8 @@ app.use("/api/question-banks", questionBankRoutes);
 app.use("/api/slots", slotRoutes);
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/bookings", bookingFeedbackRouter); 
-app.use("/api/feedback-forms", feedbackFormRoutes);      
+app.use("/api/feedback-forms", feedbackFormRoutes);   
+app.use("/api/feedback", feedbackListRouter);   
 app.use("/api/intern-history", internHistoryRouter);
 app.use("/api/event-types", eventTypeRoutes);
 app.use("/api/admin", adminRoutes);

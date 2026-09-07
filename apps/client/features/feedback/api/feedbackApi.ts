@@ -8,15 +8,20 @@ import type {
   SubmitFeedbackPayload,
   UpdateFeedbackPayload,
   FeedbackDetails,
+  ListFeedbackParams,
+  ListFeedbackResponse,
+  PendingFeedbackItem,
+  DeleteFormResult,
 } from "../types";
 
 type DataEnvelope<T> = { success: true; data: T };
-type MessageEnvelope = { success: true; message: string };
 
 // ── Feedback forms (mounted at /api/feedback-forms) ────────────────────
 
-export async function listForms() {
-  const { data } = await api.get<DataEnvelope<{ forms: FeedbackForm[] }>>("/feedback-forms");
+export async function listForms(includeArchived = false) {
+  const { data } = await api.get<DataEnvelope<{ forms: FeedbackForm[] }>>("/feedback-forms", {
+    params: includeArchived ? { includeArchived: true } : undefined,
+  });
   return data.data.forms;
 }
 
@@ -43,8 +48,19 @@ export async function updateForm(formId: number, payload: UpdateFormPayload) {
   return data.data.form;
 }
 
-export async function deleteForm(formId: number) {
-  await api.delete<MessageEnvelope>(`/feedback-forms/${formId}`);
+export async function deleteForm(formId: number): Promise<DeleteFormResult> {
+  const { data } = await api.delete<DataEnvelope<DeleteFormResult>>(
+    `/feedback-forms/${formId}`
+  );
+
+  return data.data;
+}
+
+export async function reactivateForm(formId: number) {
+  const { data } = await api.post<DataEnvelope<{ form: FeedbackFormWithFields }>>(
+    `/feedback-forms/${formId}/reactivate`
+  );
+  return data.data.form;
 }
 
 // ── Feedback submission (nested under /api/bookings/:id/feedback) ──────
@@ -70,4 +86,14 @@ export async function getFeedback(bookingId: number) {
     `/bookings/${bookingId}/feedback`
   );
   return data.data.feedback;
+}
+
+export async function listFeedback(params: ListFeedbackParams = {}) {
+  const { data } = await api.get<DataEnvelope<ListFeedbackResponse>>("/feedback", { params });
+  return data.data;
+}
+
+export async function listPendingFeedback() {
+  const { data } = await api.get<DataEnvelope<{ items: PendingFeedbackItem[] }>>("/feedback/pending");
+  return data.data.items;
 }

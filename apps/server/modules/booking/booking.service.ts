@@ -85,7 +85,7 @@ export const bookingService = {
           eq(slots.reviewerId, reviewerId),
           eq(slots.slotDate, slotDate),
           ne(slots.id, excludeSlotId),
-          sql`${slots.status} IN ('held', 'booked')`,
+          sql`(${slots.status} = 'booked' OR (${slots.status} = 'held' AND ${slots.holdExpiresAt} > now()))`, 
           sql`(${slots.startTime}, ${slots.endTime}) OVERLAPS (${startTime}::time, ${endTime}::time)`
         )
       );

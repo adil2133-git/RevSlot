@@ -2,13 +2,11 @@ import {
   pgTable, serial, integer, varchar, text, boolean, smallint,
   numeric, jsonb, timestamp, unique, index,
 } from 'drizzle-orm/pg-core';
-import { feedbackFieldType } from '../../db/schema/enums.js';
+import { feedbackFieldType, understandingLevel  } from '../../db/schema/enums.js';
 import { reviewers } from '../auth/reviewers.model.js';
 import { bookings } from '../booking/bookings.schema.js';
+import { questions } from '../questionBank/questions.model.js';
 
-// A reviewer's first-ever feedback form automatically becomes their
-// default (see feedback.service.ts createForm); isDefault marks it and
-// it can't be deleted (see feedback.service.ts deleteForm).
 export const feedbackForms = pgTable(
   'feedback_forms',
   {
@@ -18,12 +16,32 @@ export const feedbackForms = pgTable(
       .references(() => reviewers.id, { onDelete: 'cascade' }),
     name: varchar('name', { length: 150 }).notNull(),
     isDefault: boolean('is_default').notNull().default(false),
+    taskMarkEnabled: boolean('task_mark_enabled').notNull().default(false),
+    isActive: boolean('is_active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   },
   (table) => [
     unique('unique_feedback_form_name').on(table.reviewerId, table.name),
     index('idx_feedback_forms_reviewer').on(table.reviewerId),
+  ]
+);
+
+export const feedbackFormQuestions = pgTable(
+  'feedback_form_questions',
+  {
+    id: serial('id').primaryKey(),
+    formId: integer('form_id')
+      .notNull()
+      .references(() => feedbackForms.id, { onDelete: 'cascade' }),
+    questionId: integer('question_id')
+      .notNull()
+      .references(() => questions.id, { onDelete: 'cascade' }),
+    displayOrder: smallint('display_order'),
+  },
+  (table) => [
+    unique('unique_form_question').on(table.formId, table.questionId),
+    index('idx_feedback_form_questions_form').on(table.formId),
   ]
 );
 
@@ -67,8 +85,9 @@ export const feedback = pgTable(
     reviewMark: numeric('review_mark', { precision: 3, scale: 1 }),
     taskMark: numeric('task_mark', { precision: 3, scale: 1 }),
     comments: text('comments'),
+    understandingLevel: understandingLevel('understanding_level'),
     customFieldValues: jsonb('custom_field_values')
-      .$type<Record<string, { label: string; fieldType: string; value: string; options?: string[] }>>()
+      .$type<Record<string, { label: string; fieldType: string; value: string; options?: string[] | null }>>()
       .default({}),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),

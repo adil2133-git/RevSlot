@@ -85,6 +85,20 @@
       "when": 1788449059862,
       "tag": "0024_magical_joshua_kane",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1788635381137,
+      "tag": "0025_glossy_red_ghost",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1788699067205,
+      "tag": "0026_thin_tenebrous",
+      "breakpoints": true
     }
   ]
 }

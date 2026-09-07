@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import * as feedbackService from "./feedback.service.js";
-import { InternHistoryQuerySchema } from "./feedback.schema.js";
+import { InternHistoryQuerySchema, ListFeedbackQuerySchema } from "./feedback.schema.js";
 
 function reviewerId(req: Request): number {
   return req.user!.userId;
@@ -9,7 +9,8 @@ function reviewerId(req: Request): number {
 // ── Feedback forms ──────────────────────────────────────────────────
 
 export async function listForms(req: Request, res: Response) {
-  const forms = await feedbackService.listForms(reviewerId(req));
+  const includeArchived = req.query.includeArchived === "true";
+  const forms = await feedbackService.listForms(reviewerId(req), includeArchived);
   res.status(200).json({ success: true, data: { forms } });
 }
 
@@ -32,11 +33,19 @@ export async function updateForm(req: Request, res: Response) {
 
 export async function deleteForm(req: Request, res: Response) {
   const formId = Number(req.params.formId);
-  await feedbackService.deleteForm(formId, reviewerId(req));
-  res.status(200).json({ success: true, message: "Feedback form deleted" });
+  const result = await feedbackService.deleteForm(formId, reviewerId(req));
+  res.status(200).json({
+    success: true,
+    message: result.message,
+    data: result,
+  });
 }
 
-// ── Feedback submission ─────────────────────────────────────────────
+export async function reactivateForm(req: Request, res: Response) {
+  const formId = Number(req.params.formId);
+  const form = await feedbackService.reactivateForm(formId, reviewerId(req));
+  res.status(200).json({ success: true, data: { form } });
+}
 
 export async function submitFeedback(req: Request, res: Response) {
   const bookingId = Number(req.params.id);
@@ -65,4 +74,15 @@ export async function getInternHistory(req: Request, res: Response) {
     excludeBookingId
   );
   res.status(200).json({ success: true, data: { history } });
+}
+
+export async function listFeedback(req: Request, res: Response) {
+  const query = ListFeedbackQuerySchema.parse(req.query);
+  const result = await feedbackService.listFeedback(reviewerId(req), query);
+  res.status(200).json({ success: true, data: result });
+}
+
+export async function listPendingFeedback(req: Request, res: Response) {
+  const items = await feedbackService.listPendingFeedback(reviewerId(req));
+  res.status(200).json({ success: true, data: { items } });
 }

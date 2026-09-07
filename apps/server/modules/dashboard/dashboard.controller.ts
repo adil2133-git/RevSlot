@@ -22,10 +22,12 @@ export const dashboardController = {
 
   getReferenceQuestions: async (req: Request, res: Response) => {
     const { bookingId } = BookingIdParamSchema.parse(req.params);
+     const formId = req.query.formId ? Number(req.query.formId) : undefined;
 
     const result = await dashboardService.getBookingReferenceQuestions(
       req.user!.userId,
-      bookingId
+      bookingId,
+      formId
     );
 
     res.status(200).json({

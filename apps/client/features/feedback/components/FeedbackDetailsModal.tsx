@@ -5,7 +5,7 @@ import Modal from "@/components/common/Modal";
 import { XIcon } from "@/features/booking/components/icons";
 import { getFeedback, updateFeedback } from "../api/feedbackApi";
 import { formatBookingDate } from "@/features/booking/utils/bookingDisplay";
-import type { FeedbackDetails } from "../types";
+import type { FeedbackDetails, UnderstandingLevel } from "../types";
 
 interface FeedbackDetailsModalProps {
   bookingId: number;
@@ -15,6 +15,18 @@ interface FeedbackDetailsModalProps {
 // Mirrors SubmitFeedbackModal's mark options — 1.0–10.0 in half-point
 // steps, per the backend's Submit/UpdateFeedbackSchema (multipleOf 0.5).
 const MARK_OPTIONS = Array.from({ length: 19 }, (_, i) => (1 + i * 0.5).toFixed(1));
+const UNDERSTANDING_LEVELS: {
+  value: UnderstandingLevel;
+  label: string;
+}[] = [
+  { value: "excellent", label: "Excellent" },
+  { value: "good", label: "Good" },
+  { value: "average", label: "Average" },
+  {
+    value: "needs_improvement",
+    label: "Needs Improvement",
+  },
+];
 
 export default function FeedbackDetailsModal({ bookingId, onClose }: FeedbackDetailsModalProps) {
   const [details, setDetails] = useState<FeedbackDetails | null>(null);
@@ -23,6 +35,8 @@ export default function FeedbackDetailsModal({ bookingId, onClose }: FeedbackDet
 
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [reviewMark, setReviewMark] = useState("");
+  const [understandingLevel, setUnderstandingLevel] =
+  useState<UnderstandingLevel | "">("");
   const [taskMark, setTaskMark] = useState("");
   const [comments, setComments] = useState("");
   const [customValues, setCustomValues] = useState<Record<string, string>>({});
@@ -46,6 +60,7 @@ export default function FeedbackDetailsModal({ bookingId, onClose }: FeedbackDet
   const startEdit = () => {
     if (!details) return;
     setReviewMark(details.reviewMark ?? "");
+    setUnderstandingLevel(details.understandingLevel ?? "");
     setTaskMark(details.taskMark ?? "");
     setComments(details.comments ?? "");
     const values: Record<string, string> = {};
@@ -59,19 +74,27 @@ export default function FeedbackDetailsModal({ bookingId, onClose }: FeedbackDet
 
   const handleSave = async () => {
     setSaveError(null);
-    if (!reviewMark || !taskMark) {
-      setSaveError("Review mark and task mark are required.");
+    if (!reviewMark || !understandingLevel) {
+      setSaveError("Review mark and understanding Level are required.");
       return;
     }
+    if (details?.taskMarkApplicable && !taskMark) {
+    setSaveError("Task mark is required for this form.");
+    return;
+  }
 
     setSaving(true);
     try {
       await updateFeedback(bookingId, {
         reviewMark: Number(reviewMark),
-        taskMark: Number(taskMark),
+        understandingLevel: understandingLevel as UnderstandingLevel,
+        taskMark:
+             details?.taskMarkApplicable && taskMark
+            ? Number(taskMark)
+            : undefined,
         comments: comments.trim() || undefined,
         customFieldValues: customValues,
-      });
+    });
       await loadDetails();
       setMode("view");
     } catch (err) {
@@ -121,26 +144,55 @@ export default function FeedbackDetailsModal({ bookingId, onClose }: FeedbackDet
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-lg border border-slate-200 bg-surface px-3.5 py-2.5">
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                  Review mark
-                </p>
-                <p className="mt-0.5 text-lg font-bold text-on-surface">
-                  {details.reviewMark ?? "—"}
-                  <span className="text-sm font-medium text-slate-400"> / 10</span>
-                </p>
-              </div>
-              <div className="rounded-lg border border-slate-200 bg-surface px-3.5 py-2.5">
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                  Task mark
-                </p>
-                <p className="mt-0.5 text-lg font-bold text-on-surface">
-                  {details.taskMark ?? "—"}
-                  <span className="text-sm font-medium text-slate-400"> / 10</span>
-                </p>
-              </div>
-            </div>
+            <div
+  className={`grid gap-3 ${
+    details.taskMarkApplicable
+      ? "grid-cols-3"
+      : "grid-cols-2"
+  }`}
+>
+  <div className="rounded-lg border border-slate-200 bg-surface px-3.5 py-2.5">
+    <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+      Review mark
+    </p>
+
+    <p className="mt-0.5 text-lg font-bold text-on-surface">
+      {details.reviewMark ?? "—"}
+      <span className="text-sm font-medium text-slate-400">
+        {" "}
+        / 10
+      </span>
+    </p>
+  </div>
+
+  <div className="rounded-lg border border-slate-200 bg-surface px-3.5 py-2.5">
+    <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+      Understanding
+    </p>
+
+    <p className="mt-0.5 text-sm font-bold text-on-surface">
+      {UNDERSTANDING_LEVELS.find(
+        (level) => level.value === details.understandingLevel
+      )?.label ?? "—"}
+    </p>
+  </div>
+
+  {details.taskMarkApplicable && (
+    <div className="rounded-lg border border-slate-200 bg-surface px-3.5 py-2.5">
+      <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+        Task mark
+      </p>
+
+      <p className="mt-0.5 text-lg font-bold text-on-surface">
+        {details.taskMark ?? "—"}
+        <span className="text-sm font-medium text-slate-400">
+          {" "}
+          / 10
+        </span>
+      </p>
+    </div>
+  )}
+</div>
 
             {details.customFields.map((field) => (
               <div key={field.id}>
@@ -188,42 +240,79 @@ export default function FeedbackDetailsModal({ bookingId, onClose }: FeedbackDet
 
         {!loading && !error && details && mode === "edit" && (
           <>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-400">
-                  Review mark
-                </label>
-                <select
-                  value={reviewMark}
-                  onChange={(e) => setReviewMark(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3.5 py-2 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-secondary/60"
-                >
-                  <option value="">Select</option>
-                  {MARK_OPTIONS.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-400">
-                  Task mark
-                </label>
-                <select
-                  value={taskMark}
-                  onChange={(e) => setTaskMark(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3.5 py-2 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-secondary/60"
-                >
-                  <option value="">Select</option>
-                  {MARK_OPTIONS.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
+            <div
+  className={`grid gap-4 ${
+    details.taskMarkApplicable
+      ? "grid-cols-1 sm:grid-cols-3"
+      : "grid-cols-1 sm:grid-cols-2"
+  }`}
+>
+  <div>
+    <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-400">
+      Review mark
+    </label>
+
+    <select
+      value={reviewMark}
+      onChange={(e) => setReviewMark(e.target.value)}
+      className="w-full rounded-lg border border-slate-200 px-3.5 py-2 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-secondary/60"
+    >
+      <option value="">Select</option>
+
+      {MARK_OPTIONS.map((mark) => (
+        <option key={mark} value={mark}>
+          {mark}
+        </option>
+      ))}
+    </select>
+  </div>
+
+  <div>
+    <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-400">
+      Understanding
+    </label>
+
+    <select
+      value={understandingLevel}
+      onChange={(e) =>
+        setUnderstandingLevel(
+          e.target.value as UnderstandingLevel
+        )
+      }
+      className="w-full rounded-lg border border-slate-200 px-3.5 py-2 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-secondary/60"
+    >
+      <option value="">Select</option>
+
+      {UNDERSTANDING_LEVELS.map((level) => (
+        <option key={level.value} value={level.value}>
+          {level.label}
+        </option>
+      ))}
+    </select>
+  </div>
+
+  {details.taskMarkApplicable && (
+    <div>
+      <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-400">
+        Task mark
+      </label>
+
+      <select
+        value={taskMark}
+        onChange={(e) => setTaskMark(e.target.value)}
+        className="w-full rounded-lg border border-slate-200 px-3.5 py-2 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-secondary/60"
+      >
+        <option value="">Select</option>
+
+        {MARK_OPTIONS.map((mark) => (
+          <option key={mark} value={mark}>
+            {mark}
+          </option>
+        ))}
+      </select>
+    </div>
+  )}
+</div>
 
             <div>
               <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-400">

@@ -58,7 +58,7 @@ export default function BookingCard({
   useEffect(() => {
     const id = setInterval(() => {
     forceTick((t) => t + 1);
-  }, 30 * 1000);
+  }, 1000);
 
   return () => clearInterval(id);
 }, []);

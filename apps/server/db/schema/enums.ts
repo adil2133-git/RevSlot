@@ -19,3 +19,7 @@ export const userRole = pgEnum('user_role', ['reviewer', 'admin']);
 export const feedbackFieldType = pgEnum('feedback_field_type', [
   'text', 'textarea', 'number', 'select',
 ]);
+
+export const understandingLevel = pgEnum('understanding_level', [
+  'excellent', 'good', 'average', 'needs_improvement',
+]);
