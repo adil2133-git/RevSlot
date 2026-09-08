@@ -94,6 +94,7 @@ export type MyBooking = {
   cancelledReason: string | null;
   eventTypeName: string;
   bookingWindowDays: number;
+  hasFeedback: boolean;
 };
 
 export type MyBookingsPagination = {
@@ -111,7 +112,7 @@ export type MyBookingsResponse = {
 export type GetMyBookingsParams = {
   page?: number;
   limit?: number;
-  status?: ("confirmed" | "completed" | "rescheduled" | "cancelled")[];
+  status?: ("confirmed" | "completed" | "rescheduled" | "cancelled" | "no_show")[];
   scope?: "upcoming" | "past" | "ongoing";
 };
 
@@ -128,4 +129,8 @@ export type RescheduleBookingPayload = {
   date: string;
   startTime: string;
   endTime: string;
+};
+
+export type MarkOutcomePayload = {
+  outcome: "completed" | "no_show";
 };

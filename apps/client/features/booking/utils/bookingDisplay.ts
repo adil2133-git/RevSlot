@@ -29,6 +29,8 @@ export function isWithinCancelCutoff(startTime: string) {
 
 export const STATUS_LABELS: Record<string, string> = {
   confirmed: "Confirmed",
+  in_progress: "In Progress",
+  outcome_required: "Outcome Required",
   completed: "Completed",
   cancelled: "Cancelled",
   no_show: "No-show",
@@ -37,6 +39,8 @@ export const STATUS_LABELS: Record<string, string> = {
 
 export const STATUS_STYLES: Record<string, string> = {
   confirmed: "bg-emerald-50 text-emerald-700 border border-emerald-200/80",
+  in_progress: "bg-blue-50 text-blue-700 border border-blue-200/80",
+  outcome_required: "bg-orange-50 text-orange-700 border border-orange-200/80",
   completed: "bg-slate-100 text-slate-600 border border-slate-200/80",
   cancelled: "bg-rose-50 text-rose-700 border border-rose-200/80",
   no_show: "bg-rose-50 text-rose-700 border border-rose-200/80",

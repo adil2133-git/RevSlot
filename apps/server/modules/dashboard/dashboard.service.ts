@@ -9,6 +9,7 @@ import { templateTimeBlocks } from "../availability/models/templateTimeBlocks.sc
 import { questionBanks } from "../questionBank/questionBanks.model.js";
 import { questions } from "../questionBank/questions.model.js";
 import { AppError } from "../../core/errors/AppError.js";
+import { feedbackForms, feedbackFormQuestions } from "../feedback/feedback.model.js";
 import type { GetDashboardSummaryQueryInput } from "./dashboard.validation.js";
 
 export const dashboardService = {
@@ -343,7 +344,7 @@ export const dashboardService = {
     };
   },
 
-  getBookingReferenceQuestions: async (reviewerId: number, bookingId: number) => {
+  getBookingReferenceQuestions: async (reviewerId: number, bookingId: number, formId?: number) => {
     // 1. Get booking and check reviewer ownership
     const [booking] = await db
       .select({
@@ -363,7 +364,7 @@ export const dashboardService = {
     }
 
     // 2. Retrieve reviewer's question bank
-    const [bank] = await db
+    const banks = await db
       .select({
         id: questionBanks.id,
         name: questionBanks.name,
@@ -371,27 +372,57 @@ export const dashboardService = {
       })
       .from(questionBanks)
       .where(eq(questionBanks.reviewerId, reviewerId))
-      .orderBy(questionBanks.id)
-      .limit(1);
+      .orderBy(questionBanks.id);
 
-    let bankQuestions: Array<{
+    let questionBanksWithQuestions: Array<{
       id: number;
-      questionText: string;
+      name: string;
       description: string | null;
-      displayOrder: number | null;
+       questions: Array<{ id: number; questionText: string; description: string | null; displayOrder: number | null }>;
     }> = [];
 
-    if (bank) {
-      bankQuestions = await db
+    if (banks.length) {
+      const allQuestions = await db
         .select({
           id: questions.id,
+          bankId: questions.bankId,
           questionText: questions.questionText,
           description: questions.description,
           displayOrder: questions.displayOrder,
         })
         .from(questions)
-        .where(eq(questions.bankId, bank.id))
+        .where(inArray(questions.bankId, banks.map((b) => b.id)))
         .orderBy(questions.displayOrder, questions.id);
+
+        questionBanksWithQuestions = banks.map((bank) => ({
+        ...bank,
+        questions: allQuestions.filter((q) => q.bankId === bank.id),
+      }));
+    }
+
+    let formQuestions: Array<{ id: number; questionText: string; description: string | null; displayOrder: number | null }> = [];
+    let formName: string | null = null;
+
+    if (formId) {
+      const [form] = await db
+        .select({ id: feedbackForms.id, name: feedbackForms.name })
+        .from(feedbackForms)
+        .where(and(eq(feedbackForms.id, formId), eq(feedbackForms.reviewerId, reviewerId)));
+
+      if (form) {
+        formName = form.name;
+        formQuestions = await db
+          .select({
+            id: questions.id,
+            questionText: questions.questionText,
+            description: questions.description,
+            displayOrder: feedbackFormQuestions.displayOrder,
+          })
+          .from(feedbackFormQuestions)
+          .innerJoin(questions, eq(feedbackFormQuestions.questionId, questions.id))
+          .where(eq(feedbackFormQuestions.formId, form.id))
+          .orderBy(feedbackFormQuestions.displayOrder);
+      }
     }
 
     return {
@@ -401,12 +432,8 @@ export const dashboardService = {
         weekStage: booking.weekStage,
         eventTypeName: booking.eventTypeName,
       },
-      questionBank: bank ? {
-        id: bank.id,
-        name: bank.name,
-        description: bank.description,
-        questions: bankQuestions,
-      } : null,
+     questionBanks: questionBanksWithQuestions,
+      formChecklist: formId ? { formId, formName, questions: formQuestions } : null,
     };
   },
 };

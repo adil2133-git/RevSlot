@@ -1,0 +1,1 @@
+ALTER TABLE "feedback_forms" ADD COLUMN "description" varchar(200);

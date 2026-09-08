@@ -1,11 +1,19 @@
 import { STATUS_LABELS, STATUS_STYLES } from "../utils/bookingDisplay";
 
 export default function StatusBadge({ status }: { status: string }) {
-  const dotColor =
+      const dotColor =
     status === "confirmed"
       ? "bg-emerald-500"
       : status === "rescheduled"
       ? "bg-amber-500"
+      : status === "in_progress"
+      ? "bg-blue-500"
+      : status === "outcome_required"
+      ? "bg-orange-500"
+      : status === "completed"
+      ? "bg-emerald-500"
+      : status === "no_show"
+      ? "bg-rose-500"
       : status === "cancelled"
       ? "bg-rose-500"
       : "bg-slate-400";

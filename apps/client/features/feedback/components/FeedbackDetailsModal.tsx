@@ -1,0 +1,595 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Modal from "@/components/common/Modal";
+import { XIcon } from "@/features/booking/components/icons";
+import { getFeedback, updateFeedback, updatePendingQuestionStatus } from "../api/feedbackApi";
+import { formatBookingDate } from "@/features/booking/utils/bookingDisplay";
+import type { FeedbackDetails, UnderstandingLevel } from "../types";
+import { useQuestionBankStore } from "@/features/questionBanks/store/questionBankStore";
+
+
+interface FeedbackDetailsModalProps {
+  bookingId: number;
+  onClose: () => void;
+}
+
+// Mirrors SubmitFeedbackModal's mark options — 1.0–10.0 in half-point
+// steps, per the backend's Submit/UpdateFeedbackSchema (multipleOf 0.5).
+const MARK_OPTIONS = Array.from({ length: 19 }, (_, i) => (1 + i * 0.5).toFixed(1));
+const UNDERSTANDING_LEVELS: {
+  value: UnderstandingLevel;
+  label: string;
+}[] = [
+  { value: "excellent", label: "Excellent" },
+  { value: "good", label: "Good" },
+  { value: "average", label: "Average" },
+  {
+    value: "needs_improvement",
+    label: "Needs Improvement",
+  },
+];
+
+export default function FeedbackDetailsModal({ bookingId, onClose }: FeedbackDetailsModalProps) {
+
+  const {
+  banks: questionBanks,
+  selectedBank: questionBank,
+  fetchBanks,
+  fetchBank: fetchQuestionBank,
+  clearSelectedBank,
+} = useQuestionBankStore();
+
+  const [details, setDetails] = useState<FeedbackDetails | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [mode, setMode] = useState<"view" | "edit">("view");
+  const [reviewMark, setReviewMark] = useState("");
+  const [understandingLevel, setUnderstandingLevel] =
+  useState<UnderstandingLevel | "">("");
+  const [taskMark, setTaskMark] = useState("");
+  const [comments, setComments] = useState("");
+  const [customValues, setCustomValues] = useState<Record<string, string>>({});
+  const [pendingQuestionIds, setPendingQuestionIds] =
+  useState<number[]>([]);
+  const [selectedBankId, setSelectedBankId] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<number | null>(null);
+
+  const loadDetails = () => {
+    setLoading(true);
+    setError(null);
+    return getFeedback(bookingId)
+      .then(setDetails)
+      .catch(() => setError("Failed to load feedback."))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+  fetchBanks();
+
+  return () => {
+    clearSelectedBank();
+  };
+}, [fetchBanks, clearSelectedBank]);
+
+  useEffect(() => {
+    loadDetails();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookingId]);
+
+  const startEdit = () => {
+    if (!details) return;
+    setReviewMark(details.reviewMark ?? "");
+    setUnderstandingLevel(details.understandingLevel ?? "");
+    setTaskMark(details.taskMark ?? "");
+    setComments(details.comments ?? "");
+    const values: Record<string, string> = {};
+    for (const field of details.customFields) {
+      values[String(field.id)] = field.value;
+    }
+    setCustomValues(values);
+    setSaveError(null);
+    setMode("edit");
+    setPendingQuestionIds(
+     details.pendingQuestions
+    .filter((question) => question.status === "pending")
+    .map((question) => question.questionId));
+  };
+
+  const togglePendingQuestion = (questionId: number) => {
+  setPendingQuestionIds((prev) =>
+    prev.includes(questionId)
+      ? prev.filter((id) => id !== questionId)
+      : [...prev, questionId]
+  );
+};
+
+  const handleSave = async () => {
+    setSaveError(null);
+    if (!reviewMark || !understandingLevel) {
+      setSaveError("Review mark and understanding Level are required.");
+      return;
+    }
+    if (details?.taskMarkApplicable && !taskMark) {
+    setSaveError("Task mark is required for this form.");
+    return;
+  }
+
+    setSaving(true);
+    try {
+      await updateFeedback(bookingId, {
+        reviewMark: Number(reviewMark),
+        understandingLevel: understandingLevel as UnderstandingLevel,
+        taskMark:
+             details?.taskMarkApplicable && taskMark
+            ? Number(taskMark)
+            : undefined,
+        comments: comments.trim() || undefined,
+        customFieldValues: customValues,
+        pendingQuestionIds,
+    });
+      await loadDetails();
+      setMode("view");
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Failed to update feedback.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleQuestionStatus = async (pendingQuestionId: number, currentStatus: "pending" | "reviewed") => {
+    setTogglingId(pendingQuestionId);
+    try {
+      const nextStatus = currentStatus === "pending" ? "reviewed" : "pending";
+      await updatePendingQuestionStatus(bookingId, pendingQuestionId, nextStatus);
+      await loadDetails();
+    } catch {
+      // silently ignore — details will just show the unchanged status
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
+  return (
+    <Modal onClose={onClose} widthClassName="max-w-lg">
+      <div className="flex items-center justify-between border-b border-slate-100 p-6">
+        <div>
+          <h2 className="text-xl font-bold text-on-surface">
+            {mode === "edit" ? "Edit Feedback" : "Feedback"}
+          </h2>
+          {details && (
+            <p className="mt-0.5 text-sm text-slate-400">
+              {details.clientName} · {details.eventTypeName}
+            </p>
+          )}
+        </div>
+        <button
+          onClick={onClose}
+          className="rounded-lg p-1 text-slate-400 hover:bg-surface-hover hover:text-on-surface"
+          aria-label="Close"
+        >
+          <XIcon />
+        </button>
+      </div>
+
+      <div className="max-h-[65vh] space-y-4 overflow-y-auto p-6">
+        {loading && <p className="text-sm text-slate-400">Loading feedback…</p>}
+
+        {error && <p className="text-sm text-error">{error}</p>}
+
+        {!loading && !error && !details && (
+          <p className="text-sm text-slate-400">No feedback has been submitted for this booking yet.</p>
+        )}
+
+        {!loading && !error && details && mode === "view" && (
+          <>
+            <div>
+              <p className="text-xs font-medium text-slate-400">
+                {formatBookingDate(details.sessionDate)}
+                {details.formName && <> · {details.formName}</>}
+              </p>
+            </div>
+
+            <div
+  className={`grid gap-3 ${
+    details.taskMarkApplicable
+      ? "grid-cols-3"
+      : "grid-cols-2"
+  }`}
+>
+  <div className="rounded-lg border border-slate-200 bg-surface px-3.5 py-2.5">
+    <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+      Review mark
+    </p>
+
+    <p className="mt-0.5 text-lg font-bold text-on-surface">
+      {details.reviewMark ?? "—"}
+      <span className="text-sm font-medium text-slate-400">
+        {" "}
+        / 10
+      </span>
+    </p>
+  </div>
+
+  <div className="rounded-lg border border-slate-200 bg-surface px-3.5 py-2.5">
+    <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+      Understanding
+    </p>
+
+    <p className="mt-0.5 text-sm font-bold text-on-surface">
+      {UNDERSTANDING_LEVELS.find(
+        (level) => level.value === details.understandingLevel
+      )?.label ?? "—"}
+    </p>
+  </div>
+
+  {details.taskMarkApplicable && (
+    <div className="rounded-lg border border-slate-200 bg-surface px-3.5 py-2.5">
+      <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+        Task mark
+      </p>
+
+      <p className="mt-0.5 text-lg font-bold text-on-surface">
+        {details.taskMark ?? "—"}
+        <span className="text-sm font-medium text-slate-400">
+          {" "}
+          / 10
+        </span>
+      </p>
+    </div>
+  )}
+</div>
+
+            {details.customFields.map((field) => (
+              <div key={field.id}>
+                <p className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400">
+                  {field.label}
+                </p>
+                <p className="text-sm text-on-surface">{field.value || "—"}</p>
+              </div>
+            ))}
+
+            <div className="mt-6 border-t border-slate-100 pt-5">
+  <h4 className="text-sm font-semibold text-on-surface">
+    Pending Questions
+  </h4>
+
+  <p className="mt-1 text-xs text-slate-400">
+    Select questions to send to the client for preparation.
+  </p>
+
+  <select
+    className="mt-3 w-full rounded-lg border border-slate-200 px-3.5 py-2 text-sm outline-none focus:border-primary"
+    defaultValue=""
+    onChange={(e) => {
+      const bankId = Number(e.target.value);
+      if (bankId) fetchQuestionBank(bankId);
+    }}
+  >
+    <option value="">Choose a question bank</option>
+
+    {questionBanks.map((bank) => (
+      <option key={bank.id} value={bank.id}>
+        {bank.name}
+      </option>
+    ))}
+  </select>
+
+  {questionBank?.questions?.map((question) => (
+    <label
+      key={question.id}
+      className="mt-2 flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-3"
+    >
+      <input
+        type="checkbox"
+        checked={pendingQuestionIds.includes(question.id)}
+        onChange={() => togglePendingQuestion(question.id)}
+        className="mt-1"
+      />
+
+      <span className="text-sm text-on-surface">
+        {question.questionText}
+      </span>
+    </label>
+  ))}
+</div>
+
+            {details.pendingQuestions.length > 0 && (
+              <div>
+                <p className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400">
+                  Pending Topics
+                </p>
+                <div className="space-y-1.5">
+                  {details.pendingQuestions.map((pq) => (
+                    <div
+                      key={pq.id}
+                      className="flex items-start justify-between gap-3 rounded-lg border border-slate-200 bg-surface px-3 py-2"
+                    >
+                      <div>
+                        <p className="text-sm text-on-surface">{pq.questionText}</p>
+                        {pq.description && (
+                          <p className="mt-0.5 text-xs text-slate-400">{pq.description}</p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        disabled={togglingId === pq.id}
+                        onClick={() => toggleQuestionStatus(pq.id, pq.status)}
+                        className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                          pq.status === "reviewed"
+                            ? "bg-green-100 text-green-700"
+                            : "bg-amber-100 text-amber-700"
+                        } disabled:cursor-not-allowed disabled:opacity-50`}
+                      >
+                        {togglingId === pq.id ? "…" : pq.status === "reviewed" ? "Reviewed" : "Pending"}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div>
+              <p className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400">
+                Comments
+              </p>
+              <p className="whitespace-pre-wrap text-sm text-on-surface">
+                {details.comments || "No comments left."}
+              </p>
+            </div>
+
+            <div className="border-t border-slate-100 pt-3 text-xs text-slate-400">
+              Submitted {formatBookingDate(details.createdAt)}
+              {details.updatedAt !== details.createdAt && (
+                <> · Edited {formatBookingDate(details.updatedAt)}</>
+              )}
+            </div>
+
+            {details.canEdit ? (
+              <div className="flex items-center justify-between rounded-lg bg-secondary/40 px-3.5 py-2.5 text-xs text-primary">
+                <span>You can edit this feedback until {formatBookingDate(details.editableUntil)}.</span>
+                <button
+                  type="button"
+                  onClick={startEdit}
+                  className="font-semibold underline hover:no-underline"
+                >
+                  Edit Feedback
+                </button>
+              </div>
+            ) : (
+              <p className="rounded-lg bg-slate-100 px-3.5 py-2.5 text-xs text-slate-500">
+                🔒 Feedback is locked and can no longer be edited.
+              </p>
+            )}
+          </>
+        )}
+
+        {!loading && !error && details && mode === "edit" && (
+          <>
+            <div
+  className={`grid gap-4 ${
+    details.taskMarkApplicable
+      ? "grid-cols-1 sm:grid-cols-3"
+      : "grid-cols-1 sm:grid-cols-2"
+  }`}
+>
+  <div>
+    <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-400">
+      Review mark
+    </label>
+
+    <select
+      value={reviewMark}
+      onChange={(e) => setReviewMark(e.target.value)}
+      className="w-full rounded-lg border border-slate-200 px-3.5 py-2 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-secondary/60"
+    >
+      <option value="">Select</option>
+
+      {MARK_OPTIONS.map((mark) => (
+        <option key={mark} value={mark}>
+          {mark}
+        </option>
+      ))}
+    </select>
+  </div>
+
+  <div>
+    <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-400">
+      Understanding
+    </label>
+
+    <select
+      value={understandingLevel}
+      onChange={(e) =>
+        setUnderstandingLevel(
+          e.target.value as UnderstandingLevel
+        )
+      }
+      className="w-full rounded-lg border border-slate-200 px-3.5 py-2 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-secondary/60"
+    >
+      <option value="">Select</option>
+
+      {UNDERSTANDING_LEVELS.map((level) => (
+        <option key={level.value} value={level.value}>
+          {level.label}
+        </option>
+      ))}
+    </select>
+  </div>
+
+  {details.taskMarkApplicable && (
+    <div>
+      <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-400">
+        Task mark
+      </label>
+
+      <select
+        value={taskMark}
+        onChange={(e) => setTaskMark(e.target.value)}
+        className="w-full rounded-lg border border-slate-200 px-3.5 py-2 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-secondary/60"
+      >
+        <option value="">Select</option>
+
+        {MARK_OPTIONS.map((mark) => (
+          <option key={mark} value={mark}>
+            {mark}
+          </option>
+        ))}
+      </select>
+    </div>
+  )}
+</div>
+
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-400">
+                Comments <span className="font-normal normal-case text-slate-400">(optional)</span>
+              </label>
+              <textarea
+                value={comments}
+                onChange={(e) => setComments(e.target.value)}
+                rows={3}
+                className="w-full rounded-lg border border-slate-200 px-3.5 py-2 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-secondary/60"
+              />
+            </div>
+
+            {details.customFields.map((field) => (
+              <div key={field.id}>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-400">
+                  {field.label}
+                </label>
+                {field.fieldType === "textarea" ? (
+                  <textarea
+                    value={customValues[String(field.id)] ?? ""}
+                    onChange={(e) =>
+                      setCustomValues((prev) => ({ ...prev, [String(field.id)]: e.target.value }))
+                    }
+                    rows={2}
+                    className="w-full rounded-lg border border-slate-200 px-3.5 py-2 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-secondary/60"
+                  />
+                ) : field.fieldType === "select" ? (
+                  <select
+                    value={customValues[String(field.id)] ?? ""}
+                    onChange={(e) =>
+                      setCustomValues((prev) => ({ ...prev, [String(field.id)]: e.target.value }))
+                    }
+                    className="w-full rounded-lg border border-slate-200 px-3.5 py-2 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-secondary/60"
+                  >
+                    <option value="">Select</option>
+                    {(field.options ?? []).map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type={field.fieldType === "number" ? "number" : "text"}
+                    value={customValues[String(field.id)] ?? ""}
+                    onChange={(e) =>
+                      setCustomValues((prev) => ({ ...prev, [String(field.id)]: e.target.value }))
+                    }
+                    className="w-full rounded-lg border border-slate-200 px-3.5 py-2 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-secondary/60"
+                  />
+                )}
+              </div>
+            ))}
+
+              {/* Pending Questions */}
+<div className="mt-6 border-t border-slate-100 pt-5">
+  <h4 className="mb-3 text-sm font-semibold text-slate-900">
+    Pending Questions
+  </h4>
+
+  {questionBanks.length === 0 ? (
+    <p className="text-sm text-slate-500">
+      No question banks available.
+    </p>
+  ) : (
+    <>
+     <select
+  value={selectedBankId ?? ""}
+  onChange={(e) => {
+    const bankId = Number(e.target.value);
+
+    setSelectedBankId(bankId || null);
+
+    if (bankId) {
+      fetchQuestionBank(bankId);
+    }
+  }}
+  className="mb-3 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+>
+        <option value="">Select a question bank</option>
+
+        {questionBanks.map((bank) => (
+          <option key={bank.id} value={bank.id}>
+            {bank.name}
+          </option>
+        ))}
+      </select>
+
+      {selectedBankId && questionBank && (
+        <div className="space-y-2">
+          {questionBank.questions?.length ? (
+            questionBank.questions.map((question) => (
+              <label
+                key={question.id}
+                className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-3"
+              >
+                <input
+                  type="checkbox"
+                  checked={pendingQuestionIds.includes(question.id)}
+                  onChange={() => {
+                    setPendingQuestionIds((prev) =>
+                      prev.includes(question.id)
+                        ? prev.filter((id) => id !== question.id)
+                        : [...prev, question.id]
+                    );
+                  }}
+                  className="mt-1"
+                />
+
+                <span className="text-sm text-slate-700">
+                  {question.questionText}
+                </span>
+              </label>
+            ))
+          ) : (
+            <p className="text-sm text-slate-500">
+              No questions in this question bank.
+            </p>
+          )}
+        </div>
+      )}
+    </>
+  )}
+</div>
+
+            {saveError && <p className="text-sm text-error">{saveError}</p>}
+          </>
+        )}
+      </div>
+
+      {mode === "edit" && (
+        <div className="flex justify-end gap-3 border-t border-slate-100 p-6">
+          <button
+            onClick={() => setMode("view")}
+            className="rounded-lg px-5 py-2.5 font-semibold text-slate-400 hover:bg-surface-hover"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="rounded-lg bg-primary px-5 py-2.5 font-semibold text-on-primary transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {saving ? "Saving..." : "Save Changes"}
+          </button>
+        </div>
+      )}
+    </Modal>
+  );
+}

@@ -84,7 +84,9 @@ export default function BookingDetailsModal({ bookingId, onClose }: BookingDetai
               )}
             </div>
 
-            {detail.meetLink && (
+           {detail.meetLink &&
+               (detail.status === "confirmed" || detail.status === "rescheduled") &&
+                Date.now() < new Date(detail.endTime).getTime() && (
             <a 
                 href={detail.meetLink}
                 target="_blank"

@@ -6,8 +6,6 @@ import Switch from "@/components/common/Switch";
 import { fetchTemplates } from "@/features/availability/api/availability.api";
 import type { AvailabilityTemplate } from "@/features/availability/types";
 import { useEventTypeStore } from "@/features/eventTypes/store/eventType.store";
-import { listForms } from "@/features/feedback/api/feedbackApi";
-import type { FeedbackForm } from "@/features/feedback/types";
 import { getEventTypeByIdRequest } from "@/features/eventTypes/api/eventType.api";
 import { slugify } from "../utils/slugify";
 
@@ -28,36 +26,16 @@ export default function EventTypeForm({ mode, eventTypeId }: EventTypeFormProps)
   const [bufferAfterMinutes, setBufferAfterMinutes] = useState("0");
   const [availabilityTemplateId, setAvailabilityTemplateId] = useState("");
   const [isActive, setIsActive] = useState(true);
-  const [feedbackFormId, setFeedbackFormId] = useState("");
 
   const [templates, setTemplates] = useState<AvailabilityTemplate[]>([]);
   const [loading, setLoading] = useState(mode === "edit");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [feedbackForms, setFeedbackForms] = useState<FeedbackForm[]>([]);
 
   // The backend always derives the slug from `name` server-side — this is
   // a preview only, so people can see the URL before saving. Editing it
   // here would do nothing, since it's never sent in the payload.
   const slugPreview = slugify(name);
-
-  // Always load the reviewer's own templates for the dropdown — the
-  // backend re-verifies ownership on submit regardless, this is just UX.
- useEffect(() => {
-  let cancelled = false;
-  async function loadFeedbackForms() {
-    try {
-      const list = await listForms();
-      if (!cancelled) setFeedbackForms(list);
-    } catch {}
-  }
-  loadFeedbackForms();
-  window.addEventListener("focus", loadFeedbackForms);   // ← new
-  return () => {
-    cancelled = true;
-    window.removeEventListener("focus", loadFeedbackForms);   // ← new
-  };
-}, []);
 
   useEffect(() => {
   (async () => {
@@ -82,7 +60,6 @@ export default function EventTypeForm({ mode, eventTypeId }: EventTypeFormProps)
         setBufferBeforeMinutes(String(eventType.bufferBeforeMinutes));
         setBufferAfterMinutes(String(eventType.bufferAfterMinutes));
         setAvailabilityTemplateId(String(eventType.availabilityTemplateId));
-        setFeedbackFormId(eventType.feedbackFormId ? String(eventType.feedbackFormId) : "");
         setIsActive(eventType.isActive);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load event type");
@@ -128,10 +105,6 @@ export default function EventTypeForm({ mode, eventTypeId }: EventTypeFormProps)
       setError("Please select an availability template.");
       return;
     }
-    if (!feedbackFormId) {
-      setError("Please select a feedback form.");
-      return;
-    }
 
     setSaving(true);
     try {
@@ -143,7 +116,6 @@ export default function EventTypeForm({ mode, eventTypeId }: EventTypeFormProps)
         bufferBeforeMinutes: bufferBeforeNum,
         bufferAfterMinutes: bufferAfterNum,
         availabilityTemplateId: Number(availabilityTemplateId),
-        feedbackFormId: Number(feedbackFormId),
       };
 
       if (mode === "create") {
@@ -338,32 +310,6 @@ export default function EventTypeForm({ mode, eventTypeId }: EventTypeFormProps)
               You dont have any availability templates yet — create one first.
             </p>
           )}
-        </div>
-
-        <div>
-           <div className="mb-1.5 flex items-center justify-between">
-            <label className="block text-sm font-medium text-on-surface">Feedback Form</label>
-               <a href="/dashboard/feedback-forms" target="_blank" rel="noopener noreferrer">
-                   + Create new feedback form                      
-               </a>
-           </div>
-          <select
-            value={feedbackFormId}
-            onChange={(e) => setFeedbackFormId(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-primary"
-          >
-            <option value="">{feedbackForms.length === 0 ? "No feedback forms available" : "Select feedback form"}</option>
-            {feedbackForms.map((form) => (
-              <option key={form.id} value={form.id}>
-                {form.name}
-                {form.isDefault ? " (Default)" : ""}
-              </option>
-            ))}
-          </select>
-            <p className="mt-1.5 text-xs text-slate-400">
-            Choose which feedback form reviewers fill out after a booking made
-            through this event type.
-          </p>
         </div>
 
         {mode === "edit" && (

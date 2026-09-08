@@ -1,6 +1,9 @@
 import { z } from "zod";
 
 const FieldTypeEnum = z.enum(["text", "textarea", "number", "select"]);
+export const UnderstandingLevelEnum = z.enum([
+  "excellent", "good", "average", "needs_improvement",
+]);
 
 export const FormFieldSchema = z
   .object({
@@ -17,27 +20,48 @@ export const FormFieldSchema = z
 
 export const CreateFormSchema = z.object({
   name: z.string().trim().min(1).max(150),
+  description: z.string().trim().max(200).optional(),
+  taskMarkEnabled: z.boolean().optional().default(false),
   fields: z.array(FormFieldSchema).max(20).optional().default([]),
+  questionIds: z.array(z.number().int().positive()).max(100).optional(),
 });
 
 export const UpdateFormSchema = z.object({
   name: z.string().trim().min(1).max(150).optional(),
-  // When provided, this is a full replace of the form's custom fields
-  // (see feedback.service.ts updateForm) — not a partial patch list.
+  description: z.string().trim().max(200).optional(),
+  taskMarkEnabled: z.boolean().optional(),
   fields: z.array(FormFieldSchema).max(20).optional(),
+  questionIds: z.array(z.number().int().positive()).max(100).optional(),
 });
 
 export const SubmitFeedbackSchema = z
   .object({
+    formId: z.number().int().positive(),
     isNoShow: z.boolean().optional().default(false),
     reviewMark: z.number().min(1).max(10).multipleOf(0.5).optional(),
+    understandingLevel: UnderstandingLevelEnum.optional(),
     taskMark: z.number().min(1).max(10).multipleOf(0.5).optional(),
     comments: z.string().trim().max(3000).optional(),
     customFieldValues: z.record(z.string(), z.string().max(1000)).optional().default({}),
+    pendingQuestionIds: z.array(z.number().int().positive()).max(100).optional().default([]),
   })
-  .refine((data) => data.isNoShow || (data.reviewMark !== undefined && data.taskMark !== undefined), {
-    message: "Review mark and task mark are required unless marking as no-show",
-    path: ["reviewMark"],
+  .refine(
+    (data) => data.isNoShow || (data.reviewMark !== undefined && data.understandingLevel !== undefined),
+    { message: "Review mark and understanding level are required unless marking as no-show", path: ["reviewMark"] }
+  );
+
+export const UpdateFeedbackSchema = z
+  .object({
+    reviewMark: z.number().min(1).max(10).multipleOf(0.5).optional(),
+    understandingLevel: UnderstandingLevelEnum.optional(),
+    taskMark: z.number().min(1).max(10).multipleOf(0.5).optional(),
+    comments: z.string().trim().max(3000).optional(),
+    customFieldValues: z.record(z.string(), z.string().max(1000)).optional().default({}),
+    pendingQuestionIds: z
+    .array(z.number().int().positive())
+    .max(50)
+    .optional()
+    .default([]),
   });
 
 export const InternHistoryQuerySchema = z.object({
@@ -46,8 +70,24 @@ export const InternHistoryQuerySchema = z.object({
   excludeBookingId: z.coerce.number().int().optional(),
 });
 
+export const UpdatePendingQuestionStatusSchema = z.object({
+  status: z.enum(["pending", "reviewed"]),
+});
+
+export const ListFeedbackQuerySchema = z.object({
+  search: z.string().trim().min(1).max(150).optional(),
+  formId: z.coerce.number().int().positive().optional(),
+  from: z.coerce.date().optional(),
+  to: z.coerce.date().optional(),
+  page: z.coerce.number().int().positive().optional().default(1),
+  pageSize: z.coerce.number().int().positive().max(50).optional().default(20),
+});
+
 export type FormFieldInput = z.infer<typeof FormFieldSchema>;
 export type CreateFormInput = z.infer<typeof CreateFormSchema>;
 export type UpdateFormInput = z.infer<typeof UpdateFormSchema>;
 export type SubmitFeedbackInput = z.infer<typeof SubmitFeedbackSchema>;
+export type UpdateFeedbackInput = z.infer<typeof UpdateFeedbackSchema>;
 export type InternHistoryQueryInput = z.infer<typeof InternHistoryQuerySchema>;
+export type UpdatePendingQuestionStatusInput = z.infer<typeof UpdatePendingQuestionStatusSchema>;
+export type ListFeedbackQueryInput = z.infer<typeof ListFeedbackQuerySchema>;

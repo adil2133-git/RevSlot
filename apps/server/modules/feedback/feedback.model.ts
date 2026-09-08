@@ -2,13 +2,11 @@ import {
   pgTable, serial, integer, varchar, text, boolean, smallint,
   numeric, jsonb, timestamp, unique, index,
 } from 'drizzle-orm/pg-core';
-import { feedbackFieldType } from '../../db/schema/enums.js';
+import { feedbackFieldType, understandingLevel, pendingQuestionStatus } from '../../db/schema/enums.js';
 import { reviewers } from '../auth/reviewers.model.js';
 import { bookings } from '../booking/bookings.schema.js';
+import { questions } from '../questionBank/questions.model.js';
 
-// A reviewer's first-ever feedback form automatically becomes their
-// default (see feedback.service.ts createForm); isDefault marks it and
-// it can't be deleted (see feedback.service.ts deleteForm).
 export const feedbackForms = pgTable(
   'feedback_forms',
   {
@@ -17,13 +15,34 @@ export const feedbackForms = pgTable(
       .notNull()
       .references(() => reviewers.id, { onDelete: 'cascade' }),
     name: varchar('name', { length: 150 }).notNull(),
+    description: varchar('description', { length: 200 }),
     isDefault: boolean('is_default').notNull().default(false),
+    taskMarkEnabled: boolean('task_mark_enabled').notNull().default(false),
+    isActive: boolean('is_active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   },
   (table) => [
     unique('unique_feedback_form_name').on(table.reviewerId, table.name),
     index('idx_feedback_forms_reviewer').on(table.reviewerId),
+  ]
+);
+
+export const feedbackFormQuestions = pgTable(
+  'feedback_form_questions',
+  {
+    id: serial('id').primaryKey(),
+    formId: integer('form_id')
+      .notNull()
+      .references(() => feedbackForms.id, { onDelete: 'cascade' }),
+    questionId: integer('question_id')
+      .notNull()
+      .references(() => questions.id, { onDelete: 'cascade' }),
+    displayOrder: smallint('display_order'),
+  },
+  (table) => [
+    unique('unique_form_question').on(table.formId, table.questionId),
+    index('idx_feedback_form_questions_form').on(table.formId),
   ]
 );
 
@@ -53,35 +72,47 @@ export const feedback = pgTable(
   'feedback',
   {
     id: serial('id').primaryKey(),
-
     bookingId: integer('booking_id')
       .notNull()
       .unique() // one feedback (or no-show record) per booking
       .references(() => bookings.id, { onDelete: 'cascade' }),
-
     reviewerId: integer('reviewer_id')
       .notNull()
       .references(() => reviewers.id, { onDelete: 'cascade' }),
-
     formId: integer('form_id')
       .notNull()
       .references(() => feedbackForms.id, { onDelete: 'restrict' }),
-
     isNoShow: boolean('is_no_show').notNull().default(false),
-
-    // Null when isNoShow is true. 1.0–10.0, half-point steps (6.5, 8.5
-    // etc. per doc section 3.6/3.8).
     reviewMark: numeric('review_mark', { precision: 3, scale: 1 }),
     taskMark: numeric('task_mark', { precision: 3, scale: 1 }),
-
     comments: text('comments'),
-
-    // Answers to the selected form's custom fields, keyed by
-    // feedback_form_fields.id (as a string — JSON object keys are strings).
-    customFieldValues: jsonb('custom_field_values').$type<Record<string, string>>().default({}),
-
+    understandingLevel: understandingLevel('understanding_level'),
+    customFieldValues: jsonb('custom_field_values')
+      .$type<Record<string, { label: string; fieldType: string; value: string; options?: string[] | null }>>()
+      .default({}),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   },
   (table) => [index('idx_feedback_booking').on(table.bookingId)]
+);
+
+
+export const feedbackPendingQuestions = pgTable(
+  'feedback_pending_questions',
+  {
+    id: serial('id').primaryKey(),
+    feedbackId: integer('feedback_id')
+      .notNull()
+      .references(() => feedback.id, { onDelete: 'cascade' }),
+    questionId: integer('question_id')
+      .notNull()
+      .references(() => questions.id, { onDelete: 'cascade' }),
+    status: pendingQuestionStatus('status').notNull().default('pending'),
+    assignedAt: timestamp('assigned_at', { withTimezone: true }).defaultNow(),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+  },
+  (table) => [
+    unique('unique_feedback_question').on(table.feedbackId, table.questionId),
+    index('idx_feedback_pending_questions_feedback').on(table.feedbackId),
+  ]
 );

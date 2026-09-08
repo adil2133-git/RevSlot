@@ -62,7 +62,7 @@ const NAV_ITEMS = [
   },
     {
     href: "/dashboard/feedback-forms",
-    label: "Feedback Forms",
+    label: "Feedback & Forms",
     icon: (
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
