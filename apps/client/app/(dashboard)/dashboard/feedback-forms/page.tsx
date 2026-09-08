@@ -878,10 +878,10 @@ const totalPages = Math.max(
                   className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
                     taskMarkEnabled ? "bg-primary" : "bg-slate-200"
                   }`}
-                >
+                 >
                   <span
-                    className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
-                      taskMarkEnabled ? "translate-x-6" : "translate-x-1"
+                    className={`absolute top-1 left-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
+                      taskMarkEnabled ? "translate-x-5" : "translate-x-0"
                     }`}
                   />
                 </button>

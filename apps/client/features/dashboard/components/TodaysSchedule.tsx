@@ -3,19 +3,42 @@
 import React, { useState } from "react";
 import dayjs from "dayjs";
 import type { TodaysScheduleItem } from "../type";
+import StatusBadge from "@/features/booking/components/StatusBadge";
+import { CheckCircleIcon, UserXIcon } from "@/features/booking/components/icons";
+import { markBookingOutcome } from "@/features/booking/api/bookingApi";
 
 interface TodaysScheduleProps {
   schedule: TodaysScheduleItem[];
   selectedDate?: string;
   onOpenReferenceDrawer: (bookingId: number) => void;
+  onOutcomeChanged?: () => void;
 }
 
 export const TodaysSchedule: React.FC<TodaysScheduleProps> = ({
   schedule,
   selectedDate,
   onOpenReferenceDrawer,
+  onOutcomeChanged,
 }) => {
   const [filter, setFilter] = useState<"all" | "pending">("all");
+  const [outcomeToConfirm, setOutcomeToConfirm] = useState<{
+    item: TodaysScheduleItem;
+    outcome: "completed" | "no_show";
+  } | null>(null);
+  const [markingId, setMarkingId] = useState<number | null>(null);
+
+  const handleConfirmOutcome = async () => {
+    if (!outcomeToConfirm) return;
+    const { item, outcome } = outcomeToConfirm;
+    setMarkingId(item.id);
+    try {
+      await markBookingOutcome(item.id, { outcome });
+      onOutcomeChanged?.();
+    } finally {
+      setMarkingId(null);
+      setOutcomeToConfirm(null);
+    }
+  };
 
   const formattedDate = selectedDate
     ? dayjs(selectedDate).format("MMM D, YYYY")
@@ -84,6 +107,29 @@ export const TodaysSchedule: React.FC<TodaysScheduleProps> = ({
             const startFmt = dayjs(item.startTime).format("hh:mm A");
             const endFmt = dayjs(item.endTime).format("hh:mm A");
 
+            const now = Date.now();
+            const startTs = new Date(item.startTime).getTime();
+            const endTs = new Date(item.endTime).getTime();
+            const graceEnd = startTs + 10 * 60 * 1000;
+
+            const isActive = item.status === "confirmed" || item.status === "rescheduled";
+            const isInProgress = isActive && now >= startTs && now < endTs;
+            const isOutcomeRequired = isActive && now >= endTs;
+            const canMarkNoShow = isActive && now >= graceEnd;
+            const isJoinAvailable =
+                 isActive &&
+                 now >= startTs - 10 * 60 * 1000 &&
+                 now < endTs &&
+                 !!item.meetLink;
+
+            const displayStatus = isOutcomeRequired
+              ? "outcome_required"
+              : isInProgress
+              ? "in_progress"
+              : item.status;
+
+            const isMarking = markingId === item.id;
+
             return (
               <div
                 key={item.id}
@@ -119,59 +165,123 @@ export const TodaysSchedule: React.FC<TodaysScheduleProps> = ({
                 {/* Status Badge & Actions */}
                 <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-3 sm:border-t-0 sm:pt-0">
                   {/* Status Badge */}
-                  <div>
-                    {item.status === "confirmed" ? (
-                      <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                        Confirmed
-                      </span>
-                    ) : item.status === "completed" ? (
-                      <span className="inline-flex items-center rounded-full bg-secondary px-2.5 py-1 text-xs font-semibold text-primary">
-                        Completed
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-                        Pending Prep
-                      </span>
-                    )}
-                  </div>
+
+                {!isOutcomeRequired && <StatusBadge status={displayStatus} />}
 
                   {/* Buttons */}
                   <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => onOpenReferenceDrawer(item.id)}
-                      className="rounded-lg border border-slate-200/80 bg-surface-card px-3 py-1.5 text-xs font-semibold text-on-surface shadow-2xs transition-colors hover:bg-slate-50"
-                    >
-                      View Reference
-                    </button>
+                    {isOutcomeRequired && (
+  <button
+    type="button"
+    disabled={isMarking}
+    onClick={() =>
+      setOutcomeToConfirm({
+        item,
+        outcome: "completed",
+      })
+    }
+    className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3.5 py-1.5 text-xs font-semibold text-emerald-700"
+  >
+    <CheckCircleIcon />
+    Mark as completed
+  </button>
+)}
 
-                    {item.meetLink ? (
-                      <a
-                        href={item.meetLink}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-semibold text-on-primary shadow-surface transition-shadow hover:shadow-raised"
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <polygon points="23 7 16 12 23 17 23 7" />
-                          <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-                        </svg>
-                        Join Meet
-                      </a>
-                    ) : (
-                      <button
-                        type="button"
-                        disabled
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3.5 py-1.5 text-xs font-semibold text-slate-400"
-                      >
-                        Join Meet
-                      </button>
-                    )}
+{canMarkNoShow && (
+  <button
+    type="button"
+    disabled={isMarking}
+    onClick={() =>
+      setOutcomeToConfirm({
+        item,
+        outcome: "no_show",
+      })
+    }
+    className="inline-flex items-center gap-1.5 rounded-lg bg-rose-50 px-3.5 py-1.5 text-xs font-semibold text-rose-700"
+  >
+    <UserXIcon />
+    Mark as no-show
+  </button>
+)}
+
+                     {isJoinAvailable ? (
+ <a
+    href={item.meetLink!}
+    target="_blank"
+    rel="noreferrer"
+    className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-semibold text-on-primary shadow-surface transition-shadow hover:shadow-raised"
+  >
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polygon points="23 7 16 12 23 17 23 7" />
+      <rect x="1" y="5" width="15" height="14" rx="2" />
+    </svg>
+    Join Meet
+  </a>
+) : isActive && !isOutcomeRequired ? (
+  <button
+    type="button"
+    disabled
+    className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3.5 py-1.5 text-xs font-semibold text-slate-400"
+  >
+    Join Meet
+  </button>
+) : null}
                   </div>
                 </div>
               </div>
             );
           })}
+        </div>
+      )}
+
+      {outcomeToConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-xl bg-surface-card p-6 shadow-raised">
+            <h2 className="text-lg font-bold text-on-surface">
+              {outcomeToConfirm.outcome === "completed"
+                ? "Mark session as completed?"
+                : "Mark booking as no-show?"}
+            </h2>
+
+            <p className="mt-2 text-sm text-slate-500">
+              {outcomeToConfirm.outcome === "completed"
+                ? "This will mark the session as completed and allow feedback to be submitted."
+                : "This will mark the booking as no-show and feedback will not be available for this booking."}
+            </p>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setOutcomeToConfirm(null)}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-on-surface hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmOutcome}
+                className={
+                  outcomeToConfirm.outcome === "completed"
+                    ? "rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white"
+                    : "rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white"
+                }
+              >
+                {outcomeToConfirm.outcome === "completed"
+                  ? "Mark Completed"
+                  : "Mark No-show"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

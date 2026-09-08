@@ -15,6 +15,7 @@ import vacationRoutes from "./modules/vacation/vacation.routes.js";
 import calendarRoutes from "./modules/calendar/calendar.routes.js";
 import dashboardRoutes from "./modules/dashboard/dashboard.routes.js";
 import feedbackFormRoutes, { bookingFeedbackRouter, internHistoryRouter, feedbackListRouter } from "./modules/feedback/feedback.routes.js";
+import notificationRoutes from "./modules/notification/notification.routes.js";
 import { notFound, errorMiddleware } from './core/middlewares/error.middleware.js';
 import { pool } from "./config/db.js"
 
@@ -42,6 +43,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/vacation-blocks", vacationRoutes);
 app.use("/api/calendar", calendarRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 app.get('/', (req, res) => {
   res.send('Server is running');
