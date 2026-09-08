@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import dayjs from "dayjs";
 
 import { useBookingPageInfo } from "@/features/booking/hooks/useBookingPageInfo";
@@ -87,6 +88,14 @@ export default function PublicBookingPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10">
       <div className="w-full max-w-4xl">
+        <div className="mb-4 flex justify-end">
+          <Link
+            href="/my-bookings"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-surface-card px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs transition hover:border-primary hover:text-primary"
+          >
+            Check My Bookings ➔
+          </Link>
+        </div>
         <StepIndicator currentStep={currentStep} />
 
         <div className="w-full overflow-hidden rounded-2xl border border-slate-200 bg-surface-card shadow-sm">
