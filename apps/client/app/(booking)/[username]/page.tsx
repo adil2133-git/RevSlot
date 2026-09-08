@@ -60,6 +60,14 @@ export default function ReviewerProfilePage() {
   return (
     <div className="min-h-screen bg-surface px-4 py-12">
       <div className="mx-auto max-w-2xl">
+        <div className="mb-6 flex justify-end">
+          <Link
+            href="/my-bookings"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-surface-card px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs transition hover:border-primary hover:text-primary"
+          >
+            Check My Bookings ➔
+          </Link>
+        </div>
         <div className="mb-8 flex flex-col items-center text-center">
           {reviewer.avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element

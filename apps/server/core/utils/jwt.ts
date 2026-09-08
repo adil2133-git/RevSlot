@@ -10,26 +10,39 @@ if (!ACCESS_SECRET || !REFRESH_SECRET || !EMAIL_VERIFICATION_SECRET) {
 }
 
 export interface TokenPayload {
-    userId : number;
-    role : "reviewer" | "admin";
+    userId: number;
+    role: "reviewer" | "admin";
+}
+
+export interface AdvisorTokenPayload {
+    advisorEmail: string;
+    role: "advisor";
 }
 
 // for AccessToken
 export const generateAccessToken = (payload: TokenPayload): string => {
-    return jwt.sign(payload, ACCESS_SECRET, {expiresIn: "15m"})
+    return jwt.sign(payload, ACCESS_SECRET, { expiresIn: "15m" })
 }
 
-export const verifyAccessToken = (token: string): TokenPayload=> {
+export const verifyAccessToken = (token: string): TokenPayload => {
     return jwt.verify(token, ACCESS_SECRET) as TokenPayload
 }
 
+export const generateAdvisorToken = (advisorEmail: string): string => {
+    return jwt.sign({ advisorEmail, role: "advisor" }, ACCESS_SECRET, { expiresIn: "7d" });
+};
+
+export const verifyAdvisorToken = (token: string): AdvisorTokenPayload => {
+    return jwt.verify(token, ACCESS_SECRET) as AdvisorTokenPayload;
+};
+
 
 //for RefreshToken
-export const generateRefreshToken =(payload: TokenPayload): string=>{
-    return jwt.sign(payload, REFRESH_SECRET, {expiresIn: "7d"})
+export const generateRefreshToken = (payload: TokenPayload): string => {
+    return jwt.sign(payload, REFRESH_SECRET, { expiresIn: "7d" })
 }
 
-export const verifyRefreshToken = (token: string): TokenPayload=>{
+export const verifyRefreshToken = (token: string): TokenPayload => {
     return jwt.verify(token, REFRESH_SECRET) as TokenPayload;
 }
 

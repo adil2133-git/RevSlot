@@ -85,7 +85,7 @@ export const bookingService = {
           eq(slots.reviewerId, reviewerId),
           eq(slots.slotDate, slotDate),
           ne(slots.id, excludeSlotId),
-          sql`(${slots.status} = 'booked' OR (${slots.status} = 'held' AND ${slots.holdExpiresAt} > now()))`, 
+          sql`(${slots.status} = 'booked' OR (${slots.status} = 'held' AND ${slots.holdExpiresAt} > now()))`,
           sql`(${slots.startTime}, ${slots.endTime}) OVERLAPS (${startTime}::time, ${endTime}::time)`
         )
       );
@@ -245,22 +245,22 @@ export const bookingService = {
       name: string;
       role: "advisor" | "reviewer" | "intern";
     }[] = [
-      {
-        email: booking.advisorEmail,
-        name: booking.advisorName,
-        role: "advisor",
-      },
-      {
-        email: reviewer.email,
-        name: reviewer.name,
-        role: "reviewer",
-      },
-      ...(booking.internEmails ?? []).map((email) => ({
-        email,
-        name: booking.internName,
-        role: "intern" as const,
-      })),
-    ];
+        {
+          email: booking.advisorEmail,
+          name: booking.advisorName,
+          role: "advisor",
+        },
+        {
+          email: reviewer.email,
+          name: reviewer.name,
+          role: "reviewer",
+        },
+        ...(booking.internEmails ?? []).map((email) => ({
+          email,
+          name: booking.internName,
+          role: "intern" as const,
+        })),
+      ];
 
     await Promise.all(
       recipients.map(({ email, name, role }) => {
@@ -320,9 +320,9 @@ export const bookingService = {
       conditions.push(gte(bookings.endTime, now));
     }
 
-const orderBy = scope === "upcoming" || scope === "ongoing"
-  ? sql`${bookings.startTime} ASC`
-  : sql`${bookings.createdAt} DESC`;
+    const orderBy = scope === "upcoming" || scope === "ongoing"
+      ? sql`${bookings.startTime} ASC`
+      : sql`${bookings.createdAt} DESC`;
     const [rows, countResult] = await Promise.all([
       db
         .select({
@@ -542,74 +542,74 @@ const orderBy = scope === "upcoming" || scope === "ongoing"
   },
 
   markOutcome: async (
-  reviewerId: number,
-  bookingId: number,
-  outcome: "completed" | "no_show"
-) => {
-  const booking = await getOwnedBookingOrThrow(reviewerId, bookingId);
+    reviewerId: number,
+    bookingId: number,
+    outcome: "completed" | "no_show"
+  ) => {
+    const booking = await getOwnedBookingOrThrow(reviewerId, bookingId);
 
-   if (booking.status === outcome) {
-    throw new AppError(
-      `Booking is already marked as ${outcome === "completed" ? "completed" : "no-show"}`,
-      400
-    );
-  }
-  const [existingFeedback] = await db
-    .select({ id: feedback.id })
-    .from(feedback)
-    .where(eq(feedback.bookingId, bookingId))
-    .limit(1);
+    if (booking.status === outcome) {
+      throw new AppError(
+        `Booking is already marked as ${outcome === "completed" ? "completed" : "no-show"}`,
+        400
+      );
+    }
+    const [existingFeedback] = await db
+      .select({ id: feedback.id })
+      .from(feedback)
+      .where(eq(feedback.bookingId, bookingId))
+      .limit(1);
 
-  if (booking.status === "completed" && existingFeedback) {
-    throw new AppError(
-      "Booking outcome cannot be changed after feedback has been submitted",
-      400
-    );
-  }
+    if (booking.status === "completed" && existingFeedback) {
+      throw new AppError(
+        "Booking outcome cannot be changed after feedback has been submitted",
+        400
+      );
+    }
 
-  if (
-    booking.status !== "confirmed" &&
-    booking.status !== "rescheduled" &&
-    booking.status !== "completed" &&
-    booking.status !== "no_show"
-  ) {
-    throw new AppError("This booking outcome cannot be changed", 400);
-  }
+    if (
+      booking.status !== "confirmed" &&
+      booking.status !== "rescheduled" &&
+      booking.status !== "completed" &&
+      booking.status !== "no_show"
+    ) {
+      throw new AppError("This booking outcome cannot be changed", 400);
+    }
 
-  const now = Date.now();
-  const graceEnd =
-    booking.startTime.getTime() + 10 * 60 * 1000; // 10-min no-show grace period
-  const sessionEnd = booking.endTime.getTime();
+    const now = Date.now();
+    const graceEnd =
+      booking.startTime.getTime() + 10 * 60 * 1000; // 10-min no-show grace period
+    const sessionEnd = booking.endTime.getTime();
 
-  if (outcome === "no_show" && now < graceEnd) {
-    throw new AppError(
-      "No-show can only be marked after the 10-minute grace period",
-      400
-    );
-  }
+    if (outcome === "no_show" && now < graceEnd) {
+      throw new AppError(
+        "No-show can only be marked after the 10-minute grace period",
+        400
+      );
+    }
 
-  if (outcome === "completed" && now < sessionEnd) {
-    throw new AppError(
-      "This session can only be marked completed after it has ended",
-      400
-    );
-  }
+    if (outcome === "completed" && now < sessionEnd) {
+      throw new AppError(
+        "This session can only be marked completed after it has ended",
+        400
+      );
+    }
 
-   const [updated] = await db
-    .update(bookings)
-    .set({ status: outcome })
-    .where(and(eq(bookings.id, bookingId), eq(bookings.status, booking.status)))
-    .returning();
+    const [updated] = await db
+      .update(bookings)
+      .set({ status: outcome })
+      .where(and(eq(bookings.id, bookingId), eq(bookings.status, booking.status)))
+      .returning();
 
-  if (!updated) {
-    throw new AppError(
-      "This booking was just updated elsewhere. Please refresh and try again.",
-      409
-    );
-  }
+    if (!updated) {
+      throw new AppError(
+        "This booking was just updated elsewhere. Please refresh and try again.",
+        409
+      );
+    }
 
-  return updated;
-},
+    return updated;
+  },
 
   finalizeReschedule: async (
     oldBooking: { startTime: Date; endTime: Date },
@@ -709,5 +709,95 @@ const orderBy = scope === "upcoming" || scope === "ongoing"
     );
 
     return { meetLink };
+  },
+
+  getAdvisorBookings: async (
+    advisorEmail: string,
+    options: { scope?: "upcoming" | "past" | "cancelled"; search?: string }
+  ) => {
+    const { scope = "upcoming", search } = options;
+    const now = new Date();
+    const cleanEmail = advisorEmail.trim().toLowerCase();
+
+    const baseConditions = [eq(bookings.advisorEmail, cleanEmail)];
+
+    if (search && search.trim() !== "") {
+      const pattern = `%${search.trim().toLowerCase()}%`;
+      baseConditions.push(
+        sql`(
+          LOWER(${bookings.internName}) LIKE ${pattern} OR
+          LOWER(${bookings.batch}) LIKE ${pattern} OR
+          LOWER(${bookings.weekStage}) LIKE ${pattern} OR
+          LOWER(${reviewers.name}) LIKE ${pattern} OR
+          LOWER(${eventTypes.name}) LIKE ${pattern}
+        )`
+      );
+    }
+
+    const scopeConditions = [...baseConditions];
+
+    if (scope === "upcoming") {
+      scopeConditions.push(gte(bookings.startTime, now));
+      scopeConditions.push(ne(bookings.status, "cancelled"));
+    } else if (scope === "past") {
+      scopeConditions.push(lt(bookings.startTime, now));
+      scopeConditions.push(ne(bookings.status, "cancelled"));
+    } else if (scope === "cancelled") {
+      scopeConditions.push(eq(bookings.status, "cancelled"));
+    }
+
+    const orderBy = scope === "upcoming"
+      ? sql`${bookings.startTime} ASC`
+      : sql`${bookings.startTime} DESC`;
+
+    const rows = await db
+      .select({
+        id: bookings.id,
+        slotId: bookings.id,
+        eventTypeId: bookings.eventTypeId,
+        internName: bookings.internName,
+        batch: bookings.batch,
+        advisorName: bookings.advisorName,
+        advisorEmail: bookings.advisorEmail,
+        weekStage: bookings.weekStage,
+        startTime: bookings.startTime,
+        endTime: bookings.endTime,
+        status: bookings.status,
+        meetLink: bookings.meetLink,
+        cancelledAt: bookings.cancelledAt,
+        cancelledReason: bookings.cancelledReason,
+        eventTypeName: eventTypes.name,
+        reviewerName: reviewers.name,
+        timezone: sql<string>`'IST'`,
+      })
+      .from(bookings)
+      .innerJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
+      .innerJoin(reviewers, eq(bookings.reviewerId, reviewers.id))
+      .where(and(...scopeConditions))
+      .orderBy(orderBy);
+
+    const [upcomingCountRes, pastCountRes, cancelledCountRes] = await Promise.all([
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(bookings)
+        .where(and(eq(bookings.advisorEmail, cleanEmail), gte(bookings.startTime, now), ne(bookings.status, "cancelled"))),
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(bookings)
+        .where(and(eq(bookings.advisorEmail, cleanEmail), lt(bookings.startTime, now), ne(bookings.status, "cancelled"))),
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(bookings)
+        .where(and(eq(bookings.advisorEmail, cleanEmail), eq(bookings.status, "cancelled"))),
+    ]);
+
+    return {
+      bookings: rows,
+      counts: {
+        upcoming: upcomingCountRes[0]?.count ?? 0,
+        past: pastCountRes[0]?.count ?? 0,
+        cancelled: cancelledCountRes[0]?.count ?? 0,
+      },
+    };
   },
 };
