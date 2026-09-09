@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { validate, validateQuery } from "../../core/middlewares/validate.middleware.js";
-import { requireReviewer, requireAdvisor } from "../../core/middlewares/auth.middleware.js";
+import { requireReviewer } from "../../core/middlewares/auth.middleware.js";
 import {
   CreateBookingSchema,
   GetMyBookingsQuerySchema,
@@ -17,13 +17,6 @@ router.post(
   "/",
   validate(CreateBookingSchema),
   catchAsync(bookingController.createBooking)
-);
-
-// Advisor — returns bookings for the verified advisor
-router.get(
-  "/advisor",
-  requireAdvisor,
-  catchAsync(bookingController.getAdvisorBookings)
 );
 
 // Reviewer-only — returns the logged-in reviewer's own bookings
