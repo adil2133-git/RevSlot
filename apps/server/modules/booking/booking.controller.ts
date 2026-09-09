@@ -76,15 +76,6 @@ export const bookingController = {
     const { outcome } = req.body;
     const result = await bookingService.markOutcome(req.user!.userId, id, outcome);
     
-    if (outcome === "completed") {
-      await notificationService.createNotification({
-        reviewerId: req.user!.userId,
-        type: "booking_completed",
-        title: "Session completed",
-        message: `Session with ${result.advisorName} was marked completed`,
-        bookingId: result.id,
-      });
-    }
     res.status(200).json({ success: true, data: result });
   },
 };
