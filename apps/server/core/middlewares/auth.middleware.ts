@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
-import { verifyAccessToken } from "../utils/jwt.js";
+import { verifyAccessToken, verifyAdvisorToken } from "../utils/jwt.js";
 
 // Access token now arrives as "Authorization: Bearer <token>" — it's no
 // longer a cookie, since the frontend holds it in memory and attaches
@@ -79,3 +79,31 @@ const createRoleAuthMiddleware = (role: "admin" | "reviewer") => {
 
 export const requireReviewer = createRoleAuthMiddleware("reviewer");
 export const requireAdmin = createRoleAuthMiddleware("admin");
+
+export const requireAdvisor = (req: Request, res: Response, next: NextFunction) => {
+  const token = extractBearerToken(req);
+
+  if (!token) {
+    return res.status(401).json({
+      success: false,
+      message: "Authorization token required",
+    });
+  }
+
+  try {
+    const payload = verifyAdvisorToken(token);
+    if (payload.role !== "advisor" || !payload.advisorEmail) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid advisor session token",
+      });
+    }
+    res.locals.advisorEmail = payload.advisorEmail;
+    next();
+  } catch (error) {
+    return res.status(401).json({
+      success: false,
+      message: "Invalid or expired token",
+    });
+  }
+};
