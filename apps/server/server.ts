@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
 
 import authRoutes from "./modules/auth/auth.routes.js";
-import advisorAuthRoutes from "./modules/auth/advisorAuth.routes.js";
+import advisorRoutes from "./modules/advisor/advisor.routes.js";
 import availabilityRoutes from "./modules/availability/availability.routes.js";
 
 import questionBankRoutes from "./modules/questionBank/questionBank.routes.js";
@@ -30,7 +30,7 @@ app.use(express.json({ limit: '10kb' }));
 app.use(cookieParser());
 
 app.use("/api/auth", authRoutes);
-app.use("/api/auth/advisor", advisorAuthRoutes);
+app.use("/api/advisor", advisorRoutes);
 app.use("/api/availability-templates", availabilityRoutes);
 app.use("/api/question-banks", questionBankRoutes);
 app.use("/api/slots", slotRoutes);
