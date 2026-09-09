@@ -108,6 +108,39 @@ export default function AdvisorBookingsDashboard({ advisorEmail, onLogout }: Adv
           </div>
         </div>
 
+        {/* Top In-App Action Banner for Pending Reschedule Request */}
+        {(() => {
+          const pendingBooking = bookings.find((b) => b.status === "reschedule_requested" && b.rescheduleToken);
+          if (!pendingBooking) return null;
+          return (
+            <div className="mb-6 rounded-2xl bg-gradient-to-r from-purple-900 via-indigo-900 to-purple-800 p-4 sm:p-5 text-white shadow-lg border border-purple-700/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="flex items-start gap-3">
+                <div className="h-10 w-10 shrink-0 rounded-xl bg-purple-500/20 border border-purple-400/30 flex items-center justify-center text-xl">
+                  🔔
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-sm text-purple-100">Action Required</span>
+                    <span className="rounded-full bg-purple-400/20 px-2 py-0.5 text-[10px] font-semibold text-purple-200 border border-purple-300/30">
+                      Reschedule Pending
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-purple-200 leading-relaxed">
+                    Reviewer <strong>{pendingBooking.reviewerName}</strong> requested to reschedule the session for <strong>{pendingBooking.internName}</strong>.
+                  </p>
+                </div>
+              </div>
+
+              <a
+                href={`/reschedule-request/${pendingBooking.rescheduleToken}`}
+                className="w-full sm:w-auto shrink-0 rounded-xl bg-white px-4 py-2.5 text-xs font-bold text-purple-900 shadow-md transition hover:bg-purple-50 text-center"
+              >
+                Review & Respond →
+              </a>
+            </div>
+          );
+        })()}
+
         {/* Navigation Tabs (Upcoming, Past, Cancelled) */}
         <div className="mb-6 rounded-xl bg-slate-100 p-1.5 flex items-center justify-between gap-1 shadow-inner">
           <button

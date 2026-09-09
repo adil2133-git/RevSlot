@@ -27,8 +27,9 @@ export const GetMyBookingsQuerySchema = z.object({
   status: z
     .string()
     .optional()
-    .transform((val) => val?.split(",") as ("confirmed" | "completed" | "rescheduled" | "cancelled" | "no_show")[] | undefined),
+    .transform((val) => val?.split(",") as ("confirmed" | "completed" | "rescheduled" | "cancelled" | "no_show" | "reschedule_requested")[] | undefined),
   scope: z.enum(["upcoming", "past", "ongoing"]).optional(),
+  search: z.string().optional(),
 });
 
 export type GetMyBookingsQueryInput = z.infer<typeof GetMyBookingsQuerySchema>;
@@ -62,3 +63,23 @@ export const MarkOutcomeSchema = z.object({
 
 export type MarkOutcomeInput = z.infer<typeof MarkOutcomeSchema>;
 export type RescheduleBookingInput = z.infer<typeof RescheduleBookingSchema>;
+
+// Two-way reschedule request schemas
+export const RequestRescheduleSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD)"),
+  startTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, "Invalid time format (HH:MM)"),
+  endTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, "Invalid time format (HH:MM)"),
+  reason: z.string().max(500).optional(),
+});
+
+export type RequestRescheduleInput = z.infer<typeof RequestRescheduleSchema>;
+
+export const RespondRescheduleSchema = z.object({
+  action: z.enum(["accept", "counter", "decline"]),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD)").optional(),
+  startTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, "Invalid time format (HH:MM)").optional(),
+  endTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, "Invalid time format (HH:MM)").optional(),
+  declineReason: z.string().max(500).optional(),
+});
+
+export type RespondRescheduleInput = z.infer<typeof RespondRescheduleSchema>;

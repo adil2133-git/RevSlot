@@ -12,12 +12,13 @@ import { fetchMyBookings, markBookingOutcome } from "@/features/booking/api/book
 import type { MyBooking } from "@/features/booking/type";
 import FeedbackDetailsModal from "@/features/feedback/components/FeedbackDetailsModal";
 
-type BookingFilterTab = "all" | "ongoing" | "upcoming" | "completed" | "no_show" | "rescheduled" | "cancelled";
+type BookingFilterTab = "all" | "ongoing" | "upcoming" | "reschedule_requested" | "completed" | "rescheduled" | "cancelled" | "no_show";
 
 const FILTER_TABS: { id: BookingFilterTab; label: string }[] = [
   { id: "all", label: "All Bookings" },
   { id: "ongoing", label: "Ongoing" },
   { id: "upcoming", label: "Upcoming" },
+  { id: "reschedule_requested", label: "Reschedule Requests" },
   { id: "completed", label: "Completed" },
   { id: "rescheduled", label: "Rescheduled" },
   { id: "cancelled", label: "Cancelled" },
@@ -26,6 +27,7 @@ const FILTER_TABS: { id: BookingFilterTab; label: string }[] = [
 
 export default function BookingsPage() {
   const [activeTab, setActiveTab] = useState<BookingFilterTab>("all");
+  const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
 
   const [bookings, setBookings] = useState<MyBooking[]>([]);
@@ -46,16 +48,20 @@ export default function BookingsPage() {
       setLoading(true);
 
       let scopeParam: "upcoming" | "past" | "ongoing" | undefined = undefined;
-      let statusParam: ("confirmed" | "completed" | "rescheduled" | "cancelled" | "no_show")[] | undefined = undefined;
+      let statusParam: ("confirmed" | "completed" | "rescheduled" | "cancelled" | "no_show" | "reschedule_requested")[] | undefined = undefined;
 
       if (activeTab === "ongoing") {
         scopeParam = "ongoing";
       } else if (activeTab === "upcoming") {
         scopeParam = "upcoming";
+      } else if (activeTab === "reschedule_requested") {
+        statusParam = ["reschedule_requested"];
       } else if (activeTab === "completed") {
         statusParam = ["completed"];
       } else if (activeTab === "rescheduled") {
         statusParam = ["rescheduled"];
+      } else if (activeTab === "cancelled") {
+        statusParam = ["cancelled"];
       } else if (activeTab === "no_show") {
         statusParam = ["no_show"];
       }
@@ -65,6 +71,7 @@ export default function BookingsPage() {
         limit: 10,
         status: statusParam,
         scope: scopeParam,
+        search: search.trim() || undefined,
       });
 
       setBookings(result.bookings);
@@ -75,7 +82,7 @@ export default function BookingsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, activeTab]);
+  }, [page, activeTab, search]);
 
   useEffect(() => {
     loadBookings();
@@ -117,6 +124,26 @@ export default function BookingsPage() {
             Refresh
           </button>
         </div>
+      </div>
+
+      {/* Live Search Bar */}
+      <div className="relative mb-4">
+        <div className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+        </div>
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(1);
+          }}
+          placeholder="Search by intern name, batch, stage, advisor..."
+          className="w-full rounded-xl border border-slate-200 bg-surface-card pl-10 pr-4 py-2.5 text-xs font-medium text-on-surface placeholder:text-slate-400 shadow-2xs focus:border-primary focus:outline-none"
+        />
       </div>
 
       {/* Clean Filter Tabs Bar (No scrollbars, clean wrap) */}
