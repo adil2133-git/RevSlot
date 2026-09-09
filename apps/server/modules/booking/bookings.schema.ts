@@ -38,5 +38,13 @@ export const bookings = pgTable('bookings', {
     { onDelete: 'set null' }
   ),
 
+  // Two-way reschedule request fields
+  proposedStartTime: timestamp('proposed_start_time', { withTimezone: true }),
+  proposedEndTime: timestamp('proposed_end_time', { withTimezone: true }),
+  rescheduleRequestedBy: varchar('reschedule_requested_by', { length: 50 }),
+  rescheduleReason: text('reschedule_reason'),
+  rescheduleToken: varchar('reschedule_token', { length: 255 }),
+  rescheduleTokenExpiresAt: timestamp('reschedule_token_expires_at', { withTimezone: true }),
+
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
