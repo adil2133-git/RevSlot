@@ -119,6 +119,7 @@ export type GetMyBookingsParams = {
   limit?: number;
   status?: ("confirmed" | "completed" | "rescheduled" | "cancelled" | "no_show" | "reschedule_requested")[];
   scope?: "upcoming" | "past" | "ongoing";
+  search?: string;
 };
 
 export type BookingDetail = MyBooking & {

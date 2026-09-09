@@ -22,6 +22,7 @@ export interface GetMyBookingsOptions {
   limit: number;
   status?: ("confirmed" | "completed" | "rescheduled" | "cancelled" | "no_show" | "reschedule_requested")[] | undefined;
   scope?: "upcoming" | "past" | "ongoing" | undefined;
+  search?: string | undefined;
 }
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -303,7 +304,7 @@ export const bookingService = {
     reviewerId: number,
     options: GetMyBookingsOptions
   ) => {
-    const { page, limit, status, scope } = options;
+    const { page, limit, status, scope, search } = options;
     const offset = (page - 1) * limit;
     const now = new Date();
 
@@ -320,6 +321,19 @@ export const bookingService = {
     } else if (scope === "ongoing") {
       conditions.push(lte(bookings.startTime, now));
       conditions.push(gte(bookings.endTime, now));
+    }
+
+    if (search && search.trim() !== "") {
+      const pattern = `%${search.trim().toLowerCase()}%`;
+      conditions.push(
+        sql`(
+          LOWER(${bookings.internName}) LIKE ${pattern} OR
+          LOWER(${bookings.batch}) LIKE ${pattern} OR
+          LOWER(${bookings.weekStage}) LIKE ${pattern} OR
+          LOWER(${bookings.advisorName}) LIKE ${pattern} OR
+          LOWER(${eventTypes.name}) LIKE ${pattern}
+        )`
+      );
     }
 
     const orderBy = scope === "upcoming" || scope === "ongoing"

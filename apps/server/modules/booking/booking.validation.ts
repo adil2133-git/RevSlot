@@ -27,8 +27,9 @@ export const GetMyBookingsQuerySchema = z.object({
   status: z
     .string()
     .optional()
-    .transform((val) => val?.split(",") as ("confirmed" | "completed" | "rescheduled" | "cancelled" | "no_show")[] | undefined),
+    .transform((val) => val?.split(",") as ("confirmed" | "completed" | "rescheduled" | "cancelled" | "no_show" | "reschedule_requested")[] | undefined),
   scope: z.enum(["upcoming", "past", "ongoing"]).optional(),
+  search: z.string().optional(),
 });
 
 export type GetMyBookingsQueryInput = z.infer<typeof GetMyBookingsQuerySchema>;
