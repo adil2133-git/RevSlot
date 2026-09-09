@@ -1,6 +1,6 @@
 {
-  "id": "aa92b0ea-0b16-4bf5-828a-37078c775415",
-  "prevId": "904cc1e1-52d4-4eab-a2d0-1690595ec98d",
+  "id": "e8273848-36cd-4be5-9899-b8bf13488c6a",
+  "prevId": "aa92b0ea-0b16-4bf5-828a-37078c775415",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1138,6 +1138,42 @@
         "rescheduled_from_booking_id": {
           "name": "rescheduled_from_booking_id",
           "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "proposed_start_time": {
+          "name": "proposed_start_time",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "proposed_end_time": {
+          "name": "proposed_end_time",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reschedule_requested_by": {
+          "name": "reschedule_requested_by",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reschedule_reason": {
+          "name": "reschedule_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reschedule_token": {
+          "name": "reschedule_token",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reschedule_token_expires_at": {
+          "name": "reschedule_token_expires_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
@@ -2467,7 +2503,8 @@
         "cancelled",
         "completed",
         "no_show",
-        "rescheduled"
+        "rescheduled",
+        "reschedule_requested"
       ]
     },
     "public.feedback_field_type": {

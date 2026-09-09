@@ -27,3 +27,7 @@ export const understandingLevel = pgEnum('understanding_level', [
 export const pendingQuestionStatus = pgEnum('pending_question_status', [
   'pending', 'reviewed',
 ]);
+
+export const notificationType = pgEnum('notification_type', [
+  'booking_created', 'booking_cancelled', 'booking_rescheduled', 'booking_completed', 'feedback_submitted',
+]);

@@ -56,6 +56,12 @@ export default function ReviewerDashboardPage() {
     setDrawerOpen(true);
   };
 
+  const handleOutcomeChanged = () => {
+    fetchDashboardSummary(timeframe)
+      .then((res) => setData(res))
+      .catch((err) => console.error("Dashboard refresh error:", err));
+  };
+
   const scheduleList = data?.todaysSchedule || [];
   const todaySessionCount = scheduleList.length;
 
@@ -105,6 +111,7 @@ export default function ReviewerDashboardPage() {
           <TodaysSchedule
             schedule={scheduleList}
             onOpenReferenceDrawer={handleOpenReferenceDrawer}
+            onOutcomeChanged={handleOutcomeChanged}
           />
 
           {/* 6. Bottom Row: Activity Feed & Quick Widgets */}
