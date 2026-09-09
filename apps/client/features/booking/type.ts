@@ -88,10 +88,15 @@ export type MyBooking = {
   weekStage: string;
   startTime: string;
   endTime: string;
-  status: "confirmed" | "completed" | "cancelled" | "no_show" | "rescheduled";
+  status: "confirmed" | "completed" | "cancelled" | "no_show" | "rescheduled" | "reschedule_requested";
   meetLink: string | null;
   cancelledAt: string | null;
   cancelledReason: string | null;
+  proposedStartTime?: string | null;
+  proposedEndTime?: string | null;
+  rescheduleReason?: string | null;
+  rescheduleToken?: string | null;
+  rescheduleRequestedBy?: string | null;
   eventTypeName: string;
   bookingWindowDays: number;
   hasFeedback: boolean;
@@ -112,7 +117,7 @@ export type MyBookingsResponse = {
 export type GetMyBookingsParams = {
   page?: number;
   limit?: number;
-  status?: ("confirmed" | "completed" | "rescheduled" | "cancelled" | "no_show")[];
+  status?: ("confirmed" | "completed" | "rescheduled" | "cancelled" | "no_show" | "reschedule_requested")[];
   scope?: "upcoming" | "past" | "ongoing";
 };
 
@@ -129,6 +134,35 @@ export type RescheduleBookingPayload = {
   date: string;
   startTime: string;
   endTime: string;
+  reason?: string;
+};
+
+export type RespondReschedulePayload = {
+  action: "accept" | "counter" | "decline";
+  date?: string;
+  startTime?: string;
+  endTime?: string;
+  declineReason?: string;
+};
+
+export type RescheduleRequestDetail = {
+  booking: MyBooking & {
+    proposedStartTime: string;
+    proposedEndTime: string;
+    rescheduleReason: string | null;
+    rescheduleRequestedBy: string;
+  };
+  reviewer: {
+    id: number;
+    name: string;
+    email: string;
+  };
+  eventType: {
+    id: number;
+    name: string;
+    durationMinutes: number;
+    slug: string;
+  };
 };
 
 export type MarkOutcomePayload = {
