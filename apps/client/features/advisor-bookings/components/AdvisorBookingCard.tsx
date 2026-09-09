@@ -62,6 +62,8 @@ export default function AdvisorBookingCard({
         return <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-medium text-red-600">Cancelled</span>;
       case "rescheduled":
         return <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">Rescheduled</span>;
+      case "reschedule_requested":
+        return <span className="rounded-full bg-purple-100 px-3 py-1 text-xs font-semibold text-purple-800">Reschedule Requested</span>;
       default:
         return <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">{booking.status}</span>;
     }
@@ -103,6 +105,16 @@ export default function AdvisorBookingCard({
           <span>Reviewer: <strong className="font-semibold text-slate-800">{booking.reviewerName}</strong></span>
         </div>
 
+        {booking.status === "reschedule_requested" && booking.proposedStartTime && (
+          <div className="mt-3 rounded-lg bg-purple-50 p-3 text-xs text-purple-900 border border-purple-200 space-y-1">
+            <p className="font-semibold">Reviewer Requested Reschedule to:</p>
+            <p className="text-purple-800 font-bold">
+              {dayjs(booking.proposedStartTime).format("ddd, MMM D, YYYY")} at {dayjs(booking.proposedStartTime).format("h:mm A")} – {dayjs(booking.proposedEndTime).format("h:mm A")}
+            </p>
+            {booking.rescheduleReason && <p className="text-purple-700 italic font-normal">"{booking.rescheduleReason}"</p>}
+          </div>
+        )}
+
         {booking.status === "cancelled" && booking.cancelledReason && (
           <div className="mt-3 rounded-lg bg-red-50 p-2.5 text-xs text-red-700 border border-red-100">
             <strong>Cancelled Reason:</strong> {booking.cancelledReason}
@@ -114,7 +126,14 @@ export default function AdvisorBookingCard({
       <div className="flex flex-col sm:flex-row items-center gap-3 pt-3 border-t border-slate-100">
         {activeTab === "upcoming" && (
           <>
-            {booking.meetLink && booking.status !== "cancelled" ? (
+            {booking.status === "reschedule_requested" && booking.rescheduleToken ? (
+              <a
+                href={`/reschedule-request/${booking.rescheduleToken}`}
+                className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-purple-700 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-purple-800"
+              >
+                <span>Respond to Reschedule Request</span>
+              </a>
+            ) : booking.meetLink && booking.status !== "cancelled" ? (
               <a
                 href={booking.meetLink}
                 target="_blank"
@@ -135,13 +154,15 @@ export default function AdvisorBookingCard({
               </button>
             )}
 
-            <button
-              type="button"
-              onClick={() => onActionClick?.(booking)}
-              className="w-full sm:w-auto inline-flex items-center justify-center rounded-lg border border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 transition"
-            >
-              Reschedule / Cancel
-            </button>
+            {booking.status !== "reschedule_requested" && (
+              <button
+                type="button"
+                onClick={() => onActionClick?.(booking)}
+                className="w-full sm:w-auto inline-flex items-center justify-center rounded-lg border border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 transition"
+              >
+                Reschedule / Cancel
+              </button>
+            )}
           </>
         )}
 
