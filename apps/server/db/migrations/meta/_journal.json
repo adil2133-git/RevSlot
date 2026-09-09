@@ -113,6 +113,13 @@
       "when": 1788781613353,
       "tag": "0028_ambitious_human_fly",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1788852976012,
+      "tag": "0029_wandering_triathlon",
+      "breakpoints": true
     }
   ]
 }

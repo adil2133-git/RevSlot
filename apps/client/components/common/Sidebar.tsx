@@ -5,6 +5,7 @@ import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAuthStore } from "@/features/auth/store/authStore";
+import NotificationBell from "@/features/notifications/components/NotificationBell";
 
 const NAV_ITEMS = [
   {
@@ -110,10 +111,11 @@ export default function Sidebar() {
 
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-slate-100 bg-surface-card">
-      <div className="flex h-16 items-center px-6">
+      <div className="flex h-16 items-center justify-between px-6">
         <Link href="/dashboard" className="text-lg font-semibold tracking-tight text-primary">
           RevSlot
         </Link>
+       <NotificationBell />
       </div>
 
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-2">
