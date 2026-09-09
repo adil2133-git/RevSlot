@@ -53,10 +53,26 @@ export const bookingController = {
 
   rescheduleBooking: async (req: Request, res: Response) => {
     const id = parseBookingId(req.params);
-    const oldBooking = await bookingService.getBookingById(req.user!.userId, id);
-    const newBooking = await bookingService.rescheduleBooking(req.user!.userId, id, req.body);
-    const { meetLink } = await bookingService.finalizeReschedule(oldBooking, newBooking);
-    res.status(200).json({ success: true, data: { ...newBooking, meetLink } });
+    const result = await bookingService.requestReschedule(req.user!.userId, id, req.body);
+    res.status(200).json({ success: true, data: result });
+  },
+
+  requestReschedule: async (req: Request, res: Response) => {
+    const id = parseBookingId(req.params);
+    const result = await bookingService.requestReschedule(req.user!.userId, id, req.body);
+    res.status(200).json({ success: true, data: result });
+  },
+
+  getRescheduleRequestByToken: async (req: Request, res: Response) => {
+    const token = String(req.params.token || "");
+    const result = await bookingService.getRescheduleRequestByToken(token);
+    res.status(200).json({ success: true, data: result });
+  },
+
+  respondToReschedule: async (req: Request, res: Response) => {
+    const token = String(req.params.token || "");
+    const result = await bookingService.respondToReschedule(token, req.body);
+    res.status(200).json({ success: true, data: result });
   },
 
   markOutcome: async (req: Request, res: Response) => {
