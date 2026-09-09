@@ -59,15 +59,6 @@ export const bookingController = {
     const id = parseBookingId(req.params);
     const result = await bookingService.cancelBooking(req.user!.userId, id, req.body);
 
-     if (result) {
-      await notificationService.createNotification({
-        reviewerId: req.user!.userId,
-        type: "booking_cancelled",
-        title: "Booking cancelled",
-        message: `Session with ${result.advisorName} on ${dayjs(result.startTime).format("ddd, MMM D")} was cancelled`,
-        bookingId: result.id,
-      });
-    }
     res.status(200).json({ success: true, data: result });
   },
 
@@ -77,13 +68,6 @@ export const bookingController = {
     const newBooking = await bookingService.rescheduleBooking(req.user!.userId, id, req.body);
     const { meetLink } = await bookingService.finalizeReschedule(oldBooking, newBooking);
 
-    await notificationService.createNotification({
-      reviewerId: req.user!.userId,
-      type: "booking_rescheduled",
-      title: "Booking rescheduled",
-      message: `Session with ${newBooking.advisorName} rescheduled to ${dayjs(newBooking.startTime).format("ddd, MMM D, h:mm A")}`,
-      bookingId: newBooking.id,
-    });
     res.status(200).json({ success: true, data: { ...newBooking, meetLink } });
   },
 
