@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { AdvisorBookingScope, AdvisorBookingsResponse } from "../types";
+import type { AdvisorBookingScope, AdvisorBookingsResponse, AdvisorFeedbackData } from "../types";
 
 const ADVISOR_TOKEN_KEY = "revslot_advisor_token";
 const ADVISOR_EMAIL_KEY = "revslot_advisor_email";
@@ -36,12 +36,12 @@ export const clearAdvisorSession = () => {
 
 export const advisorApi = {
   sendOtp: async (email: string) => {
-    const res = await advisorClient.post("/auth/advisor/send-otp", { email });
+    const res = await advisorClient.post("/advisor/auth/send-otp", { email });
     return res.data;
   },
 
   verifyOtp: async (email: string, code: string) => {
-    const res = await advisorClient.post("/auth/advisor/verify-otp", { email, code });
+    const res = await advisorClient.post("/advisor/auth/verify-otp", { email, code });
     const { token, advisorEmail } = res.data.data;
     setAdvisorSession(token, advisorEmail);
     return { token, advisorEmail };
@@ -49,13 +49,23 @@ export const advisorApi = {
 
   getBookings: async (scope: AdvisorBookingScope = "upcoming", search: string = "") => {
     const token = getStoredAdvisorToken();
-    const res = await advisorClient.get<{ success: boolean; data: AdvisorBookingsResponse }>("/bookings/advisor", {
+    const res = await advisorClient.get<{ success: boolean; data: AdvisorBookingsResponse }>("/advisor/bookings", {
       headers: {
         Authorization: `Bearer ${token}`,
       },
       params: {
         scope,
         search,
+      },
+    });
+    return res.data.data;
+  },
+
+  getBookingFeedback: async (bookingId: number) => {
+    const token = getStoredAdvisorToken();
+    const res = await advisorClient.get<{ success: boolean; data: AdvisorFeedbackData }>(`/advisor/bookings/${bookingId}/feedback`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
       },
     });
     return res.data.data;
