@@ -75,6 +75,7 @@ export async function fetchMyBookings(params: GetMyBookingsParams = {}) {
         limit: params.limit,
         status: params.status?.join(","),
         scope: params.scope,
+        search: params.search,
       },
     }
   );
@@ -98,10 +99,27 @@ export async function cancelBooking(id: number, payload: CancelBookingPayload) {
   return data.data;
 }
 
-// Reviewer-initiated reschedule — new date/time for the same event type
+// Reviewer-initiated reschedule request
 export async function rescheduleBooking(id: number, payload: RescheduleBookingPayload) {
-  const { data } = await api.patch<{ success: boolean; data: BookingDetail & { meetLink: string | null } }>(
+  const { data } = await api.patch<{ success: boolean; data: BookingDetail }>(
     `/bookings/${id}/reschedule`,
+    payload
+  );
+  return data.data;
+}
+
+// Fetch reschedule request detail by token (Public for Advisor)
+export async function fetchRescheduleRequestByToken(token: string) {
+  const { data } = await api.get<{ success: boolean; data: import("../type").RescheduleRequestDetail }>(
+    `/bookings/reschedule-request/${token}`
+  );
+  return data.data;
+}
+
+// Respond to reschedule request (Public for Advisor)
+export async function respondToRescheduleRequest(token: string, payload: import("../type").RespondReschedulePayload) {
+  const { data } = await api.post<{ success: boolean; data: BookingDetail }>(
+    `/bookings/reschedule-request/${token}/respond`,
     payload
   );
   return data.data;

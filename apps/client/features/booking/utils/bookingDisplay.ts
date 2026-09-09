@@ -35,6 +35,7 @@ export const STATUS_LABELS: Record<string, string> = {
   cancelled: "Cancelled",
   no_show: "No-show",
   rescheduled: "Rescheduled",
+  reschedule_requested: "Reschedule Requested",
 };
 
 export const STATUS_STYLES: Record<string, string> = {
@@ -45,4 +46,5 @@ export const STATUS_STYLES: Record<string, string> = {
   cancelled: "bg-rose-50 text-rose-700 border border-rose-200/80",
   no_show: "bg-rose-50 text-rose-700 border border-rose-200/80",
   rescheduled: "bg-amber-50 text-amber-800 border border-amber-300/80",
+  reschedule_requested: "bg-purple-50 text-purple-700 border border-purple-200/80",
 };

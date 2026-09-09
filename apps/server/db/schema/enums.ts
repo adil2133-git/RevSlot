@@ -5,7 +5,7 @@ export const slotStatus = pgEnum('slot_status', [
 ]);
 
 export const bookingStatus = pgEnum('booking_status', [
-  'confirmed', 'cancelled', 'completed', 'no_show', 'rescheduled',
+  'confirmed', 'cancelled', 'completed', 'no_show', 'rescheduled', 'reschedule_requested',
 ]);
 
 export const otpPurposeEnum = pgEnum('otp_purpose', [

@@ -73,18 +73,60 @@ export const bookingController = {
 
   rescheduleBooking: async (req: Request, res: Response) => {
     const id = parseBookingId(req.params);
-    const oldBooking = await bookingService.getBookingById(req.user!.userId, id);
-    const newBooking = await bookingService.rescheduleBooking(req.user!.userId, id, req.body);
-    const { meetLink } = await bookingService.finalizeReschedule(oldBooking, newBooking);
+    const result = await bookingService.requestReschedule(req.user!.userId, id, req.body);
 
-    await notificationService.createNotification({
-      reviewerId: req.user!.userId,
-      type: "booking_rescheduled",
-      title: "Booking rescheduled",
-      message: `Session with ${newBooking.advisorName} rescheduled to ${dayjs(newBooking.startTime).format("ddd, MMM D, h:mm A")}`,
-      bookingId: newBooking.id,
-    });
-    res.status(200).json({ success: true, data: { ...newBooking, meetLink } });
+    if (result) {
+      await notificationService.createNotification({
+        reviewerId: req.user!.userId,
+        type: "booking_rescheduled",
+        title: "Reschedule requested",
+        message: `Reschedule request sent to ${result.advisorName}`,
+        bookingId: result.id,
+      });
+    }
+
+    res.status(200).json({ success: true, data: result });
+  },
+
+  requestReschedule: async (req: Request, res: Response) => {
+    const id = parseBookingId(req.params);
+    const result = await bookingService.requestReschedule(req.user!.userId, id, req.body);
+
+    if (result) {
+      await notificationService.createNotification({
+        reviewerId: req.user!.userId,
+        type: "booking_rescheduled",
+        title: "Reschedule requested",
+        message: `Reschedule request sent to ${result.advisorName}`,
+        bookingId: result.id,
+      });
+    }
+
+    res.status(200).json({ success: true, data: result });
+  },
+
+  getRescheduleRequestByToken: async (req: Request, res: Response) => {
+    const token = String(req.params.token || "");
+    const result = await bookingService.getRescheduleRequestByToken(token);
+    res.status(200).json({ success: true, data: result });
+  },
+
+  respondToReschedule: async (req: Request, res: Response) => {
+    const token = String(req.params.token || "");
+    const result = await bookingService.respondToReschedule(token, req.body);
+
+    if (result) {
+      const actionText = req.body.action === "accept" ? "accepted" : "declined";
+      await notificationService.createNotification({
+        reviewerId: result.reviewerId,
+        type: "booking_rescheduled",
+        title: `Reschedule ${actionText}`,
+        message: `${result.advisorName} ${actionText} the reschedule request`,
+        bookingId: result.id,
+      });
+    }
+
+    res.status(200).json({ success: true, data: result });
   },
 
   markOutcome: async (req: Request, res: Response) => {
@@ -101,14 +143,6 @@ export const bookingController = {
         bookingId: result.id,
       });
     }
-    res.status(200).json({ success: true, data: result });
-  },
-
-  getAdvisorBookings: async (req: Request, res: Response) => {
-    const advisorEmail = res.locals.advisorEmail;
-    const scope = (req.query.scope as "upcoming" | "past" | "cancelled") || "upcoming";
-    const search = (req.query.search as string) || "";
-    const result = await bookingService.getAdvisorBookings(advisorEmail, { scope, search });
     res.status(200).json({ success: true, data: result });
   },
 };

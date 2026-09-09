@@ -6,6 +6,8 @@ export default function StatusBadge({ status }: { status: string }) {
       ? "bg-emerald-500"
       : status === "rescheduled"
       ? "bg-amber-500"
+      : status === "reschedule_requested"
+      ? "bg-purple-500"
       : status === "in_progress"
       ? "bg-blue-500"
       : status === "outcome_required"
