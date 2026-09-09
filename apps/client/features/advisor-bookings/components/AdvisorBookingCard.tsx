@@ -1,11 +1,13 @@
 "use client";
 
 import dayjs from "dayjs";
-import type { AdvisorBookingItem } from "../types";
+import type { AdvisorBookingItem, AdvisorBookingScope } from "../types";
 
 interface AdvisorBookingCardProps {
   booking: AdvisorBookingItem;
+  activeTab?: AdvisorBookingScope;
   onActionClick?: (booking: AdvisorBookingItem) => void;
+  onViewFeedback?: (booking: AdvisorBookingItem) => void;
 }
 
 const CalendarIcon = () => (
@@ -31,7 +33,22 @@ const VideoIcon = () => (
   </svg>
 );
 
-export default function AdvisorBookingCard({ booking, onActionClick }: AdvisorBookingCardProps) {
+const FeedbackIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <polyline points="14 2 14 8 20 8" />
+    <line x1="16" y1="13" x2="8" y2="13" />
+    <line x1="16" y1="17" x2="8" y2="17" />
+    <polyline points="10 9 9 9 8 9" />
+  </svg>
+);
+
+export default function AdvisorBookingCard({
+  booking,
+  activeTab = "upcoming",
+  onActionClick,
+  onViewFeedback,
+}: AdvisorBookingCardProps) {
   const formattedDate = dayjs(booking.startTime).format("ddd, MMM D");
   const formattedTime = `${dayjs(booking.startTime).format("h:mm A")} – ${dayjs(booking.endTime).format("h:mm A")} (${booking.timezone || "IST"})`;
 
@@ -85,38 +102,74 @@ export default function AdvisorBookingCard({ booking, onActionClick }: AdvisorBo
           <UserIcon />
           <span>Reviewer: <strong className="font-semibold text-slate-800">{booking.reviewerName}</strong></span>
         </div>
+
+        {booking.status === "cancelled" && booking.cancelledReason && (
+          <div className="mt-3 rounded-lg bg-red-50 p-2.5 text-xs text-red-700 border border-red-100">
+            <strong>Cancelled Reason:</strong> {booking.cancelledReason}
+          </div>
+        )}
       </div>
 
-      {/* Bottom Actions Row */}
+      {/* Bottom Actions Row — Context Aware */}
       <div className="flex flex-col sm:flex-row items-center gap-3 pt-3 border-t border-slate-100">
-        {booking.meetLink && booking.status !== "cancelled" ? (
-          <a
-            href={booking.meetLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-xs font-semibold text-on-primary shadow-sm transition hover:bg-primary/90"
-          >
-            <VideoIcon />
-            <span>Join Google Meet</span>
-          </a>
-        ) : (
-          <button
-            type="button"
-            disabled
-            className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-slate-100 px-4 py-2.5 text-xs font-semibold text-slate-400 cursor-not-allowed"
-          >
-            <VideoIcon />
-            <span>No Link Available</span>
-          </button>
+        {activeTab === "upcoming" && (
+          <>
+            {booking.meetLink && booking.status !== "cancelled" ? (
+              <a
+                href={booking.meetLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-xs font-semibold text-on-primary shadow-sm transition hover:bg-primary/90"
+              >
+                <VideoIcon />
+                <span>Join Google Meet</span>
+              </a>
+            ) : (
+              <button
+                type="button"
+                disabled
+                className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-slate-100 px-4 py-2.5 text-xs font-semibold text-slate-400 cursor-not-allowed"
+              >
+                <VideoIcon />
+                <span>No Link Available</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => onActionClick?.(booking)}
+              className="w-full sm:w-auto inline-flex items-center justify-center rounded-lg border border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 transition"
+            >
+              Reschedule / Cancel
+            </button>
+          </>
         )}
 
-        <button
-          type="button"
-          onClick={() => onActionClick?.(booking)}
-          className="w-full sm:w-auto inline-flex items-center justify-center rounded-lg border border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 transition"
-        >
-          Reschedule / Cancel
-        </button>
+        {activeTab === "past" && (
+          <>
+            {booking.hasFeedback ? (
+              <button
+                type="button"
+                onClick={() => onViewFeedback?.(booking)}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-[#003366] px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-[#003366]/90"
+              >
+                <FeedbackIcon />
+                <span>View Feedback</span>
+              </button>
+            ) : (
+              <div className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-slate-100 px-4 py-2.5 text-xs font-medium text-slate-500 border border-slate-200">
+                <span>Feedback Pending</span>
+                <span className="text-slate-400">⏳</span>
+              </div>
+            )}
+          </>
+        )}
+
+        {activeTab === "cancelled" && (
+          <div className="w-full inline-flex items-center justify-center rounded-lg bg-red-50/50 px-4 py-2 text-xs font-medium text-red-600 border border-red-100">
+            Session Cancelled
+          </div>
+        )}
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { advisorApi, clearAdvisorSession } from "../services/advisorApi";
 import type { AdvisorBookingItem, AdvisorBookingScope } from "../types";
 import AdvisorBookingCard from "./AdvisorBookingCard";
+import AdvisorFeedbackModal from "./AdvisorFeedbackModal";
 import PoweredByFooter from "@/features/booking/components/PoweredByFooter";
 
 interface AdvisorBookingsDashboardProps {
@@ -39,6 +40,7 @@ export default function AdvisorBookingsDashboard({ advisorEmail, onLogout }: Adv
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionModalBooking, setActionModalBooking] = useState<AdvisorBookingItem | null>(null);
+  const [feedbackModalBookingId, setFeedbackModalBookingId] = useState<number | null>(null);
 
   const fetchBookings = async () => {
     setLoading(true);
@@ -198,7 +200,9 @@ export default function AdvisorBookingsDashboard({ advisorEmail, onLogout }: Adv
               <AdvisorBookingCard
                 key={booking.id}
                 booking={booking}
+                activeTab={scope}
                 onActionClick={(b) => setActionModalBooking(b)}
+                onViewFeedback={(b) => setFeedbackModalBookingId(b.id)}
               />
             ))}
           </div>
@@ -210,7 +214,7 @@ export default function AdvisorBookingsDashboard({ advisorEmail, onLogout }: Adv
         </div>
       </div>
 
-      {/* Reschedule / Cancel Modal Info Dialog */}
+      {/* Reschedule / Cancel Modal Info Dialog for Upcoming Slots */}
       {actionModalBooking && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-xs">
           <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl text-center">
@@ -227,6 +231,14 @@ export default function AdvisorBookingsDashboard({ advisorEmail, onLogout }: Adv
             </button>
           </div>
         </div>
+      )}
+
+      {/* View Feedback Modal for Past Slots */}
+      {feedbackModalBookingId && (
+        <AdvisorFeedbackModal
+          bookingId={feedbackModalBookingId}
+          onClose={() => setFeedbackModalBookingId(null)}
+        />
       )}
     </div>
   );

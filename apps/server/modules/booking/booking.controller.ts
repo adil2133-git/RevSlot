@@ -103,12 +103,4 @@ export const bookingController = {
     }
     res.status(200).json({ success: true, data: result });
   },
-
-  getAdvisorBookings: async (req: Request, res: Response) => {
-    const advisorEmail = res.locals.advisorEmail;
-    const scope = (req.query.scope as "upcoming" | "past" | "cancelled") || "upcoming";
-    const search = (req.query.search as string) || "";
-    const result = await bookingService.getAdvisorBookings(advisorEmail, { scope, search });
-    res.status(200).json({ success: true, data: result });
-  },
 };
