@@ -9,7 +9,7 @@ import CancelBookingModal from "@/features/booking/components/CancelBookingModal
 import RescheduleBookingModal from "@/features/booking/components/RescheduleBookingModal";
 import SubmitFeedbackModal from "@/features/feedback/components/SubmitFeedbackModal";
 import Pagination from "@/features/booking/components/Pagination";
-import { fetchMyBookings, markBookingOutcome } from "@/features/booking/api/bookingApi";
+import { fetchMyBookings, markBookingOutcome, fetchBookingById } from "@/features/booking/api/bookingApi";
 import type { MyBooking, BookingTabCounts } from "@/features/booking/type";
 import FeedbackDetailsModal from "@/features/feedback/components/FeedbackDetailsModal";
 
@@ -97,9 +97,78 @@ function BookingsContent() {
     }
   }, [page, activeTab, search]);
 
+  const bookingIdFromUrl = searchParams.get("bookingId");
+  const actionFromUrl = searchParams.get("action");
+  const [autoOpenedBookingId, setAutoOpenedBookingId] = useState<number | null>(null);
+
   useEffect(() => {
     loadBookings();
   }, [loadBookings]);
+
+  useEffect(() => {
+    if (!bookingIdFromUrl || actionFromUrl !== "feedback") return;
+
+    const targetId = Number(bookingIdFromUrl);
+    if (!targetId || autoOpenedBookingId === targetId) return;
+
+    const openTargetModal = async () => {
+      let targetBooking: MyBooking | null = bookings.find((b) => b.id === targetId) || null;
+
+      if (!targetBooking) {
+        try {
+          const detail = await fetchBookingById(targetId);
+          if (detail) {
+            targetBooking = {
+              id: detail.id,
+              eventTypeId: detail.eventTypeId,
+              internName: detail.internName,
+              batch: detail.batch,
+              advisorName: detail.advisorName,
+              advisorEmail: detail.advisorEmail,
+              weekStage: detail.weekStage,
+              startTime: detail.startTime,
+              endTime: detail.endTime,
+              status: detail.status,
+              meetLink: detail.meetLink,
+              cancelledAt: detail.cancelledAt,
+              cancelledReason: detail.cancelledReason,
+              eventTypeName: detail.eventTypeName,
+              bookingWindowDays: 60,
+              hasFeedback: detail.hasFeedback,
+            };
+          }
+        } catch {
+          return;
+        }
+      }
+
+      if (!targetBooking) return;
+
+      setAutoOpenedBookingId(targetId);
+
+      if (targetBooking.status === "completed" && !targetBooking.hasFeedback) {
+        setSelectedFeedbackBooking(targetBooking);
+      } else if (targetBooking.status === "confirmed" && new Date(targetBooking.endTime).getTime() <= Date.now()) {
+        try {
+          await markBookingOutcome(targetBooking.id, { outcome: "completed" });
+          setSelectedFeedbackBooking({
+            ...targetBooking,
+            status: "completed",
+            hasFeedback: false,
+          });
+          loadBookings();
+        } catch {
+          setSelectedFeedbackBooking(targetBooking);
+        }
+      } else if (targetBooking.status === "completed" && targetBooking.hasFeedback) {
+        setSelectedViewFeedbackBooking(targetBooking);
+      }
+    };
+
+    if (!loading) {
+      openTargetModal();
+    }
+  }, [loading, bookings, bookingIdFromUrl, actionFromUrl, autoOpenedBookingId, loadBookings]);
 
   const handleTabChange = (tab: BookingFilterTab) => {
     setActiveTab(tab);
