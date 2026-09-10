@@ -112,11 +112,7 @@ export default function BookingCard({
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-bold text-on-surface text-base">{displayName}</span>
-            {booking.batch && (
-              <span className="rounded-md bg-secondary px-2 py-0.5 text-xs font-semibold text-primary">
-                {booking.batch}
-              </span>
-            )}
+
             {booking.eventTypeName && (
               <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
                 {booking.eventTypeName}
@@ -125,9 +121,6 @@ export default function BookingCard({
           </div>
 
           <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
-            {booking.weekStage && (
-              <span className="font-medium text-slate-700">{booking.weekStage}</span>
-            )}
             {booking.advisorName && (
               <span>
                 Advisor: <strong className="font-medium text-slate-700">{booking.advisorName}</strong>

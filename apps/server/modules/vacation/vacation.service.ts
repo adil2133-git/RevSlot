@@ -5,6 +5,9 @@ import { db } from "../../config/db.js";
 import { vacationBlocks } from "./vacation.schema.js";
 import { bookings } from "../booking/bookings.schema.js";
 import { eventTypes } from "../eventType/eventTypes.model.js";
+import { emailService } from "../../services/email.service.js";
+import { bookingCancelledTemplate } from "../../emails/templates/bookingCancelled.js";
+import { reviewers } from "../auth/reviewers.model.js";
 
 import { AppError } from "../../core/errors/AppError.js";
 
@@ -68,14 +71,18 @@ const findAffectedBookings = async (reviewerId: number, startDate: string, endDa
     .select({
       id: bookings.id,
       internName: bookings.internName,
+      internEmails: bookings.internEmails,
       batch: bookings.batch,
       advisorEmail: bookings.advisorEmail,
+      advisorName: bookings.advisorName,
       startTime: bookings.startTime,
       endTime: bookings.endTime,
       eventTypeName: eventTypes.name,
+      reviewerName: reviewers.name,
     })
     .from(bookings)
     .innerJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
+    .innerJoin(reviewers, eq(bookings.reviewerId, reviewers.id))
     .where(
       and(
         eq(bookings.reviewerId, reviewerId),
@@ -109,6 +116,73 @@ const cancelBookings = async (
   // }
 };
 
+const sendVacationCancellationEmails = async (
+  affectedBookings: Array<{
+    internName: string;
+    internEmails: string[] | null;
+    advisorEmail: string;
+    advisorName: string;
+    startTime: Date;
+    endTime: Date;
+    eventTypeName: string;
+    reviewerName: string;
+  }>,
+  reason: string
+) => {
+  await Promise.all(
+    affectedBookings.flatMap((booking) => {
+      const formattedDate = dayjs(booking.startTime).format("ddd, MMM D");
+
+      const formattedTime =
+        `${dayjs(booking.startTime).format("h:mm A")} – ` +
+        `${dayjs(booking.endTime).format("h:mm A")}`;
+
+      const recipients: {
+        email: string;
+        name: string;
+        role: "advisor" | "intern";
+      }[] = [
+        {
+          email: booking.advisorEmail,
+          name: booking.advisorName,
+          role: "advisor",
+        },
+        ...(booking.internEmails ?? []).map((email) => ({
+          email,
+          name: booking.internName,
+          role: "intern" as const,
+        })),
+      ];
+
+      return recipients.map(({ email, name, role }) => {
+        const { subject, html } = bookingCancelledTemplate({
+          recipientName: name,
+          recipientRole: role,
+          eventTypeName: booking.eventTypeName,
+          reviewerName: booking.reviewerName,
+          advisorName: booking.advisorName,
+          formattedDate,
+          formattedTime,
+          reason,
+        });
+
+        return emailService
+          .sendEmail({
+            to: email,
+            subject,
+            html,
+          })
+          .catch((err) => {
+            console.error(
+              `[Vacation] Failed to send cancellation email to ${email}:`,
+              err
+            );
+          });
+      });
+    })
+  );
+};
+
 export const vacationService = {
   // Creates a new vacation block, warning about (or cancelling) affected bookings
   createVacationBlock: async (reviewerId: number, data: CreateVacationBlockInput) => {
@@ -131,7 +205,11 @@ export const vacationService = {
       );
     }
 
-    return db.transaction(async (tx) => {
+    const cancellationReason = data.reason
+      ? `vacation: ${data.reason}`
+      : "vacation";
+
+    const result = await db.transaction(async (tx) => {
       const [block] = await tx
         .insert(vacationBlocks)
         .values({
@@ -149,13 +227,25 @@ export const vacationService = {
       if (affectedBookings.length > 0) {
         await cancelBookings(
           tx,
-          affectedBookings.map((b) => b.id),
-          data.reason ? `vacation: ${data.reason}` : "vacation"
+          affectedBookings.map((booking) => booking.id),
+          cancellationReason
         );
       }
 
-      return { ...block, cancelledBookingsCount: affectedBookings.length };
+      return {
+        ...block,
+        cancelledBookingsCount: affectedBookings.length,
+      };
     });
+
+    if (affectedBookings.length > 0) {
+      await sendVacationCancellationEmails(
+        affectedBookings,
+        cancellationReason
+      );
+    }
+
+    return result;
   },
 
   // Lists all vacation blocks for a reviewer
@@ -209,30 +299,50 @@ export const vacationService = {
       );
     }
 
-    return db.transaction(async (tx) => {
+       const effectiveReason = data.reason ?? existing.reason;
+
+    const cancellationReason = effectiveReason
+      ? `vacation: ${effectiveReason}`
+      : "vacation";
+
+    const result = await db.transaction(async (tx) => {
       const [updated] = await tx
         .update(vacationBlocks)
         .set({
           startDate: newStartDate,
           endDate: newEndDate,
-          reason: data.reason ?? existing.reason,
+          reason: effectiveReason,
           updatedAt: new Date(),
         })
         .where(eq(vacationBlocks.id, blockId))
         .returning();
 
-      const effectiveReason = data.reason ?? existing.reason;
+      if (!updated) {
+        throw new AppError("Vacation block not found", 404);
+      }
 
       if (newlyAffected.length > 0) {
         await cancelBookings(
           tx,
-          newlyAffected.map((b) => b.id),
-          effectiveReason ? `vacation: ${effectiveReason}` : "vacation"
+          newlyAffected.map((booking) => booking.id),
+          cancellationReason
         );
       }
 
-      return { ...updated, cancelledBookingsCount: newlyAffected.length };
+      return {
+        ...updated,
+        cancelledBookingsCount: newlyAffected.length,
+      };
     });
+
+    if (newlyAffected.length > 0) {
+      await sendVacationCancellationEmails(
+        newlyAffected,
+        cancellationReason
+      );
+    }
+
+    return result;
   },
 
   // Deletes a vacation block (does not un-cancel any bookings already cancelled by it)

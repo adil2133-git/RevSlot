@@ -1,6 +1,6 @@
 import dayjs from "dayjs";
 import { randomUUID } from "crypto";
-import { eq, and, gte, lte, inArray, sql } from "drizzle-orm";
+import { eq, and, gte, lte, inArray, sql, or } from "drizzle-orm";
 import { db } from "../../config/db.js";
 import { eventTypes } from "../eventType/eventTypes.model.js";
 import { templateTimeBlocks } from "../availability/models/templateTimeBlocks.schema.js";
@@ -270,10 +270,16 @@ export const slotService = {
             eq(slots.eventTypeId, data.eventTypeId),
             eq(slots.slotDate, data.date),
             eq(slots.startTime, data.startTime),
-            sql`${slots.status} = 'held' AND ${slots.holdExpiresAt} < now()`
-          )
+            or(
+             eq(slots.status, "available"),
+             and(
+                eq(slots.status, "held"),
+                sql`${slots.holdExpiresAt} < now()`
+              )
+           )
         )
-        .returning();
+     )
+      .returning();
  
       if (reclaimed) {
         return { slotId: reclaimed.id, holdToken, holdExpiresAt };
