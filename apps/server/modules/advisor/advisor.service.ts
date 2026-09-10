@@ -1,12 +1,17 @@
+import dayjs from "dayjs";
 import { eq, and, ne, gte, lt, sql } from "drizzle-orm";
 import { db } from "../../config/db.js";
 import { bookings } from "../booking/bookings.schema.js";
+import { slots } from "../slot/slots.schema.js";
 import { eventTypes } from "../eventType/eventTypes.model.js";
 import { reviewers } from "../auth/reviewers.model.js";
 import { feedback } from "../feedback/feedback.model.js";
 import { otpService } from "../auth/otp.service.js";
+import { slotService } from "../slot/slot.service.js";
+import { calendarService } from "../calendar/calendar.service.js";
 import { emailService } from "../../services/email.service.js";
 import { advisorOtpTemplate } from "../../emails/templates/advisorOtp.js";
+import { bookingCancelledTemplate } from "../../emails/templates/bookingCancelled.js";
 import { generateAdvisorToken } from "../../core/utils/jwt.js";
 import { AppError } from "../../core/errors/AppError.js";
 
@@ -106,6 +111,7 @@ export const advisorService = {
         rescheduleToken: bookings.rescheduleToken,
         rescheduleRequestedBy: bookings.rescheduleRequestedBy,
         eventTypeName: eventTypes.name,
+        bookingWindowDays: eventTypes.bookingWindowDays,
         reviewerName: reviewers.name,
         timezone: sql<string>`'IST'`,
         hasFeedback: sql<boolean>`${feedback.id} is not null`,
@@ -200,4 +206,199 @@ export const advisorService = {
       },
     };
   },
+
+  cancelAdvisorBooking: async (advisorEmail: string, bookingId: number, data: { reason?: string | undefined }) => {
+    const cleanEmail = advisorEmail.trim().toLowerCase();
+
+    const [booking] = await db
+      .select()
+      .from(bookings)
+      .where(and(eq(bookings.id, bookingId), eq(bookings.advisorEmail, cleanEmail)))
+      .limit(1);
+
+    if (!booking) {
+      throw new AppError("Booking not found", 404);
+    }
+
+    if (booking.status !== "confirmed" && booking.status !== "rescheduled") {
+      throw new AppError("Only confirmed or rescheduled bookings can be cancelled", 400);
+    }
+
+    const hoursUntilStart = dayjs(booking.startTime).diff(dayjs(), "hour", true);
+    if (hoursUntilStart < 3) {
+      throw new AppError("This session starts in less than 3 hours and can no longer be changed online", 409);
+    }
+
+    const [eventType] = await db
+      .select({ name: eventTypes.name })
+      .from(eventTypes)
+      .where(eq(eventTypes.id, booking.eventTypeId))
+      .limit(1);
+
+    const [reviewer] = await db
+      .select({ name: reviewers.name, email: reviewers.email })
+      .from(reviewers)
+      .where(eq(reviewers.id, booking.reviewerId))
+      .limit(1);
+
+    const reasonText = data.reason?.trim() || "Cancelled by advisor";
+
+    const updated = await db.transaction(async (tx) => {
+      const [result] = await tx
+        .update(bookings)
+        .set({
+          status: "cancelled",
+          cancelledAt: new Date(),
+          cancelledReason: reasonText,
+        })
+        .where(eq(bookings.id, bookingId))
+        .returning();
+
+      const slotDate = dayjs(booking.startTime).format("YYYY-MM-DD");
+      const startTime = dayjs(booking.startTime).format("HH:mm:ss");
+      const endTime = dayjs(booking.endTime).format("HH:mm:ss");
+
+      await tx
+        .update(slots)
+        .set({ status: "available", holdToken: null, holdExpiresAt: null, updatedAt: new Date() })
+        .where(
+          and(
+            eq(slots.eventTypeId, booking.eventTypeId),
+            eq(slots.slotDate, slotDate),
+            eq(slots.startTime, startTime),
+            eq(slots.endTime, endTime)
+          )
+        );
+
+      return result;
+    });
+
+    if (booking.googleEventId) {
+      await calendarService.cancelMeetEvent(booking.reviewerId, booking.googleEventId).catch((err) => {
+        console.error(`[AdvisorBooking] Failed to cancel Calendar event for booking ${bookingId}:`, err);
+      });
+    }
+
+    if (eventType && reviewer) {
+      const formattedDate = dayjs(booking.startTime).format("ddd, MMM D");
+      const formattedTime = `${dayjs(booking.startTime).format("h:mm A")} – ${dayjs(booking.endTime).format("h:mm A")}`;
+
+      const recipients: { email: string; name: string; role: "advisor" | "reviewer" | "intern" }[] = [
+        { email: booking.advisorEmail, name: booking.advisorName, role: "advisor" },
+        { email: reviewer.email, name: reviewer.name, role: "reviewer" },
+        ...(booking.internEmails ?? []).map((email) => ({
+          email,
+          name: booking.internName,
+          role: "intern" as const,
+        })),
+      ];
+
+      await Promise.all(
+        recipients.map(({ email, name, role }) => {
+          const { subject, html } = bookingCancelledTemplate({
+            recipientName: name,
+            recipientRole: role,
+            eventTypeName: eventType.name,
+            reviewerName: reviewer.name,
+            advisorName: booking.advisorName,
+            formattedDate,
+            formattedTime,
+            reason: reasonText,
+          });
+          return emailService.sendEmail({ to: email, subject, html }).catch((err) => {
+            console.error(`[AdvisorBooking] Failed to send cancellation email to ${email}:`, err);
+          });
+        })
+      );
+    }
+
+    return updated;
+  },
+
+  rescheduleAdvisorBooking: async (
+    advisorEmail: string,
+    bookingId: number,
+    data: { date: string; startTime: string; endTime: string; reason?: string | undefined }
+  ) => {
+    const cleanEmail = advisorEmail.trim().toLowerCase();
+
+    const [booking] = await db
+      .select()
+      .from(bookings)
+      .where(and(eq(bookings.id, bookingId), eq(bookings.advisorEmail, cleanEmail)))
+      .limit(1);
+
+    if (!booking) {
+      throw new AppError("Booking not found", 404);
+    }
+
+    if (booking.status !== "confirmed" && booking.status !== "rescheduled") {
+      throw new AppError("Only confirmed or rescheduled bookings can be rescheduled", 400);
+    }
+
+    const hoursUntilStart = dayjs(booking.startTime).diff(dayjs(), "hour", true);
+    if (hoursUntilStart < 3) {
+      throw new AppError("This session starts in less than 3 hours and can no longer be changed online", 409);
+    }
+
+    const hold = await slotService.holdSlot({
+      eventTypeId: booking.eventTypeId,
+      date: data.date,
+      startTime: data.startTime,
+      endTime: data.endTime,
+    });
+
+    const newStartTime = dayjs(`${data.date}T${data.startTime}`).toDate();
+    const newEndTime = dayjs(`${data.date}T${data.endTime}`).toDate();
+
+    const updatedBooking = await db.transaction(async (tx) => {
+      const oldSlotDate = dayjs(booking.startTime).format("YYYY-MM-DD");
+      const oldStartTime = dayjs(booking.startTime).format("HH:mm:ss");
+      const oldEndTime = dayjs(booking.endTime).format("HH:mm:ss");
+
+      await tx
+        .update(slots)
+        .set({ status: "available", holdToken: null, holdExpiresAt: null, updatedAt: new Date() })
+        .where(
+          and(
+            eq(slots.eventTypeId, booking.eventTypeId),
+            eq(slots.slotDate, oldSlotDate),
+            eq(slots.startTime, oldStartTime),
+            eq(slots.endTime, oldEndTime)
+          )
+        );
+
+      const [updated] = await tx
+        .update(bookings)
+        .set({
+          startTime: newStartTime,
+          endTime: newEndTime,
+          status: "rescheduled",
+          meetLink: null,
+          googleEventId: null,
+        })
+        .where(eq(bookings.id, bookingId))
+        .returning();
+
+      if (!updated) {
+        throw new AppError("Failed to reschedule booking", 500);
+      }
+
+      await tx
+        .update(slots)
+        .set({ status: "booked", holdToken: null, holdExpiresAt: null, updatedAt: new Date() })
+        .where(eq(slots.id, hold.slotId));
+
+      return updated;
+    });
+
+    if (booking.googleEventId) {
+      await calendarService.cancelMeetEvent(booking.reviewerId, booking.googleEventId).catch((err) => {
+        console.error(`[AdvisorBooking] Failed to cancel old Calendar event for booking ${bookingId}:`, err);
+      });
+    }
+
+    return updatedBooking;
+  },
 };
+

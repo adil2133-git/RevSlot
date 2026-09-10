@@ -5,6 +5,7 @@ import { advisorApi, clearAdvisorSession } from "../services/advisorApi";
 import type { AdvisorBookingItem, AdvisorBookingScope } from "../types";
 import AdvisorBookingCard from "./AdvisorBookingCard";
 import AdvisorFeedbackModal from "./AdvisorFeedbackModal";
+import AdvisorActionModal from "./AdvisorActionModal";
 import PoweredByFooter from "@/features/booking/components/PoweredByFooter";
 
 interface AdvisorBookingsDashboardProps {
@@ -247,23 +248,16 @@ export default function AdvisorBookingsDashboard({ advisorEmail, onLogout }: Adv
         </div>
       </div>
 
-      {/* Reschedule / Cancel Modal Info Dialog for Upcoming Slots */}
+      {/* Reschedule / Cancel Modal Dialog for Upcoming Slots */}
       {actionModalBooking && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-xs">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl text-center">
-            <h3 className="text-base font-bold text-slate-900">Manage Booking #{actionModalBooking.slotId || actionModalBooking.id}</h3>
-            <p className="mt-2 text-xs text-slate-600 leading-relaxed">
-              To reschedule or cancel this slot for <strong>{actionModalBooking.internName}</strong>, please contact reviewer <strong>{actionModalBooking.reviewerName}</strong> or check your booking confirmation email.
-            </p>
-            <button
-              type="button"
-              onClick={() => setActionModalBooking(null)}
-              className="mt-5 w-full rounded-lg bg-[#003366] py-2 text-xs font-semibold text-white transition hover:bg-[#003366]/90"
-            >
-              Got it
-            </button>
-          </div>
-        </div>
+        <AdvisorActionModal
+          booking={actionModalBooking}
+          onClose={() => setActionModalBooking(null)}
+          onSuccess={() => {
+            setActionModalBooking(null);
+            fetchBookings();
+          }}
+        />
       )}
 
       {/* View Feedback Modal for Past Slots */}
