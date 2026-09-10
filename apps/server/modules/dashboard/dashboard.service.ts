@@ -1,15 +1,15 @@
 import { eq, and, gte, lte, desc, count, inArray, sql } from "drizzle-orm";
 import { db } from "../../config/db.js";
-import { reviewers } from "../auth/reviewers.model.js";
+import { reviewers } from "../auth/reviewers.schema.js";
 import { bookings } from "../booking/bookings.schema.js";
-import { eventTypes } from "../eventType/eventTypes.model.js";
+import { eventTypes } from "../eventType/eventTypes.schema.js";
 import { vacationBlocks } from "../vacation/vacation.schema.js";
-import { availabilityTemplates } from "../availability/models/availabilityTemplates.schema.js";
-import { templateTimeBlocks } from "../availability/models/templateTimeBlocks.schema.js";
-import { questionBanks } from "../questionBank/questionBanks.model.js";
-import { questions } from "../questionBank/questions.model.js";
+import { availabilityTemplates } from "../availability/schema/availabilityTemplates.schema.js";
+import { templateTimeBlocks } from "../availability/schema/templateTimeBlocks.schema.js";
+import { questionBanks } from "../questionBank/questionBanks.schema.js";
+import { questions } from "../questionBank/questions.schema.js";
 import { AppError } from "../../core/errors/AppError.js";
-import { feedbackForms, feedbackFormQuestions } from "../feedback/feedback.model.js";
+import { feedbackForms, feedbackFormQuestions } from "../feedback/feedback.schema.js";
 import type { GetDashboardSummaryQueryInput } from "./dashboard.validation.js";
 
 export const dashboardService = {

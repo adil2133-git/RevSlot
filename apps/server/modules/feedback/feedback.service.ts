@@ -1,8 +1,8 @@
 import { eq, and, ne, asc, desc, ilike, or, gte, lte, sql, inArray, isNull } from "drizzle-orm";
 import { db } from "../../config/db.js";
 import { bookings, eventTypes, feedback, feedbackForms, feedbackFormFields, feedbackFormQuestions, feedbackPendingQuestions, } from "../../db/index.js";
-import { questions } from "../questionBank/questions.model.js";
-import { questionBanks } from "../questionBank/questionBanks.model.js";
+import { questions } from "../questionBank/questions.schema.js";
+import { questionBanks } from "../questionBank/questionBanks.schema.js";
 import { AppError } from "../../core/errors/AppError.js";
 import type {
   CreateFormInput,
@@ -11,7 +11,7 @@ import type {
   SubmitFeedbackInput,
   UpdateFeedbackInput,
   ListFeedbackQueryInput,
-} from "./feedback.schema.js";
+} from "./feedback.validation.js";
 
 // ── Feedback forms (design-time) ──────────────────────────────────────
 

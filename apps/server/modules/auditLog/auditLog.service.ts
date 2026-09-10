@@ -1,8 +1,8 @@
 import { and, desc, eq, gte, lte, count } from "drizzle-orm";
 import { db } from "../../config/db.js";
-import { auditLogs } from "./auditLog.model.js";
+import { auditLogs } from "./auditLog.schema.js";
 import dayjs from "dayjs";
-import type { ListAuditLogQuery } from "./auditLog.schema.js";
+import type { ListAuditLogQuery } from "./auditLog.validation.js";
 
 type RecordAuditLogInput = {
   actorId: number;

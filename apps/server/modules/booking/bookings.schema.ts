@@ -1,6 +1,6 @@
 import { pgTable, serial, integer, varchar, text, timestamp, type AnyPgColumn } from 'drizzle-orm/pg-core';
-import { reviewers } from '../auth/reviewers.model.js';
-import { eventTypes } from '../eventType/eventTypes.model.js';
+import { reviewers } from '../auth/reviewers.schema.js';
+import { eventTypes } from '../eventType/eventTypes.schema.js';
 import { bookingStatus } from '../../db/schema/enums.js';
 
 export const bookings = pgTable('bookings', {

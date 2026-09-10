@@ -6,8 +6,8 @@ import { slots } from "../slot/slots.schema.js";
 import { bookings } from "./bookings.schema.js";
 import { AppError } from "../../core/errors/AppError.js";
 import type { CreateBookingInput, CancelBookingInput, RescheduleBookingInput, RequestRescheduleInput, RespondRescheduleInput } from "./booking.validation.js";
-import { eventTypes } from "../eventType/eventTypes.model.js";
-import { reviewers } from "../auth/reviewers.model.js";
+import { eventTypes } from "../eventType/eventTypes.schema.js";
+import { reviewers } from "../auth/reviewers.schema.js";
 import { calendarService } from "../calendar/calendar.service.js";
 import { emailService } from "../../services/email.service.js";
 import { bookingConfirmationTemplate } from "../../emails/templates/bookingConfirmation.js";
@@ -15,7 +15,7 @@ import { bookingCancelledTemplate } from "../../emails/templates/bookingCancelle
 import { bookingRescheduledTemplate } from "../../emails/templates/bookingRescheduled.js";
 import { bookingRescheduleRequestedTemplate } from "../../emails/templates/bookingRescheduleRequested.js";
 import { slotService } from "../slot/slot.service.js";
-import { feedback } from "../feedback/feedback.model.js";
+import { feedback } from "../feedback/feedback.schema.js";
 
 export interface GetMyBookingsOptions {
   page: number;

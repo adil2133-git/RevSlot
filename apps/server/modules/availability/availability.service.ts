@@ -1,14 +1,14 @@
 import { eq, and, asc, inArray, ne, sql } from "drizzle-orm";
 import { db } from "../../config/db.js";
 
-import { availabilityTemplates } from "./models/availabilityTemplates.schema.js";
-import { templateTimeBlocks } from "./models/templateTimeBlocks.schema.js";
+import { availabilityTemplates } from "./schema/availabilityTemplates.schema.js";
+import { templateTimeBlocks } from "./schema/templateTimeBlocks.schema.js";
 
-import { templateDateOverrides } from "./models/templateDateOverrides.schema.js";
-import { templateOverrideBlocks } from "./models/templateDateOverrideBlocks.schema.js";
-import { eventTypes } from "../eventType/eventTypes.model.js";
+import { templateDateOverrides } from "./schema/templateDateOverrides.schema.js";
+import { templateOverrideBlocks } from "./schema/templateDateOverrideBlocks.schema.js";
+import { eventTypes } from "../eventType/eventTypes.schema.js";
 import { bookings } from "../booking/bookings.schema.js";
-import { reviewers } from "../auth/reviewers.model.js";
+import { reviewers } from "../auth/reviewers.schema.js";
 import type { CreateDateOverrideInput } from "./availability.validation.js";
 
 import { AppError } from "../../core/errors/AppError.js";

@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { adminService } from "./admin.service.js";
-import type { ListReviewersQuery, ListBookingsQuery, UpdateAdminProfileInput } from "./admin.schema.js";
+import type { ListReviewersQuery, ListBookingsQuery, UpdateAdminProfileInput } from "./admin.validation.js";
 
 export const adminController = {
   listReviewers: async (req: Request, res: Response) => {

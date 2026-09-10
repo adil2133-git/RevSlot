@@ -3,7 +3,7 @@ import { validate, validateParams } from "../../core/middlewares/validate.middle
 import { catchAsync } from "../../core/utils/catchAsync.js";
 import { eventTypeController } from "./eventType.controller.js";
 import { requireAuth } from "../../core/middlewares/auth.middleware.js"
-import { BookingPageParamsSchema, ReviewerProfileParamsSchema, CreateEventTypeSchema, UpdateEventTypeSchema } from "./eventType.schema.js";
+import { BookingPageParamsSchema, ReviewerProfileParamsSchema, CreateEventTypeSchema, UpdateEventTypeSchema } from "./eventType.validation.js";
 
 const router = Router();
 

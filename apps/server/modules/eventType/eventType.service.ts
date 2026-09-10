@@ -1,11 +1,11 @@
 import { eq, and, desc } from "drizzle-orm";
 import { db } from "../../config/db.js";
-import { reviewers } from "../auth/reviewers.model.js";
-import { eventTypes } from "./eventTypes.model.js";
-import { availabilityTemplates } from "../availability/models/availabilityTemplates.schema.js";
+import { reviewers } from "../auth/reviewers.schema.js";
+import { eventTypes } from "./eventTypes.schema.js";
+import { availabilityTemplates } from "../availability/schema/availabilityTemplates.schema.js";
 import { AppError } from "../../core/errors/AppError.js";
 
-import type { CreateEventTypeInput, UpdateEventTypeInput } from "./eventType.schema.js";
+import type { CreateEventTypeInput, UpdateEventTypeInput } from "./eventType.validation.js";
 
 export const eventTypeService = {
   // Public lookup for the booking page — given a username and an event

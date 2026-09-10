@@ -9,7 +9,7 @@ import {
   CreateQuestionSchema,
   UpdateQuestionSchema,
   ReorderQuestionsSchema,
-} from "./questionBank.schema.js";
+} from "./questionBank.validation.js";
 
 const router = Router();
 

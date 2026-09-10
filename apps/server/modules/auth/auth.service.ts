@@ -4,8 +4,8 @@ import { OAuth2Client } from "google-auth-library";
 import { eq, type InferSelectModel } from "drizzle-orm";
 import { db } from "../../config/db.js";
 
-import { reviewers } from "./reviewers.model.js";
-import { admins } from "../admin/admins.model.js";
+import { reviewers } from "./reviewers.schema.js";
+import { admins } from "../admin/admins.schema.js";
 
 import { AppError } from "../../core/errors/AppError.js";
 
@@ -19,7 +19,7 @@ import type {
   GoogleAuthInput,
   UpdateProfileInput,
   ChangePasswordInput,
-} from "./auth.schema.js";
+} from "./auth.validation.js";
 import {
   verifyRefreshToken,
 } from "../../core/utils/jwt.js";

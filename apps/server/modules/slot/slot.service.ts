@@ -2,14 +2,14 @@ import dayjs from "dayjs";
 import { randomUUID } from "crypto";
 import { eq, and, gte, lte, inArray, sql, or } from "drizzle-orm";
 import { db } from "../../config/db.js";
-import { eventTypes } from "../eventType/eventTypes.model.js";
-import { templateTimeBlocks } from "../availability/models/templateTimeBlocks.schema.js";
+import { eventTypes } from "../eventType/eventTypes.schema.js";
+import { templateTimeBlocks } from "../availability/schema/templateTimeBlocks.schema.js";
 import { vacationBlocks } from "../vacation/vacation.schema.js";
 import { slots } from "./slots.schema.js";
 import { AppError } from "../../core/errors/AppError.js";
 import type { HoldSlotInput, ReleaseSlotInput } from "./slot.validation.js";
-import { templateDateOverrides } from "../availability/models/templateDateOverrides.schema.js";
-import { templateOverrideBlocks } from "../availability/models/templateDateOverrideBlocks.schema.js";
+import { templateDateOverrides } from "../availability/schema/templateDateOverrides.schema.js";
+import { templateOverrideBlocks } from "../availability/schema/templateDateOverrideBlocks.schema.js";
 
 type TimeBlockLike = { startTime: string, endTime: string };
 type Candidate = { slotDate: string; startTime: string; endTime: string};

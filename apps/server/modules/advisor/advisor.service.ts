@@ -1,9 +1,9 @@
 import { eq, and, ne, gte, lt, sql } from "drizzle-orm";
 import { db } from "../../config/db.js";
 import { bookings } from "../booking/bookings.schema.js";
-import { eventTypes } from "../eventType/eventTypes.model.js";
-import { reviewers } from "../auth/reviewers.model.js";
-import { feedback } from "../feedback/feedback.model.js";
+import { eventTypes } from "../eventType/eventTypes.schema.js";
+import { reviewers } from "../auth/reviewers.schema.js";
+import { feedback } from "../feedback/feedback.schema.js";
 import { otpService } from "../auth/otp.service.js";
 import { emailService } from "../../services/email.service.js";
 import { advisorOtpTemplate } from "../../emails/templates/advisorOtp.js";
