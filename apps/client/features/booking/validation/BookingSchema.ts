@@ -5,6 +5,7 @@ export const DEFAULT_BOOKING_FORM_VALUES = {
   fullName: "",
   email: "",
   whatsappNumber: "",
+  mainlyFocusedFor: "",
   comments: "",
 } as const;
 
@@ -13,6 +14,10 @@ export function buildBookingSchema(fields: BookingFormField[]) {
     fullName: z.string().trim().min(1, "Full name is required"),
     email: z.string().trim().email("Enter a valid email address"),
     whatsappNumber: z.string().trim().min(1, "WhatsApp number is required"),
+    mainlyFocusedFor: z
+     .string()
+     .trim()
+     .min(1, "Mainly focused for is required"),
     comments: z.string().optional(),
   };
 

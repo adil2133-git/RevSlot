@@ -1,7 +1,20 @@
+import { useState } from "react";
 import type { UseFormRegister, FieldErrors } from "react-hook-form";
 import type { BookingFormField } from "../type";
 import type { BookingFormValues } from "../validation/BookingSchema";
 import { BOOKING_FIELD_DEFINITIONS, type BookingFieldKey } from "../../bookingFields/bookingFieldLibrary";
+
+
+ const PRIORITY_FIELD_KEYS: BookingFieldKey[] = [
+  "internName",
+  "internEmail",
+  "phoneNumber",
+  "location",
+  "collegeUniversity",
+  "reasonForBooking",
+  "expectations",
+  "additionalInformation",
+];
 
 type BookingFormProps = {
   fields: BookingFormField[];
@@ -30,9 +43,28 @@ export default function BookingForm({
   onSubmit,
   onBack,
 }: BookingFormProps) {
-  const suggestedFields = (
+const [showAllSuggestedFields, setShowAllSuggestedFields] =
+  useState(false);
+
+  const HIDDEN_FIELD_KEYS: BookingFieldKey[] = [
+  "advisorName",
+  "advisorEmail",
+  "internId",
+];
+
+const suggestedFields = (
   Object.keys(BOOKING_FIELD_DEFINITIONS) as BookingFieldKey[]
-).filter((fieldKey) => !selectedFieldKeys.includes(fieldKey));
+).filter(
+  (fieldKey) =>
+    !selectedFieldKeys.includes(fieldKey) &&
+    !HIDDEN_FIELD_KEYS.includes(fieldKey)
+);
+
+const visibleSuggestedFields = showAllSuggestedFields
+  ? suggestedFields
+  : PRIORITY_FIELD_KEYS.filter((fieldKey) =>
+      suggestedFields.includes(fieldKey)
+    );
   return (
   <form
     onSubmit={onSubmit}
@@ -161,7 +193,7 @@ export default function BookingForm({
         </p>
 
         <div className="mt-4 space-y-2">
-          {suggestedFields.map((fieldKey) => {
+          {visibleSuggestedFields.map((fieldKey) => {
             const field = BOOKING_FIELD_DEFINITIONS[fieldKey];
 
             return (
@@ -176,6 +208,16 @@ export default function BookingForm({
               </button>
             );
           })}
+          {!showAllSuggestedFields &&
+      suggestedFields.length > PRIORITY_FIELD_KEYS.length && (
+        <button
+          type="button"
+          onClick={() => setShowAllSuggestedFields(true)}
+          className="w-full pt-2 text-sm font-medium text-slate-600 hover:text-slate-900"
+        >
+          More +
+        </button>
+      )}
         </div>
       </aside>
     </div>

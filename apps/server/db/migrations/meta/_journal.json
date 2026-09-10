@@ -141,6 +141,13 @@
       "when": 1789051615328,
       "tag": "0032_yielding_triton",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1789066533727,
+      "tag": "0033_parallel_reaper",
+      "breakpoints": true
     }
   ]
 }

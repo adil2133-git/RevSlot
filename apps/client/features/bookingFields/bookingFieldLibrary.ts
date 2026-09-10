@@ -1,5 +1,5 @@
 export const BOOKING_FIELD_DEFINITIONS = {
-  phone: {
+  phoneNumber: {
     label: "Phone Number",
     type: "tel",
     category: "Personal",
@@ -10,12 +10,12 @@ export const BOOKING_FIELD_DEFINITIONS = {
     category: "Personal",
   },
 
-  college: {
+  collegeUniversity: {
     label: "College / University",
     type: "text",
     category: "Education",
   },
-  course: {
+  courseDegree: {
     label: "Course / Degree",
     type: "text",
     category: "Education",
@@ -72,12 +72,12 @@ export const BOOKING_FIELD_DEFINITIONS = {
     category: "Professional",
   },
 
-  linkedin: {
+  linkedinProfile: {
     label: "LinkedIn Profile",
     type: "url",
     category: "Profiles",
   },
-  github: {
+  githubProfile: {
     label: "GitHub Profile",
     type: "url",
     category: "Profiles",

@@ -1,0 +1,1 @@
+ALTER TABLE "reviewers" DROP COLUMN "booking_form_fields";

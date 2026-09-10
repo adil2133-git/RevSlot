@@ -140,6 +140,15 @@ export const bookingService = {
       ).toDate();
       const endTimestamp = dayjs(`${slot.slotDate}T${slot.endTime}`).toDate();
 
+  const allowedKeys = new Set<string>([
+  "fullName",
+  "email",
+  "whatsappNumber",
+  "mainlyFocusedFor",
+  "comments",
+  ...Object.keys(BOOKING_FIELD_DEFINITIONS),
+]);
+
   const submittedFormData: Record<string, string> =
   data.formData ?? {};
 
@@ -148,14 +157,6 @@ export const bookingService = {
     .filter(([key]) => allowedKeys.has(key))
     .map(([key, value]) => [key, value.trim()])
 );
-
-const allowedKeys = new Set<string>([
-  "fullName",
-  "email",
-  "whatsappNumber",
-  "comments",
-  ...Object.keys(BOOKING_FIELD_DEFINITIONS),
-]);
 
       const [booking] = await tx
         .insert(bookings)

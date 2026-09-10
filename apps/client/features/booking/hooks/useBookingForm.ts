@@ -65,6 +65,13 @@ const removeField = (fieldKey: BookingFieldKey) => {
     required: true,
   },
   {
+  fieldKey: "mainlyFocusedFor",
+  label: "Mainly Focused For",
+  type: "text",
+  category: "Basic",
+  required: true,
+  },
+  {
     fieldKey: "comments",
     label: "Comments / Message",
     type: "tel",
