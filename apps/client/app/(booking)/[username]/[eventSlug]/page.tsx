@@ -65,9 +65,11 @@ export default function PublicBookingPage() {
     submitError,
     bookingDone,
     meetLink,
-  } = useBookingForm( holdResult,
-  pageInfo?.reviewer.bookingFormFields ?? []
-);
+    fields,
+    selectedFieldKeys,
+    addField,
+    removeField,
+  } = useBookingForm( holdResult);
 
   const currentStep = bookingDone ? 3 : showDetailsForm ? 2 : 1;
   const slotsForSelectedDate = slots.filter((s) => s.date === selectedDate);
@@ -141,7 +143,10 @@ export default function PublicBookingPage() {
 
               {holdResult && showDetailsForm && (
                 <BookingForm
-                  fields={pageInfo.reviewer.bookingFormFields}
+                  fields={fields}
+                  selectedFieldKeys={selectedFieldKeys}
+                  addField={addField}
+                  removeField={removeField}
                   register={register}
                   errors={errors}
                   submitting={submitting}

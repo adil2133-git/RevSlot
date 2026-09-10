@@ -1,9 +1,13 @@
 import type { UseFormRegister, FieldErrors } from "react-hook-form";
 import type { BookingFormField } from "../type";
 import type { BookingFormValues } from "../validation/BookingSchema";
+import { BOOKING_FIELD_DEFINITIONS, type BookingFieldKey } from "../../bookingFields/bookingFieldLibrary";
 
 type BookingFormProps = {
   fields: BookingFormField[];
+  selectedFieldKeys: BookingFieldKey[];
+  addField: (fieldKey: BookingFieldKey) => void;
+  removeField: (fieldKey: BookingFieldKey) => void;
   register: UseFormRegister<BookingFormValues>;
   errors: FieldErrors<BookingFormValues>;
   submitting: boolean;
@@ -15,6 +19,9 @@ type BookingFormProps = {
 
 export default function BookingForm({
   fields,
+  selectedFieldKeys,
+  addField,
+  removeField,
   register,
   errors,
   submitting,
@@ -23,75 +30,155 @@ export default function BookingForm({
   onSubmit,
   onBack,
 }: BookingFormProps) {
+  const suggestedFields = (
+  Object.keys(BOOKING_FIELD_DEFINITIONS) as BookingFieldKey[]
+).filter((fieldKey) => !selectedFieldKeys.includes(fieldKey));
   return (
-    <form
-      onSubmit={onSubmit}
-      className="rounded-xl border border-slate-200 bg-surface-card p-6"
-    >
-      <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm font-medium text-on-surface">Your details</p>
-        <p
-          className={`text-sm font-medium ${
-            secondsLeft <= 60 ? "text-error" : "text-slate-600"
-          }`}
-        >
-          Expires in {Math.floor(secondsLeft / 60)}:
-          {String(secondsLeft % 60).padStart(2, "0")}
+  <form
+    onSubmit={onSubmit}
+    className="rounded-xl border border-slate-200 bg-surface-card p-6"
+  >
+    <div className="grid gap-4 lg:grid-cols-[1fr_180px]">
+      {/* LEFT - Your Details */}
+      <div>
+        <div className="mb-4 flex items-center justify-between">
+          <p className="text-sm font-medium text-slate-700">
+            Your details
+          </p>
+
+          <p className="text-sm font-medium text-slate-600">
+            Expires in {Math.floor(secondsLeft / 60)}:
+            {String(secondsLeft % 60).padStart(2, "0")}
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          {fields.map((field) => {
+            const error = errors[field.fieldKey];
+
+            const commonProps = {
+              ...register(field.fieldKey),
+              placeholder: `${field.label}${field.required ? " *" : ""}`,
+            };
+
+            if (field.type === "textarea") {
+              return (
+                <div key={field.fieldKey}>
+                  <textarea
+                    {...commonProps}
+                    rows={4}
+                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
+                  />
+
+                  {error && (
+                    <p className="mt-1 text-xs text-red-600">
+                      {String(error.message)}
+                    </p>
+                  )}
+
+                  {selectedFieldKeys.includes(
+                    field.fieldKey as BookingFieldKey
+                  ) && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        removeField(field.fieldKey as BookingFieldKey)
+                      }
+                      className="mt-1 text-xs text-slate-500 hover:text-red-600"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              );
+            }
+
+            return (
+              <div key={field.fieldKey}>
+                <input
+                  {...commonProps}
+                  type={field.type}
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
+                />
+
+                {error && (
+                  <p className="mt-1 text-xs text-red-600">
+                    {String(error.message)}
+                  </p>
+                )}
+
+                {selectedFieldKeys.includes(
+                  field.fieldKey as BookingFieldKey
+                ) && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      removeField(field.fieldKey as BookingFieldKey)
+                    }
+                    className="mt-1 text-xs text-slate-500 hover:text-red-600"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {submitError && (
+          <p className="mt-4 text-sm text-red-600">
+            {submitError}
+          </p>
+        )}
+
+        <div className="mt-6 flex gap-3">
+          <button
+            type="submit"
+            disabled={submitting}
+            className="rounded-xl bg-blue-900 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            {submitting ? "Confirming..." : "Confirm booking"}
+          </button>
+
+          <button
+            type="button"
+            onClick={onBack}
+            className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700"
+          >
+            Back
+          </button>
+        </div>
+      </div>
+
+      {/* RIGHT - Suggested Fields */}
+      <aside className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+        <h3 className="text-sm font-semibold text-slate-800">
+          Suggested Fields
+        </h3>
+
+        <p className="mt-1 text-xs text-slate-500">
+          Add any additional information you want to provide.
         </p>
-      </div>
 
-      <div className="space-y-3">
-        {fields.map((field) => {
-          const error = errors[field.fieldKey];
+        <div className="mt-4 space-y-2">
+          {suggestedFields.map((fieldKey) => {
+            const field = BOOKING_FIELD_DEFINITIONS[fieldKey];
 
-          const commonProps = {
-            id: field.fieldKey,
-            className:
-              "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-primary",
-            placeholder: field.required
-              ? `${field.label} *`
-              : field.label,
-            ...register(field.fieldKey),
-          };
-
-          return (
-            <div key={field.fieldKey}>
-              {field.type === "textarea" ? (
-                <textarea {...commonProps} rows={3} />
-              ) : (
-                <input {...commonProps} type={field.type} />
-              )}
-
-              {error && (
-                <p className="mt-1 text-xs text-error">
-                  {String(error.message ?? "Invalid value")}
-                </p>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {submitError && (
-        <p className="mt-3 text-sm text-error">{submitError}</p>
-      )}
-
-      <div className="mt-5 flex gap-2">
-        <button
-          type="submit"
-          disabled={submitting}
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary disabled:opacity-50"
-        >
-          {submitting ? "Confirming..." : "Confirm booking"}
-        </button>
-        <button
-          type="button"
-          onClick={onBack}
-          className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-on-surface"
-        >
-          Back
-        </button>
-      </div>
-    </form>
-  );
+            return (
+              <button
+                key={fieldKey}
+                type="button"
+                onClick={() => addField(fieldKey)}
+                className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-left text-sm text-slate-700 hover:border-slate-400 hover:bg-slate-50"
+              >
+                <span>{field.label}</span>
+                <span className="text-base font-medium">+</span>
+              </button>
+            );
+          })}
+        </div>
+      </aside>
+    </div>
+  </form>
+);
 }

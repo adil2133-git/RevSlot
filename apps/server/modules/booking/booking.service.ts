@@ -16,7 +16,9 @@ import { bookingRescheduledTemplate } from "../../emails/templates/bookingResche
 import { bookingRescheduleRequestedTemplate } from "../../emails/templates/bookingRescheduleRequested.js";
 import { slotService } from "../slot/slot.service.js";
 import { feedback } from "../feedback/feedback.schema.js";
-import { getEffectiveBookingFields } from "./bookingFields.js";
+import {
+  BOOKING_FIELD_DEFINITIONS,
+} from "./bookingFields.js";
 
 export interface GetMyBookingsOptions {
   page: number;
@@ -138,42 +140,22 @@ export const bookingService = {
       ).toDate();
       const endTimestamp = dayjs(`${slot.slotDate}T${slot.endTime}`).toDate();
 
-      const [reviewer] = await tx
-  .select({
-    bookingFormFields: reviewers.bookingFormFields,
-  })
-  .from(reviewers)
-  .where(eq(reviewers.id, slot.reviewerId))
-  .limit(1);
+  const submittedFormData: Record<string, string> =
+  data.formData ?? {};
 
-if (!reviewer) {
-  throw new AppError("Reviewer not found", 404);
-}
-
-const effectiveFields = getEffectiveBookingFields(
-  reviewer.bookingFormFields
-);
-
-const allowedKeys = new Set<string>(
-  effectiveFields.map((field) => field.fieldKey)
-);
-
-const submittedFormData: Record<string, string> = data.formData ?? {};
-
-const formData = Object.fromEntries(
+ const formData = Object.fromEntries(
   Object.entries(submittedFormData)
     .filter(([key]) => allowedKeys.has(key))
     .map(([key, value]) => [key, value.trim()])
 );
 
-for (const field of effectiveFields) {
-  if (
-    field.required &&
-    !formData[field.fieldKey]?.trim()
-  ) {
-    throw new AppError(`${field.label} is required`, 400);
-  }
-}
+const allowedKeys = new Set<string>([
+  "fullName",
+  "email",
+  "whatsappNumber",
+  "comments",
+  ...Object.keys(BOOKING_FIELD_DEFINITIONS),
+]);
 
       const [booking] = await tx
         .insert(bookings)
@@ -446,6 +428,7 @@ for (const field of effectiveFields) {
         advisorEmail: bookings.advisorEmail,
         internEmails: bookings.internEmails,
         weekStage: bookings.weekStage,
+        formData: bookings.formData,
         startTime: bookings.startTime,
         endTime: bookings.endTime,
         status: bookings.status,

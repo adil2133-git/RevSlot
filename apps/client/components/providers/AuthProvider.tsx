@@ -12,7 +12,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   const hydrate = useAuthStore((state) => state.hydrate);
   const logoutLocal = useAuthStore((state) => state.logoutLocal);
   const isHydrated = useAuthStore((state) => state.isHydrated);
-
+  
   useEffect(() => {
     pathnameRef.current = pathname;
   }, [pathname]);

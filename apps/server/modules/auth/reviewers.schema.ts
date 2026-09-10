@@ -38,10 +38,6 @@ export const reviewers = pgTable(
     linkedinUrl: text("linkedin_url"),
     githubUrl: text("github_url"),
     portfolioUrl: text("portfolio_url"),
-    bookingFormFields: jsonb('booking_form_fields')
-      .$type<{ fieldKey: string; displayOrder: number }[]>()
-      .notNull()
-      .default([]),
     isActive: boolean('is_active').default(true),
     emailVerified: boolean('email_verified').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),

@@ -3,7 +3,6 @@ import { db } from "../../config/db.js";
 import { reviewers } from "../auth/reviewers.schema.js";
 import { eventTypes } from "./eventTypes.schema.js";
 import { availabilityTemplates } from "../availability/schema/availabilityTemplates.schema.js";
-import { getEffectiveBookingFields } from "../booking/bookingFields.js";
 import { AppError } from "../../core/errors/AppError.js";
 
 import type { CreateEventTypeInput, UpdateEventTypeInput } from "./eventType.validation.js";
@@ -30,7 +29,6 @@ export const eventTypeService = {
         linkedinUrl: reviewers.linkedinUrl,
         githubUrl: reviewers.githubUrl,
         portfolioUrl: reviewers.portfolioUrl,
-        bookingFormFields: reviewers.bookingFormFields,
       })
       .from(reviewers)
       .where(and(eq(reviewers.username, username), eq(reviewers.isActive, true)))
@@ -72,14 +70,11 @@ export const eventTypeService = {
       throw new AppError("Event type not found", 404);
     }
  
-    return {   reviewer: {
-    ...reviewer,
-    bookingFormFields: getEffectiveBookingFields(
-      reviewer.bookingFormFields
-    ),
-  }, eventType };
+    return { 
+      reviewer, 
+      eventType
+    };
   },
-
    
   // Public lookup for the profile page — given just a username, returns
   // the reviewer plus every active event type they offer, so a visitor

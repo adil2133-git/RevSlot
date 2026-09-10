@@ -15,7 +15,6 @@ export type BookingPageInfo = {
     linkedinUrl: string | null;
     githubUrl: string | null;
     portfolioUrl: string | null;
-    bookingFormFields: BookingFormField[];
   };
 
   eventType: {
@@ -72,7 +71,6 @@ export type HoldResult = {
 
 export type BookingFormField = {
   fieldKey: string;
-  displayOrder: number;
   label: string;
   type: string;
   category: string;

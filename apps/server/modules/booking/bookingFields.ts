@@ -138,71 +138,11 @@ export const BOOKING_FIELD_DEFINITIONS = {
 
 export type BookingFieldKey = keyof typeof BOOKING_FIELD_DEFINITIONS;
 
-export const DEFAULT_BOOKING_FIELDS = [
-  {
-    fieldKey: "fullName",
-    displayOrder: 0,
-    label: "Full Name",
-    type: "text",
-    category: "Basic",
-    required: true,
-  },
-  {
-    fieldKey: "email",
-    displayOrder: 1,
-    label: "Email Address",
-    type: "email",
-    category: "Basic",
-    required: true,
-  },
-  {
-    fieldKey: "whatsappNumber",
-    displayOrder: 2,
-    label: "WhatsApp Number",
-    type: "tel",
-    category: "Basic",
-    required: true,
-  },
-  {
-    fieldKey: "comments",
-    displayOrder: 3,
-    label: "Comments / Message",
-    type: "textarea",
-    category: "Basic",
-    required: false,
-  },
+export const BOOKING_FIELD_CATEGORIES = [
+  "Personal",
+  "Education",
+  "Professional",
+  "Profiles",
+  "Advisor / Intern",
+  "Additional",
 ] as const;
-
-export type PublicBookingField =
-  | (typeof DEFAULT_BOOKING_FIELDS)[number]
-  | {
-      fieldKey: BookingFieldKey;
-      displayOrder: number;
-      label: string;
-      type: string;
-      category: string;
-      required: false;
-    };
-
-export function getEffectiveBookingFields(
-  selected: { fieldKey: string; displayOrder: number }[] = []
-): PublicBookingField[] {
-  const extras = [...selected]
-    .filter((field) => field.fieldKey in BOOKING_FIELD_DEFINITIONS)
-    .sort((a, b) => a.displayOrder - b.displayOrder)
-    .map((field) => {
-      const definition =
-        BOOKING_FIELD_DEFINITIONS[field.fieldKey as BookingFieldKey];
-
-      return {
-        fieldKey: field.fieldKey as BookingFieldKey,
-        displayOrder: field.displayOrder,
-        label: definition.label,
-        type: definition.type,
-        category: definition.category,
-        required: false as const,
-      };
-    });
-
-  return [...DEFAULT_BOOKING_FIELDS, ...extras];
-}

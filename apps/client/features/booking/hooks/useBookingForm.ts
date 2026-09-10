@@ -7,6 +7,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { createBooking } from "../api/bookingApi";
 import type { BookingFormField, HoldResult } from "../type";
 import {
+  BOOKING_FIELD_DEFINITIONS,
+  type BookingFieldKey,
+} from "../../../features/bookingFields/bookingFieldLibrary";
+import {
   buildBookingSchema,
   DEFAULT_BOOKING_FORM_VALUES,
   type BookingFormValues,
@@ -16,12 +20,66 @@ export type { BookingFormValues };
 
 export function useBookingForm(
   holdResult: HoldResult | null,
-  fields: BookingFormField[]
 ) {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [bookingDone, setBookingDone] = useState(false);
   const [meetLink, setMeetLink] = useState<string | null>(null);
+  const [selectedFieldKeys, setSelectedFieldKeys] =
+  useState<BookingFieldKey[]>([]);
+
+  const addField = (fieldKey: BookingFieldKey) => {
+  setSelectedFieldKeys((prev) =>
+    prev.includes(fieldKey)
+      ? prev
+      : [...prev, fieldKey]
+  );
+};
+
+const removeField = (fieldKey: BookingFieldKey) => {
+  setSelectedFieldKeys((prev) =>
+    prev.filter((key) => key !== fieldKey)
+  );
+};
+
+  const fields: BookingFormField[] = [
+  {
+    fieldKey: "fullName",
+    label: "Full Name",
+    type: "text",
+    category: "Basic",
+    required: true,
+  },
+  {
+    fieldKey: "email",
+    label: "Email Address",
+    type: "email",
+    category: "Basic",
+    required: true,
+  },
+  {
+    fieldKey: "whatsappNumber",
+    label: "WhatsApp Number",
+    type: "tel",
+    category: "Basic",
+    required: true,
+  },
+  {
+    fieldKey: "comments",
+    label: "Comments / Message",
+    type: "tel",
+    category: "Basic",
+    required: false,
+  },
+
+...selectedFieldKeys.map((fieldKey): BookingFormField => ({
+    fieldKey,
+    label: BOOKING_FIELD_DEFINITIONS[fieldKey].label,
+    type: BOOKING_FIELD_DEFINITIONS[fieldKey].type,
+    category: BOOKING_FIELD_DEFINITIONS[fieldKey].category,
+    required: false,
+  })),
+];
 
   const bookingSchema = useMemo(
     () => buildBookingSchema(fields),
@@ -80,5 +138,9 @@ export function useBookingForm(
       bookingDone,
       meetLink,
       onSubmit,
+      fields,
+      selectedFieldKeys,
+      addField,
+      removeField,
   };
 }
