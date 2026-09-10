@@ -74,7 +74,7 @@ const removeField = (fieldKey: BookingFieldKey) => {
   {
     fieldKey: "comments",
     label: "Comments / Message",
-    type: "tel",
+    type: "textarea",
     category: "Basic",
     required: false,
   },

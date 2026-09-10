@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ChangeEvent } from "react";
 import type { UseFormRegister, FieldErrors } from "react-hook-form";
 import type { BookingFormField } from "../type";
 import type { BookingFormValues } from "../validation/BookingSchema";
@@ -10,10 +10,15 @@ import { BOOKING_FIELD_DEFINITIONS, type BookingFieldKey } from "../../bookingFi
   "internEmail",
   "phoneNumber",
   "location",
-  "collegeUniversity",
   "reasonForBooking",
   "expectations",
   "additionalInformation",
+];
+
+const HIDDEN_FIELD_KEYS: BookingFieldKey[] = [
+  "advisorName",
+  "advisorEmail",
+  "internId",
 ];
 
 type BookingFormProps = {
@@ -46,12 +51,6 @@ export default function BookingForm({
 const [showAllSuggestedFields, setShowAllSuggestedFields] =
   useState(false);
 
-  const HIDDEN_FIELD_KEYS: BookingFieldKey[] = [
-  "advisorName",
-  "advisorEmail",
-  "internId",
-];
-
 const suggestedFields = (
   Object.keys(BOOKING_FIELD_DEFINITIONS) as BookingFieldKey[]
 ).filter(
@@ -65,6 +64,11 @@ const visibleSuggestedFields = showAllSuggestedFields
   : PRIORITY_FIELD_KEYS.filter((fieldKey) =>
       suggestedFields.includes(fieldKey)
     );
+
+const hasMoreSuggestedFields = suggestedFields.some(
+  (fieldKey) => !PRIORITY_FIELD_KEYS.includes(fieldKey)
+);
+
   return (
   <form
     onSubmit={onSubmit}
@@ -88,10 +92,11 @@ const visibleSuggestedFields = showAllSuggestedFields
           {fields.map((field) => {
             const error = errors[field.fieldKey];
 
-            const commonProps = {
-              ...register(field.fieldKey),
-              placeholder: `${field.label}${field.required ? " *" : ""}`,
-            };
+        const registered = register(field.fieldKey);
+        const commonProps = {
+         ...registered,
+          placeholder: `${field.label}${field.required ? " *" : ""}`,
+          };
 
             if (field.type === "textarea") {
               return (
@@ -128,10 +133,21 @@ const visibleSuggestedFields = showAllSuggestedFields
             return (
               <div key={field.fieldKey}>
                 <input
-                  {...commonProps}
-                  type={field.type}
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
-                />
+  {...commonProps}
+  type={field.type}
+  inputMode={
+    field.fieldKey === "whatsappNumber" ? "numeric" : undefined
+  }
+  onChange={
+    field.fieldKey === "whatsappNumber"
+      ? (e: ChangeEvent<HTMLInputElement>) => {
+          e.target.value = e.target.value.replace(/\D/g, "");
+          registered.onChange(e);
+        }
+      : commonProps.onChange
+  }
+  className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
+/>
 
                 {error && (
                   <p className="mt-1 text-xs text-red-600">
@@ -193,32 +209,32 @@ const visibleSuggestedFields = showAllSuggestedFields
         </p>
 
         <div className="mt-4 space-y-2">
-          {visibleSuggestedFields.map((fieldKey) => {
-            const field = BOOKING_FIELD_DEFINITIONS[fieldKey];
+  {visibleSuggestedFields.map((fieldKey) => {
+    const field = BOOKING_FIELD_DEFINITIONS[fieldKey];
 
-            return (
-              <button
-                key={fieldKey}
-                type="button"
-                onClick={() => addField(fieldKey)}
-                className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-left text-sm text-slate-700 hover:border-slate-400 hover:bg-slate-50"
-              >
-                <span>{field.label}</span>
-                <span className="text-base font-medium">+</span>
-              </button>
-            );
-          })}
-          {!showAllSuggestedFields &&
-      suggestedFields.length > PRIORITY_FIELD_KEYS.length && (
-        <button
-          type="button"
-          onClick={() => setShowAllSuggestedFields(true)}
-          className="w-full pt-2 text-sm font-medium text-slate-600 hover:text-slate-900"
-        >
-          More +
-        </button>
-      )}
-        </div>
+    return (
+      <button
+        key={fieldKey}
+        type="button"
+        onClick={() => addField(fieldKey)}
+        className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-left text-sm text-slate-700 hover:border-slate-400 hover:bg-slate-50"
+      >
+        <span>{field.label}</span>
+        <span className="text-base font-medium">+</span>
+      </button>
+    );
+  })}
+
+  {!showAllSuggestedFields && hasMoreSuggestedFields && (
+    <button
+      type="button"
+      onClick={() => setShowAllSuggestedFields(true)}
+      className="w-full pt-2 text-sm font-medium text-slate-600 hover:text-slate-900"
+    >
+      More +
+    </button>
+  )}
+</div>
       </aside>
     </div>
   </form>
