@@ -69,7 +69,7 @@ export const AlertsStack: React.FC<AlertsStackProps> = ({ alerts }) => {
           </div>
           <div className="flex items-center gap-3">
             <Link
-              href="/dashboard/reviews"
+              href="/dashboard/bookings?tab=completed"
               className="rounded-lg bg-amber-900 px-3 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-amber-950 transition-colors"
             >
               {alerts.pendingEvaluations.actionLabel}

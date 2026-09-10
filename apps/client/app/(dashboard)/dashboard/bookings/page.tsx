@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { RefreshIcon, CalendarIcon } from "@/features/booking/components/icons";
 import BookingCard from "@/features/booking/components/BookingCard";
 import BookingDetailsModal from "@/features/booking/components/BookingDetailsModal";
@@ -9,7 +10,7 @@ import RescheduleBookingModal from "@/features/booking/components/RescheduleBook
 import SubmitFeedbackModal from "@/features/feedback/components/SubmitFeedbackModal";
 import Pagination from "@/features/booking/components/Pagination";
 import { fetchMyBookings, markBookingOutcome } from "@/features/booking/api/bookingApi";
-import type { MyBooking } from "@/features/booking/type";
+import type { MyBooking, BookingTabCounts } from "@/features/booking/type";
 import FeedbackDetailsModal from "@/features/feedback/components/FeedbackDetailsModal";
 
 type BookingFilterTab = "all" | "ongoing" | "upcoming" | "reschedule_requested" | "completed" | "rescheduled" | "cancelled" | "no_show";
@@ -25,12 +26,21 @@ const FILTER_TABS: { id: BookingFilterTab; label: string }[] = [
   { id: "no_show", label: "No-show" },
 ];
 
-export default function BookingsPage() {
-  const [activeTab, setActiveTab] = useState<BookingFilterTab>("all");
+function BookingsContent() {
+  const searchParams = useSearchParams();
+  const tabFromUrl = searchParams.get("tab") as BookingFilterTab | null;
+  const [activeTab, setActiveTab] = useState<BookingFilterTab>(tabFromUrl || "all");
+
+  useEffect(() => {
+    if (tabFromUrl && FILTER_TABS.some((t) => t.id === tabFromUrl)) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [tabFromUrl]);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
 
   const [bookings, setBookings] = useState<MyBooking[]>([]);
+  const [tabCounts, setTabCounts] = useState<BookingTabCounts | null>(null);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -76,6 +86,9 @@ export default function BookingsPage() {
 
       setBookings(result.bookings);
       setTotalPages(result.pagination.totalPages);
+      if (result.counts) {
+        setTabCounts(result.counts);
+      }
       setError(null);
     } catch {
       setError("Failed to load bookings. Please try again.");
@@ -146,26 +159,55 @@ export default function BookingsPage() {
         />
       </div>
 
-      {/* Clean Filter Tabs Bar (No scrollbars, clean wrap) */}
-      <div className="mb-6 rounded-xl border border-slate-200/80 bg-surface-card p-1.5 shadow-surface">
-        <div className="flex flex-wrap items-center gap-1">
-          {FILTER_TABS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => handleTabChange(tab.id)}
-              className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all ${
-                activeTab === tab.id
-                  ? "bg-primary text-on-primary shadow-2xs"
-                  : "text-slate-600 hover:bg-slate-100 hover:text-on-surface"
-              }`}
-            >
-              {tab.label}
-              {tab.id === "ongoing" && (
-                <span className="ml-1.5 inline-block h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-              )}
-            </button>
-          ))}
+      {/* Clean Filter Tabs Bar */}
+      <div className="mb-6 rounded-xl border border-slate-200/80 bg-surface-card p-2 shadow-surface">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {FILTER_TABS.map((tab) => {
+            const count = tabCounts?.[tab.id];
+            const isActive = activeTab === tab.id;
+            const isOngoing = tab.id === "ongoing";
+            const isRescheduleReq = tab.id === "reschedule_requested";
+            const hasOngoing = isOngoing && count !== undefined && count > 0;
+            const hasRescheduleReq = isRescheduleReq && count !== undefined && count > 0;
+
+            let extraStyle = "text-slate-600 hover:bg-slate-100 hover:text-on-surface";
+            if (isActive) {
+              extraStyle = "bg-[#003366] text-white shadow-2xs";
+            } else if (hasOngoing) {
+              extraStyle = "bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100";
+            } else if (hasRescheduleReq) {
+              extraStyle = "bg-purple-50 text-purple-800 border border-purple-200 hover:bg-purple-100";
+            }
+
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => handleTabChange(tab.id)}
+                className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold transition-all ${extraStyle}`}
+              >
+                <span>{tab.label}</span>
+
+                {isOngoing && (
+                  <span className={`inline-block h-2 w-2 rounded-full ${hasOngoing ? "bg-emerald-500 animate-pulse" : "bg-slate-300"}`} />
+                )}
+
+                {(hasOngoing || hasRescheduleReq) && (
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-bold transition-all ${
+                      isActive
+                        ? "bg-white/20 text-white"
+                        : hasRescheduleReq
+                        ? "bg-purple-200 text-purple-900"
+                        : "bg-emerald-200 text-emerald-900"
+                    }`}
+                  >
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -285,5 +327,13 @@ export default function BookingsPage() {
       )}
       
     </div>
+  );
+}
+
+export default function BookingsPage() {
+  return (
+    <Suspense fallback={null}>
+      <BookingsContent />
+    </Suspense>
   );
 }

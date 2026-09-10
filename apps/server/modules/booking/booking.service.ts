@@ -339,7 +339,10 @@ export const bookingService = {
     const orderBy = scope === "upcoming" || scope === "ongoing"
       ? sql`${bookings.startTime} ASC`
       : sql`${bookings.createdAt} DESC`;
-    const [rows, countResult] = await Promise.all([
+
+    const reviewerCondition = eq(bookings.reviewerId, reviewerId);
+
+    const [rows, countResult, countsRes] = await Promise.all([
       db
         .select({
           id: bookings.id,
@@ -375,9 +378,23 @@ export const bookingService = {
         .select({ count: sql<number>`count(*)::int` })
         .from(bookings)
         .where(and(...conditions)),
+      db
+        .select({
+          all: sql<number>`count(*)::int`,
+          ongoing: sql<number>`count(case when ${bookings.startTime} <= ${now} and ${bookings.endTime} >= ${now} and ${bookings.status} != 'cancelled' then 1 end)::int`,
+          upcoming: sql<number>`count(case when ${bookings.startTime} >= ${now} and ${bookings.status} != 'cancelled' then 1 end)::int`,
+          reschedule_requested: sql<number>`count(case when ${bookings.status} = 'reschedule_requested' then 1 end)::int`,
+          completed: sql<number>`count(case when ${bookings.status} = 'completed' then 1 end)::int`,
+          rescheduled: sql<number>`count(case when ${bookings.status} = 'rescheduled' then 1 end)::int`,
+          cancelled: sql<number>`count(case when ${bookings.status} = 'cancelled' then 1 end)::int`,
+          no_show: sql<number>`count(case when ${bookings.status} = 'no_show' then 1 end)::int`,
+        })
+        .from(bookings)
+        .where(reviewerCondition),
     ]);
 
     const totalCount = countResult[0]?.count ?? 0;
+    const defaultCounts = { all: 0, ongoing: 0, upcoming: 0, reschedule_requested: 0, completed: 0, rescheduled: 0, cancelled: 0, no_show: 0 };
 
     return {
       bookings: rows,
@@ -387,6 +404,7 @@ export const bookingService = {
         totalCount,
         totalPages: Math.ceil(totalCount / limit),
       },
+      counts: countsRes[0] ?? defaultCounts,
     };
   },
 
