@@ -14,7 +14,7 @@ import { bookingConfirmationTemplate } from "../../emails/templates/bookingConfi
 import { bookingCancelledTemplate } from "../../emails/templates/bookingCancelled.js";
 import { bookingRescheduledTemplate } from "../../emails/templates/bookingRescheduled.js";
 import { bookingRescheduleRequestedTemplate } from "../../emails/templates/bookingRescheduleRequested.js";
-import { slotService } from "../slot/slot.service.js";
+import { slotService } from "../slot/slot.service.js"; 
 import { feedback } from "../feedback/feedback.schema.js";
 import {
   BOOKING_FIELD_DEFINITIONS,
