@@ -15,7 +15,7 @@ import ErrorState from "@/features/booking/components/ErrorState";
 import BookingConfirmation from "@/features/booking/components/BookingConfirmation";
 import StepIndicator from "@/features/booking/components/StepIndicator";
 import ReviewerInfoPanel from "@/features/booking/components/ReviewerInfoPanel";
-import MonthCalendar from "@/features/booking/components/MonthCalender";
+import MonthCalendar from "@/features/booking/components/MonthCalendar";
 import SlotPicker from "@/features/booking/components/SlotPicker";
 import TimeSelectedCard from "@/features/booking/components/TimeSelectedCard";
 import BookingForm from "@/features/booking/components/BookingForm";
@@ -58,14 +58,16 @@ export default function PublicBookingPage() {
 
   const {
     register,
+    onSubmit,
     errors,
     advisorEmail,
     submitting,
     submitError,
     bookingDone,
     meetLink,
-    onSubmit,
-  } = useBookingForm(holdResult);
+  } = useBookingForm( holdResult,
+  pageInfo?.reviewer.bookingFormFields ?? []
+);
 
   const currentStep = bookingDone ? 3 : showDetailsForm ? 2 : 1;
   const slotsForSelectedDate = slots.filter((s) => s.date === selectedDate);
@@ -139,6 +141,7 @@ export default function PublicBookingPage() {
 
               {holdResult && showDetailsForm && (
                 <BookingForm
+                  fields={pageInfo.reviewer.bookingFormFields}
                   register={register}
                   errors={errors}
                   submitting={submitting}

@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, varchar, text, timestamp, type AnyPgColumn } from 'drizzle-orm/pg-core';
+import { pgTable, serial, integer, varchar, text, jsonb, timestamp, type AnyPgColumn } from 'drizzle-orm/pg-core';
 import { reviewers } from '../auth/reviewers.schema.js';
 import { eventTypes } from '../eventType/eventTypes.schema.js';
 import { bookingStatus } from '../../db/schema/enums.js';
@@ -20,7 +20,10 @@ export const bookings = pgTable('bookings', {
   advisorEmail: varchar('advisor_email', { length: 255 }).notNull(),
   internEmails: text('intern_emails').array(),
   weekStage: varchar('week_stage', { length: 255 }).notNull(),
-
+  formData: jsonb("form_data")
+  .$type<Record<string, string>>()
+  .notNull()
+  .default({}),
   startTime: timestamp('start_time', { withTimezone: true }).notNull(),
   endTime: timestamp('end_time', { withTimezone: true }).notNull(),
 

@@ -7,13 +7,15 @@ import dayjs from "dayjs";
 import { useAuthStore } from "@/features/auth/store/authStore";
 import GoogleCalendarCard from "@/features/calendar/components/GoogleCalendarCard";
 import ProfileInfoCard from "@/features/auth/components/ProfileInfoCard";
+import BookingFieldsEditor from "@/features/bookingFields/BookingFiledsEditor";
 import { ApiError } from "@/lib/axios";
 
-type Tab = "profile" | "calendar" | "account";
+type Tab = "profile" | "calendar" | "booking" | "account";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "profile", label: "Profile" },
   { id: "calendar", label: "Calendar" },
+  { id: "booking", label: "Booking Form" },
   { id: "account", label: "Account" },
 ];
 
@@ -125,6 +127,13 @@ export default function SettingsPage() {
       {activeTab === "calendar" && (
         <div className="mt-6">
           <GoogleCalendarCard />
+        </div>
+      )}
+
+      {/* ---- Booking Form tab ---- */}
+      {activeTab === "booking" && (
+        <div className="mt-6">
+          <BookingFieldsEditor />
         </div>
       )}
 

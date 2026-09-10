@@ -1,7 +1,9 @@
 import type { UseFormRegister, FieldErrors } from "react-hook-form";
+import type { BookingFormField } from "../type";
 import type { BookingFormValues } from "../validation/BookingSchema";
 
 type BookingFormProps = {
+  fields: BookingFormField[];
   register: UseFormRegister<BookingFormValues>;
   errors: FieldErrors<BookingFormValues>;
   submitting: boolean;
@@ -12,6 +14,7 @@ type BookingFormProps = {
 };
 
 export default function BookingForm({
+  fields,
   register,
   errors,
   submitting,
@@ -38,72 +41,35 @@ export default function BookingForm({
       </div>
 
       <div className="space-y-3">
-        <div>
-          <input
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-primary"
-            placeholder="Advisor name"
-            {...register("advisorName")}
-          />
-          {errors.advisorName && (
-            <p className="mt-1 text-xs text-error">{errors.advisorName.message}</p>
-          )}
-        </div>
+        {fields.map((field) => {
+          const error = errors[field.fieldKey];
 
-        <div>
-          <input
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-primary"
-            placeholder="Advisor email"
-            type="email"
-            {...register("advisorEmail")}
-          />
-          {errors.advisorEmail && (
-            <p className="mt-1 text-xs text-error">{errors.advisorEmail.message}</p>
-          )}
-        </div>
+          const commonProps = {
+            id: field.fieldKey,
+            className:
+              "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-primary",
+            placeholder: field.required
+              ? `${field.label} *`
+              : field.label,
+            ...register(field.fieldKey),
+          };
 
-        <div>
-          <input
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-primary"
-            placeholder="Intern name"
-            {...register("internName")}
-          />
-          {errors.internName && (
-            <p className="mt-1 text-xs text-error">{errors.internName.message}</p>
-          )}
-        </div>
+          return (
+            <div key={field.fieldKey}>
+              {field.type === "textarea" ? (
+                <textarea {...commonProps} rows={3} />
+              ) : (
+                <input {...commonProps} type={field.type} />
+              )}
 
-        <div>
-          <input
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-primary"
-            placeholder="Batch"
-            {...register("batch")}
-          />
-          {errors.batch && (
-            <p className="mt-1 text-xs text-error">{errors.batch.message}</p>
-          )}
-        </div>
-
-        <div>
-          <input
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-primary"
-            placeholder="Intern email(s), comma separated — optional"
-            {...register("internEmails")}
-          />
-          {errors.internEmails && (
-            <p className="mt-1 text-xs text-error">{errors.internEmails.message}</p>
-          )}
-        </div>
-
-        <div>
-          <input
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-primary"
-            placeholder="Week / stage"
-            {...register("weekStage")}
-          />
-          {errors.weekStage && (
-            <p className="mt-1 text-xs text-error">{errors.weekStage.message}</p>
-          )}
-        </div>
+              {error && (
+                <p className="mt-1 text-xs text-error">
+                  {String(error.message ?? "Invalid value")}
+                </p>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {submitError && (

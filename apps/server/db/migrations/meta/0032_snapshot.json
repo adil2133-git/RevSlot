@@ -1,6 +1,6 @@
 {
-  "id": "3da8f2f1-ea14-44ed-9bf9-aca115953366",
-  "prevId": "e8273848-36cd-4be5-9899-b8bf13488c6a",
+  "id": "4c637d3a-bfa4-4060-830a-36b1f2622f89",
+  "prevId": "3da8f2f1-ea14-44ed-9bf9-aca115953366",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1097,6 +1097,13 @@
           "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true
+        },
+        "form_data": {
+          "name": "form_data",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
         },
         "start_time": {
           "name": "start_time",

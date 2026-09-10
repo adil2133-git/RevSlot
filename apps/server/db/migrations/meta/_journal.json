@@ -127,6 +127,20 @@
       "when": 1788965373824,
       "tag": "0031_strange_goblin_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1789042827847,
+      "tag": "0031_curvy_wolfsbane",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1789051615328,
+      "tag": "0032_yielding_triton",
+      "breakpoints": true
     }
   ]
 }

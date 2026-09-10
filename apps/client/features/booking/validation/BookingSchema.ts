@@ -1,20 +1,44 @@
 import { z } from "zod";
+import type { BookingFormField } from "../type";
 
-export const bookingSchema = z.object({
-  advisorName: z.string().trim().min(1, "Advisor name is required"),
-  advisorEmail: z.string().trim().email("Enter a valid email address"),
-  internName: z.string().trim().min(1, "Intern name is required"),
-  batch: z.string().trim().min(1, "Batch is required"),
-  internEmails: z
-    .string()
-    .optional()
-    .refine((value) => {
-      if (!value || !value.trim()) return true;
-      const emails = value.split(",").map((e) => e.trim()).filter(Boolean);
-      if (emails.length > 10) return false;
-      return emails.every((e) => z.string().email().safeParse(e).success);
-    }, "Enter valid email(s), separated by commas"),
-  weekStage: z.string().trim().min(1, "Week / stage is required"),
-});
+export const DEFAULT_BOOKING_FORM_VALUES = {
+  fullName: "",
+  email: "",
+  whatsappNumber: "",
+  comments: "",
+} as const;
 
-export type BookingFormValues = z.infer<typeof bookingSchema>;
+export function buildBookingSchema(fields: BookingFormField[]) {
+  const shape: Record<string, z.ZodTypeAny> = {
+    fullName: z.string().trim().min(1, "Full name is required"),
+    email: z.string().trim().email("Enter a valid email address"),
+    whatsappNumber: z.string().trim().min(1, "WhatsApp number is required"),
+    comments: z.string().optional(),
+  };
+
+  for (const field of fields) {
+    if (field.fieldKey in shape) continue;
+
+    let validator = z.string().trim();
+
+    if (field.type === "email") {
+      validator = z
+        .string()
+        .trim()
+        .email(`Enter a valid ${field.label.toLowerCase()}`);
+    } else if (field.type === "url") {
+      validator = z
+        .string()
+        .trim()
+        .url(`Enter a valid ${field.label.toLowerCase()}`);
+    }
+
+    shape[field.fieldKey] = field.required
+      ? validator.min(1, `${field.label} is required`)
+      : validator.optional();
+  }
+
+  return z.object(shape);
+}
+
+export type BookingFormValues = Record<string, string>;

@@ -3,13 +3,9 @@ import { z } from "zod";
 // Advisor booking form submission — confirms a held slot.
 export const CreateBookingSchema = z.object({
   holdToken: z.string().uuid("Invalid hold token"),
-  advisorName: z.string().min(1, "Advisor name is required").max(150),
-  advisorEmail: z.string().email("Invalid advisor email"),
-  internName: z.string().min(1, "Intern name is required").max(150),
-  batch: z.string().min(1, "Batch is required").max(50),
-  // Optional per docs: "Intern Email(s) — optional", supports multiple emails
-  internEmails: z.array(z.string().email()).max(10).optional(),
-  weekStage: z.string().min(1, "Week/stage is required").max(255),
+  formData: z
+    .record(z.string(), z.string())
+    .default({}),
 });
 
 export type CreateBookingInput = z.infer<typeof CreateBookingSchema>;
@@ -82,4 +78,4 @@ export const RespondRescheduleSchema = z.object({
   declineReason: z.string().max(500).optional(),
 });
 
-export type RespondRescheduleInput = z.infer<typeof RespondRescheduleSchema>;
+export type RespondRescheduleInput = z.infer<typeof RespondRescheduleSchema>;

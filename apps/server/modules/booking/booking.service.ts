@@ -16,6 +16,7 @@ import { bookingRescheduledTemplate } from "../../emails/templates/bookingResche
 import { bookingRescheduleRequestedTemplate } from "../../emails/templates/bookingRescheduleRequested.js";
 import { slotService } from "../slot/slot.service.js";
 import { feedback } from "../feedback/feedback.schema.js";
+import { getEffectiveBookingFields } from "./bookingFields.js";
 
 export interface GetMyBookingsOptions {
   page: number;
@@ -137,21 +138,64 @@ export const bookingService = {
       ).toDate();
       const endTimestamp = dayjs(`${slot.slotDate}T${slot.endTime}`).toDate();
 
+      const [reviewer] = await tx
+  .select({
+    bookingFormFields: reviewers.bookingFormFields,
+  })
+  .from(reviewers)
+  .where(eq(reviewers.id, slot.reviewerId))
+  .limit(1);
+
+if (!reviewer) {
+  throw new AppError("Reviewer not found", 404);
+}
+
+const effectiveFields = getEffectiveBookingFields(
+  reviewer.bookingFormFields
+);
+
+const allowedKeys = new Set<string>(
+  effectiveFields.map((field) => field.fieldKey)
+);
+
+const submittedFormData: Record<string, string> = data.formData ?? {};
+
+const formData = Object.fromEntries(
+  Object.entries(submittedFormData)
+    .filter(([key]) => allowedKeys.has(key))
+    .map(([key, value]) => [key, value.trim()])
+);
+
+for (const field of effectiveFields) {
+  if (
+    field.required &&
+    !formData[field.fieldKey]?.trim()
+  ) {
+    throw new AppError(`${field.label} is required`, 400);
+  }
+}
+
       const [booking] = await tx
         .insert(bookings)
         .values({
-          eventTypeId: slot.eventTypeId,
-          reviewerId: slot.reviewerId,
-          internName: data.internName,
-          batch: data.batch,
-          advisorName: data.advisorName,
-          advisorEmail: data.advisorEmail,
-          internEmails: data.internEmails,
-          weekStage: data.weekStage,
-          startTime: startTimestamp,
-          endTime: endTimestamp,
-          status: "confirmed",
-        })
+           eventTypeId: slot.eventTypeId,
+           reviewerId: slot.reviewerId,
+           internName: formData.internName || formData.fullName || "",
+           batch: formData.batch || "",
+           advisorName: formData.advisorName || formData.fullName || "",
+           advisorEmail: formData.advisorEmail || formData.email || "",
+           internEmails: formData.internEmail
+            ? [formData.internEmail]
+            : undefined,
+           weekStage: formData.weekStage || "",
+
+          // New dynamic booking form data
+           formData,
+
+           startTime: startTimestamp,
+           endTime: endTimestamp,
+           status: "confirmed",
+       })
         .returning();
 
       if (!booking) {
@@ -349,6 +393,7 @@ export const bookingService = {
           advisorName: bookings.advisorName,
           advisorEmail: bookings.advisorEmail,
           weekStage: bookings.weekStage,
+          formData: bookings.formData,
           startTime: bookings.startTime,
           endTime: bookings.endTime,
           status: bookings.status,

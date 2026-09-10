@@ -10,6 +10,7 @@ import availabilityRoutes from "./modules/availability/availability.routes.js";
 import questionBankRoutes from "./modules/questionBank/questionBank.routes.js";
 import slotRoutes from "./modules/slot/slot.routes.js";
 import bookingRoutes from "./modules/booking/booking.routes.js"
+import bookingFieldsRoutes from "./modules/booking/bookingFields.routes.js";
 import eventTypeRoutes from "./modules/eventType/eventType.routes.js"
 import adminRoutes from "./modules/admin/admin.routes.js"
 import vacationRoutes from "./modules/vacation/vacation.routes.js";
@@ -46,6 +47,7 @@ app.use("/api/vacation-blocks", vacationRoutes);
 app.use("/api/calendar", calendarRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/booking-fields", bookingFieldsRoutes);
 
 app.get('/', (req, res) => {
   res.send('Server is running');
