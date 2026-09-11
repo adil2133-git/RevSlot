@@ -108,3 +108,124 @@ export type ListAuditLogResponse = {
   logs: AuditLogEntry[];
   pagination: Pagination;
 };
+
+export type AnalyticsRange = "7d" | "30d" | "90d" | "this_month" | "all";
+
+export type AnalyticsQueryParams = {
+  range?: AnalyticsRange;
+  fromDate?: string;
+  toDate?: string;
+};
+
+export type KpiSummary = {
+  weeklyBookings: number;
+  bookingsChangePct: number | null;
+  overallNoShowRatePct: number;
+  noShowRateDeltaPct: number | null;
+  avgFeedbackTurnaroundHours: number;
+  turnaroundDeltaHours: number | null;
+  totalCompletedReviews: number;
+  activeReviewers: number;
+};
+
+export type ReviewerBookingStat = {
+  reviewerId: number;
+  reviewerName: string;
+  email: string;
+  bookingCount: number;
+  completedCount: number;
+  noShowCount: number;
+  percentageOfMax: number;
+};
+
+export type ReviewerNoShowStat = {
+  reviewerId: number;
+  reviewerName: string;
+  email: string;
+  noShowRatePct: number;
+  noShowCount: number;
+  completedCount: number;
+  totalSessions: number;
+};
+
+export type TechStackStat = {
+  name: string;
+  count: number;
+  percentage: number;
+  color: string;
+};
+
+export type AnalyticsData = {
+  timeframe: {
+    range: string;
+    startDate: string;
+    endDate: string;
+    prevStartDate: string;
+    prevEndDate: string;
+  };
+  kpis: KpiSummary;
+  bookingsPerReviewer: ReviewerBookingStat[];
+  noShowRatePerReviewer: ReviewerNoShowStat[];
+  popularTechStacks: TechStackStat[];
+};
+
+export type AdminFeedbackItem = {
+  id: number;
+  bookingId: number;
+  reviewerId: number;
+  reviewerName: string;
+  reviewerEmail: string;
+  reviewerBio: string | null;
+  internName: string;
+  advisorName: string;
+  advisorEmail: string;
+  batch: string;
+  weekStage: string;
+  formId: number | null;
+  formName: string | null;
+  eventTypeName: string | null;
+  isNoShow: boolean;
+  reviewMark: string | null;
+  taskMark: string | null;
+  understandingLevel: string | null;
+  comments: string | null;
+  customFieldValues: Record<string, any> | null;
+  createdAt: string;
+  sessionStartTime: string;
+  sessionEndTime: string;
+};
+
+export type AdminFeedbackDetails = AdminFeedbackItem & {
+  taskMarkEnabled: boolean | null;
+  updatedAt?: string | null;
+  customFields: Array<{
+    id: number;
+    label: string;
+    fieldType: string;
+    value: string;
+    options?: string[] | null;
+  }>;
+  pendingQuestions: Array<{
+    id: number;
+    questionId: number;
+    questionText: string;
+    description: string | null;
+    status: string;
+    assignedAt: string;
+    completedAt: string | null;
+  }>;
+};
+
+export type ListAdminFeedbackParams = {
+  search?: string;
+  reviewerId?: number;
+  fromDate?: string;
+  toDate?: string;
+  page?: number;
+  limit?: number;
+};
+
+export type ListAdminFeedbackResponse = {
+  submissions: AdminFeedbackItem[];
+  pagination: Pagination;
+};

@@ -10,6 +10,11 @@ import type {
   UpdateAdminProfileInput,
   AuditLogEntry,
   ListAuditLogParams,
+  AnalyticsData,
+  AnalyticsQueryParams,
+  AdminFeedbackItem,
+  AdminFeedbackDetails,
+  ListAdminFeedbackParams,
 } from "../types";
 import * as api from "../api/adminApi";
 
@@ -19,10 +24,16 @@ type AdminState = {
   bookings: AdminBooking[];
   bookingsPagination: Pagination | null;
   stats: DashboardStats | null;
+  analytics: AnalyticsData | null;
+  feedbackHistory: AdminFeedbackItem[];
+  feedbackPagination: Pagination | null;
+  selectedFeedback: AdminFeedbackDetails | null;
   profile: AdminProfile | null;
   auditLog: AuditLogEntry[];
   auditLogPagination: Pagination | null;
   isLoading: boolean;
+  isAnalyticsLoading: boolean;
+  isFeedbackLoading: boolean;
   isProfileLoading: boolean;
   error: string | null;
 
@@ -30,6 +41,10 @@ type AdminState = {
   toggleReviewerStatus: (reviewerId: number, isActive: boolean) => Promise<void>;
   fetchBookings: (params?: ListBookingsParams) => Promise<void>;
   fetchStats: () => Promise<void>;
+  fetchAnalytics: (params?: AnalyticsQueryParams) => Promise<void>;
+  downloadAnalyticsCsv: (params?: AnalyticsQueryParams) => Promise<void>;
+  fetchFeedbackHistory: (params?: ListAdminFeedbackParams) => Promise<void>;
+  fetchFeedbackDetails: (id: number) => Promise<AdminFeedbackDetails>;
   fetchProfile: () => Promise<void>;
   updateProfile: (input: UpdateAdminProfileInput) => Promise<void>;
   fetchAuditLog: (params?: ListAuditLogParams) => Promise<void>;
@@ -41,10 +56,16 @@ export const useAdminStore = create<AdminState>((set) => ({
   bookings: [],
   bookingsPagination: null,
   stats: null,
+  analytics: null,
+  feedbackHistory: [],
+  feedbackPagination: null,
+  selectedFeedback: null,
   profile: null,
   auditLog: [],
   auditLogPagination: null,
   isLoading: false,
+  isAnalyticsLoading: false,
+  isFeedbackLoading: false,
   isProfileLoading: false,
   error: null,
 
@@ -92,6 +113,51 @@ export const useAdminStore = create<AdminState>((set) => ({
       set({ stats });
     } catch (err) {
       set({ error: (err as Error).message });
+    }
+  },
+
+  fetchAnalytics: async (params) => {
+    set({ isAnalyticsLoading: true, error: null });
+    try {
+      const analytics = await api.getAnalytics(params);
+      set({ analytics, isAnalyticsLoading: false });
+    } catch (err) {
+      set({ isAnalyticsLoading: false, error: (err as Error).message });
+    }
+  },
+
+  downloadAnalyticsCsv: async (params) => {
+    set({ error: null });
+    try {
+      await api.downloadAnalyticsCsv(params);
+    } catch (err) {
+      set({ error: (err as Error).message });
+    }
+  },
+
+  fetchFeedbackHistory: async (params) => {
+    set({ isFeedbackLoading: true, error: null });
+    try {
+      const { submissions, pagination } = await api.listAdminFeedback(params);
+      set({
+        feedbackHistory: submissions,
+        feedbackPagination: pagination,
+        isFeedbackLoading: false,
+      });
+    } catch (err) {
+      set({ isFeedbackLoading: false, error: (err as Error).message });
+    }
+  },
+
+  fetchFeedbackDetails: async (id: number) => {
+    set({ error: null });
+    try {
+      const details = await api.getAdminFeedbackDetails(id);
+      set({ selectedFeedback: details });
+      return details;
+    } catch (err) {
+      set({ error: (err as Error).message });
+      throw err;
     }
   },
 

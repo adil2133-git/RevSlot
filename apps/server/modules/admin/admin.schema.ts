@@ -50,3 +50,21 @@ export const UpdateAdminProfileSchema = z
   });
 
 export type UpdateAdminProfileInput = z.infer<typeof UpdateAdminProfileSchema>;
+
+// GET /api/admin/feedback — feedback history query filters
+export const ListAdminFeedbackQuerySchema = z.object({
+  search: z.string().trim().max(150).optional(),
+  reviewerId: z.coerce.number().int().positive().optional(),
+  fromDate: z.string().date().optional(),
+  toDate: z.string().date().optional(),
+  page: z.coerce.number().int().min(1).optional().default(1),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(10),
+});
+
+export type ListAdminFeedbackQuery = z.infer<typeof ListAdminFeedbackQuerySchema>;
+
+export const FeedbackIdParamsSchema = z.object({
+  id: z.coerce.number().int().positive(),
+});
+
+export type FeedbackIdParams = z.infer<typeof FeedbackIdParamsSchema>;

@@ -10,7 +10,10 @@ import {
   UpdateReviewerStatusSchema,
   ListBookingsQuerySchema,
   UpdateAdminProfileSchema,
+  ListAdminFeedbackQuerySchema,
+  FeedbackIdParamsSchema,
 } from "./admin.schema.js";
+import { GetAnalyticsQuerySchema } from "./analytics.schema.js";
 import { ListAuditLogQuerySchema } from "../auditLog/auditLog.schema.js";
 
 const router = Router();
@@ -22,6 +25,15 @@ router.get("/me", catchAsync(adminController.getProfile));
 router.patch("/me", validate(UpdateAdminProfileSchema), catchAsync(adminController.updateProfile));
 
 router.get("/dashboard-stats", catchAsync(adminController.getDashboardStats));
+router.get("/analytics", validateQuery(GetAnalyticsQuerySchema), catchAsync(adminController.getAnalytics));
+router.get("/analytics/export", validateQuery(GetAnalyticsQuerySchema), catchAsync(adminController.exportAnalyticsCsv));
+
+router.get("/feedback", validateQuery(ListAdminFeedbackQuerySchema), catchAsync(adminController.listFeedbackHistory));
+router.get(
+  "/feedback/:id",
+  validateParams(FeedbackIdParamsSchema),
+  catchAsync(adminController.getFeedbackDetails)
+);
 
 router.get("/reviewers", validateQuery(ListReviewersQuerySchema), catchAsync(adminController.listReviewers));
 router.patch(
