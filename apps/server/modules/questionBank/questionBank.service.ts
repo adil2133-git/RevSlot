@@ -1,7 +1,7 @@
 import { eq, and, asc, sql } from "drizzle-orm";
 import { db } from "../../config/db.js";
-import { questionBanks } from "./questionBanks.model.js";
-import { questions } from "./questions.model.js";
+import { questionBanks } from "./questionBanks.schema.js";
+import { questions } from "./questions.schema.js";
 import { AppError } from "../../core/errors/AppError.js";
 import type {
   CreateBankInput,
@@ -9,7 +9,7 @@ import type {
   CreateQuestionInput,
   UpdateQuestionInput,
   ReorderQuestionsInput,
-} from "./questionBank.schema.js";
+} from "./questionBank.validation.js";
 
 // Every function takes reviewerId and checks it against the row's
 // reviewer_id — a reviewer can only ever see/touch their own banks and

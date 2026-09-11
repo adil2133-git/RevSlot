@@ -6,7 +6,7 @@ import { AppError } from "../../core/errors/AppError.js";
 const parseTemplateId = (raw: string | string[] | undefined): number => {
   if (Array.isArray(raw)) {
     throw new AppError("Invalid template id", 400);
-  }
+}
 
   const id = Number(raw);
   if (!Number.isInteger(id) || id <= 0) {

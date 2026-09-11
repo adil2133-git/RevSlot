@@ -1,7 +1,7 @@
 import { Router } from "express";
 
 import { validate } from "../../core/middlewares/validate.middleware.js";
-import { LoginSchema, RegisterSchema, ForgotPasswordSchema, ResetPasswordSchema, VerifyEmailSchema, ResendVerificationSchema, GoogleAuthSchema, UpdateUsernameSchema,  UpdateProfileSchema, ChangePasswordSchema } from "./auth.schema.js";
+import { LoginSchema, RegisterSchema, ForgotPasswordSchema, ResetPasswordSchema, VerifyEmailSchema, ResendVerificationSchema, GoogleAuthSchema, UpdateUsernameSchema,  UpdateProfileSchema, ChangePasswordSchema } from "./auth.validation.js";
 import { catchAsync } from "../../core/utils/catchAsync.js";
 import { authController } from "./auth.controller.js";
 import { requireAuth, requireAdmin } from "../../core/middlewares/auth.middleware.js";

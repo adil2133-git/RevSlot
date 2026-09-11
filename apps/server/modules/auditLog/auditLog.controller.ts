@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { auditLogService } from "./auditLog.service.js";
-import type { ListAuditLogQuery } from "./auditLog.schema.js";
+import type { ListAuditLogQuery } from "./auditLog.validation.js";
 
 export const auditLogController = {
   listAuditLogs: async (req: Request, res: Response) => {

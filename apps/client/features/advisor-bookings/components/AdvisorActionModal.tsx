@@ -6,7 +6,7 @@ import type { AdvisorBookingItem } from "../types";
 import { advisorApi } from "../services/advisorApi";
 import { isWithinCancelCutoff, CANCEL_CUTOFF_HOURS, formatBookingDate, formatBookingTimeRange } from "@/features/booking/utils/bookingDisplay";
 import { useAvailableSlots } from "@/features/booking/hooks/useAvailableSlots";
-import MonthCalendar from "@/features/booking/components/MonthCalender";
+import MonthCalendar from "@/features/booking/components/MonthCalendar";
 import SlotPicker from "@/features/booking/components/SlotPicker";
 import type { SlotItem } from "@/features/booking/type";
 

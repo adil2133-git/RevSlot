@@ -10,8 +10,8 @@ import {
   UpdateReviewerStatusSchema,
   ListBookingsQuerySchema,
   UpdateAdminProfileSchema,
-} from "./admin.schema.js";
-import { ListAuditLogQuerySchema } from "../auditLog/auditLog.schema.js";
+} from "./admin.validation.js";
+import { ListAuditLogQuerySchema } from "../auditLog/auditLog.validation.js";
 
 const router = Router();
 

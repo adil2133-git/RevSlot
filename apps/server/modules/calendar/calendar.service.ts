@@ -1,7 +1,7 @@
 import { google } from "googleapis";
 import { eq } from "drizzle-orm";
 import { db } from "../../config/db.js";
-import { reviewers } from "../auth/reviewers.model.js";
+import { reviewers } from "../auth/reviewers.schema.js";
 import { AppError } from "../../core/errors/AppError.js";
 import { signCalendarState, verifyCalendarState } from "../../core/utils/jwt.js";
 

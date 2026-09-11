@@ -1,6 +1,6 @@
 import { and, desc, eq, count } from "drizzle-orm";
 import { db } from "../../config/db.js";
-import { notifications } from "./notification.model.js";
+import { notifications } from "./notification.schema.js";
 import { AppError } from "../../core/errors/AppError.js";
 
 export type NotificationTypeValue =

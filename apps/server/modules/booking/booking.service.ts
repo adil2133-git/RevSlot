@@ -6,16 +6,19 @@ import { slots } from "../slot/slots.schema.js";
 import { bookings } from "./bookings.schema.js";
 import { AppError } from "../../core/errors/AppError.js";
 import type { CreateBookingInput, CancelBookingInput, RescheduleBookingInput, RequestRescheduleInput, RespondRescheduleInput } from "./booking.validation.js";
-import { eventTypes } from "../eventType/eventTypes.model.js";
-import { reviewers } from "../auth/reviewers.model.js";
+import { eventTypes } from "../eventType/eventTypes.schema.js";
+import { reviewers } from "../auth/reviewers.schema.js";
 import { calendarService } from "../calendar/calendar.service.js";
 import { emailService } from "../../services/email.service.js";
 import { bookingConfirmationTemplate } from "../../emails/templates/bookingConfirmation.js";
 import { bookingCancelledTemplate } from "../../emails/templates/bookingCancelled.js";
 import { bookingRescheduledTemplate } from "../../emails/templates/bookingRescheduled.js";
 import { bookingRescheduleRequestedTemplate } from "../../emails/templates/bookingRescheduleRequested.js";
-import { slotService } from "../slot/slot.service.js";
-import { feedback } from "../feedback/feedback.model.js";
+import { slotService } from "../slot/slot.service.js"; 
+import { feedback } from "../feedback/feedback.schema.js";
+import {
+  BOOKING_FIELD_DEFINITIONS,
+} from "./bookingFields.js";
 
 export interface GetMyBookingsOptions {
   page: number;
@@ -137,21 +140,45 @@ export const bookingService = {
       ).toDate();
       const endTimestamp = dayjs(`${slot.slotDate}T${slot.endTime}`).toDate();
 
+  const allowedKeys = new Set<string>([
+  "fullName",
+  "email",
+  "whatsappNumber",
+  "mainlyFocusedFor",
+  "comments",
+  ...Object.keys(BOOKING_FIELD_DEFINITIONS),
+]);
+
+  const submittedFormData: Record<string, string> =
+  data.formData ?? {};
+
+ const formData = Object.fromEntries(
+  Object.entries(submittedFormData)
+    .filter(([key]) => allowedKeys.has(key))
+    .map(([key, value]) => [key, value.trim()])
+);
+
       const [booking] = await tx
         .insert(bookings)
         .values({
-          eventTypeId: slot.eventTypeId,
-          reviewerId: slot.reviewerId,
-          internName: data.internName,
-          batch: data.batch,
-          advisorName: data.advisorName,
-          advisorEmail: data.advisorEmail,
-          internEmails: data.internEmails,
-          weekStage: data.weekStage,
-          startTime: startTimestamp,
-          endTime: endTimestamp,
-          status: "confirmed",
-        })
+           eventTypeId: slot.eventTypeId,
+           reviewerId: slot.reviewerId,
+           internName: formData.internName || formData.fullName || "",
+           batch: formData.batch || "",
+           advisorName: formData.advisorName || formData.fullName || "",
+           advisorEmail: formData.advisorEmail || formData.email || "",
+           internEmails: formData.internEmail
+            ? [formData.internEmail]
+            : undefined,
+           weekStage: formData.weekStage || "",
+
+          // New dynamic booking form data
+           formData,
+
+           startTime: startTimestamp,
+           endTime: endTimestamp,
+           status: "confirmed",
+       })
         .returning();
 
       if (!booking) {
@@ -352,6 +379,7 @@ export const bookingService = {
           advisorName: bookings.advisorName,
           advisorEmail: bookings.advisorEmail,
           weekStage: bookings.weekStage,
+          formData: bookings.formData,
           startTime: bookings.startTime,
           endTime: bookings.endTime,
           status: bookings.status,
@@ -419,6 +447,7 @@ export const bookingService = {
         advisorEmail: bookings.advisorEmail,
         internEmails: bookings.internEmails,
         weekStage: bookings.weekStage,
+        formData: bookings.formData,
         startTime: bookings.startTime,
         endTime: bookings.endTime,
         status: bookings.status,
