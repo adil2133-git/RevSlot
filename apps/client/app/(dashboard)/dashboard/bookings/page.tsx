@@ -119,22 +119,8 @@ function BookingsContent() {
           const detail = await fetchBookingById(targetId);
           if (detail) {
             targetBooking = {
-              id: detail.id,
-              eventTypeId: detail.eventTypeId,
-              internName: detail.internName,
-              batch: detail.batch,
-              advisorName: detail.advisorName,
-              advisorEmail: detail.advisorEmail,
-              weekStage: detail.weekStage,
-              startTime: detail.startTime,
-              endTime: detail.endTime,
-              status: detail.status,
-              meetLink: detail.meetLink,
-              cancelledAt: detail.cancelledAt,
-              cancelledReason: detail.cancelledReason,
-              eventTypeName: detail.eventTypeName,
-              bookingWindowDays: 60,
-              hasFeedback: detail.hasFeedback,
+              ...detail,
+              formData: detail.formData || {},
             };
           }
         } catch {
