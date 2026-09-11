@@ -26,6 +26,7 @@ export interface ImminentAlert {
 
 export interface PendingEvalAlert {
   count: number;
+  bookingId?: number;
   message: string;
   actionLabel: string;
 }
