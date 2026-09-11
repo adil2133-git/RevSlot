@@ -114,9 +114,21 @@ export type MyBookingsPagination = {
   totalPages: number;
 };
 
+export type BookingTabCounts = {
+  all: number;
+  ongoing: number;
+  upcoming: number;
+  reschedule_requested: number;
+  completed: number;
+  rescheduled: number;
+  cancelled: number;
+  no_show: number;
+};
+
 export type MyBookingsResponse = {
   bookings: MyBooking[];
   pagination: MyBookingsPagination;
+  counts?: BookingTabCounts;
 };
 
 export type GetMyBookingsParams = {

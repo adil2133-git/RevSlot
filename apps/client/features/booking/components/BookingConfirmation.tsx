@@ -57,11 +57,11 @@ export default function BookingConfirmation({
 
         <div className="mt-6 flex flex-col gap-2">
           <Link
-             href="/my-bookings"
-             className="block w-full rounded-lg bg-primary px-4 py-2.5 text-center text-sm font-semibold text-on-primary transition-colors hover:bg-primary/90"
-           >
-           Check My Bookings
-         </Link>
+            href="/my-bookings"
+            className="w-full rounded-lg bg-primary px-4 py-2.5 text-center text-sm font-semibold text-on-primary transition-colors hover:bg-primary/90"
+          >
+            Check My Bookings
+          </Link>
 
           <button
             type="button"

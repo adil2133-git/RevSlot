@@ -21,6 +21,7 @@ export interface AdvisorBookingItem {
   rescheduleToken?: string | null;
   rescheduleRequestedBy?: string | null;
   eventTypeName: string;
+  bookingWindowDays?: number;
   reviewerName: string;
   timezone: string;
   hasFeedback?: boolean;

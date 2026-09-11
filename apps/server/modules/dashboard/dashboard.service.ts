@@ -9,7 +9,7 @@ import { templateTimeBlocks } from "../availability/schema/templateTimeBlocks.sc
 import { questionBanks } from "../questionBank/questionBanks.schema.js";
 import { questions } from "../questionBank/questions.schema.js";
 import { AppError } from "../../core/errors/AppError.js";
-import { feedbackForms, feedbackFormQuestions } from "../feedback/feedback.schema.js";
+import { feedbackForms, feedbackFormQuestions, feedback } from "../feedback/feedback.schema.js";
 import type { GetDashboardSummaryQueryInput } from "./dashboard.validation.js";
 
 export const dashboardService = {
@@ -157,21 +157,25 @@ export const dashboardService = {
         id: bookings.id,
         internName: bookings.internName,
         weekStage: bookings.weekStage,
+        status: bookings.status,
       })
       .from(bookings)
+      .leftJoin(feedback, eq(feedback.bookingId, bookings.id))
       .where(
         and(
           eq(bookings.reviewerId, reviewerId),
-          eq(bookings.status, 'confirmed'),
-          lte(bookings.endTime, now)
+          lte(bookings.endTime, now),
+          sql`(${bookings.status} = 'confirmed' OR (${bookings.status} = 'completed' AND ${feedback.id} IS NULL))`
         )
-      );
+      )
+      .orderBy(desc(bookings.endTime));
 
     let pendingEvalAlert = null;
     if (pendingEvalBookings.length > 0) {
       pendingEvalAlert = {
         count: pendingEvalBookings.length,
-        message: `Action Required: You have ${pendingEvalBookings.length} past sessions with pending evaluation scores/feedback.`,
+        bookingId: pendingEvalBookings[0]?.id,
+        message: `Action Required: You have ${pendingEvalBookings.length} past session(s) with pending evaluation scores/feedback.`,
         actionLabel: "Complete Evaluation",
       };
     }
