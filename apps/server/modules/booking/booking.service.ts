@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import dayjs from "dayjs";
+import { z } from "zod";
 import { eq, and, ne, inArray, gte, lte, lt, sql } from "drizzle-orm";
 import { db } from "../../config/db.js";
 import { slots } from "../slot/slots.schema.js";
@@ -157,6 +158,53 @@ export const bookingService = {
     .filter(([key]) => allowedKeys.has(key))
     .map(([key, value]) => [key, value.trim()])
 );
+
+    const requiredFields = [
+  "fullName",
+  "email",
+  "whatsappNumber",
+  "mainlyFocusedFor",
+] as const;
+
+for (const key of requiredFields) {
+  if (!formData[key]) {
+    throw new AppError(`${key} is required`, 400);
+  }
+}
+
+if (!z.string().email().safeParse(formData.email).success) {
+  throw new AppError("Invalid email address", 400);
+}
+
+if (
+  !formData.whatsappNumber ||
+  !/^\d+$/.test(formData.whatsappNumber)
+) {
+  throw new AppError("WhatsApp number must contain digits only", 400);
+}
+
+for (const [key, value] of Object.entries(formData)) {
+  const definition =
+    BOOKING_FIELD_DEFINITIONS[
+      key as keyof typeof BOOKING_FIELD_DEFINITIONS
+    ];
+
+  if (!definition || !value) continue;
+
+  if (
+    definition.type === "email" &&
+    !z.string().email().safeParse(value).success
+  ) {
+    throw new AppError(`Invalid ${definition.label}`, 400);
+  }
+
+  if (
+    definition.type === "url" &&
+    !z.string().url().safeParse(value).success
+  ) {
+    throw new AppError(`Invalid ${definition.label}`, 400);
+  }
+}
 
       const [booking] = await tx
         .insert(bookings)

@@ -126,6 +126,7 @@ function BookingsContent() {
               advisorName: detail.advisorName,
               advisorEmail: detail.advisorEmail,
               weekStage: detail.weekStage,
+              formData: detail.formData,
               startTime: detail.startTime,
               endTime: detail.endTime,
               status: detail.status,
@@ -196,16 +197,26 @@ function BookingsContent() {
           <h1 className="text-2xl font-bold tracking-tight text-on-surface">Bookings</h1>
           <p className="mt-1 text-sm text-slate-500">View and manage your project review sessions.</p>
         </div>
-        <div>
-          <button
-            onClick={loadBookings}
-            disabled={loading}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200/80 bg-surface-card px-4 py-2 text-xs font-semibold text-on-surface shadow-2xs transition-all hover:bg-slate-50 disabled:opacity-50"
-          >
-            <RefreshIcon className={loading ? "animate-spin text-primary" : "text-slate-500"} />
-            Refresh
-          </button>
-        </div>
+        <div className="flex items-center gap-2">
+  <a
+    href="https://calendar.google.com/calendar/u/0/r"
+    target="_blank"
+    rel="noopener noreferrer"
+    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200/80 bg-surface-card px-4 py-2 text-xs font-semibold text-on-surface shadow-2xs transition-all hover:bg-slate-50"
+  >
+    <CalendarIcon className="text-slate-500" />
+    Go to Google Calendar
+  </a>
+
+  <button
+    onClick={loadBookings}
+    disabled={loading}
+    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200/80 bg-surface-card px-4 py-2 text-xs font-semibold text-on-surface shadow-2xs transition-all hover:bg-slate-50 disabled:opacity-50"
+  >
+    <RefreshIcon className={loading ? "animate-spin text-primary" : "text-slate-500"} />
+    Refresh
+  </button>
+</div>
       </div>
 
       {/* Live Search Bar */}

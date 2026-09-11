@@ -36,7 +36,9 @@ export function useBookingForm(
   );
 };
 
-const removeField = (fieldKey: BookingFieldKey) => {
+  const removeField = (fieldKey: BookingFieldKey) => {
+  unregister(fieldKey);
+
   setSelectedFieldKeys((prev) =>
     prev.filter((key) => key !== fieldKey)
   );
@@ -97,6 +99,7 @@ const removeField = (fieldKey: BookingFieldKey) => {
     register,
     handleSubmit,
     watch,
+    unregister,
     formState: { errors },
   } = useForm<BookingFormValues>({
     resolver: zodResolver(bookingSchema) as Resolver<BookingFormValues>,
