@@ -778,38 +778,23 @@ export const bookingService = {
         });
       }
 
-      if (eventType && reviewer) {
-        const oldFormattedDate = dayjs(booking.startTime).format("ddd, MMM D, YYYY");
-        const oldFormattedTime = `${dayjs(booking.startTime).format("h:mm A")} – ${dayjs(booking.endTime).format("h:mm A")}`;
-        const newFormattedDate = dayjs(newStartTime).format("ddd, MMM D, YYYY");
-        const newFormattedTime = `${dayjs(newStartTime).format("h:mm A")} – ${dayjs(newEndTime).format("h:mm A")}`;
-
-        const recipients = [
-          { email: booking.advisorEmail, name: booking.advisorName, role: "advisor" as const },
-          { email: reviewer.email, name: reviewer.name, role: "reviewer" as const },
-          ...(booking.internEmails ?? []).map((email) => ({ email, name: booking.internName, role: "intern" as const })),
-        ];
-
-        await Promise.all(
-          recipients.map(({ email, name, role }) => {
-            const { subject, html } = bookingRescheduledTemplate({
-              recipientName: name,
-              recipientRole: role,
-              eventTypeName: eventType.name,
-              reviewerName: reviewer.name,
-              advisorName: booking.advisorName,
-              oldFormattedDate,
-              oldFormattedTime,
-              newFormattedDate,
-              newFormattedTime,
-              meetLink: updatedBooking.meetLink,
-            });
-            return emailService.sendEmail({ to: email, subject, html }).catch((err) => {
-              console.error(`[Booking] Failed to send reschedule confirmation email to ${email}:`, err);
-            });
-          })
-        );
-      }
+  await bookingService.finalizeReschedule({
+    startTime: booking.startTime,
+    endTime: booking.endTime,
+  },
+  {
+    id: updatedBooking.id,
+    eventTypeId: updatedBooking.eventTypeId,
+    reviewerId: updatedBooking.reviewerId,
+    internName: updatedBooking.internName,
+    advisorName: updatedBooking.advisorName,
+    advisorEmail: updatedBooking.advisorEmail,
+    internEmails: updatedBooking.internEmails,
+    weekStage: updatedBooking.weekStage,
+    startTime: updatedBooking.startTime,
+    endTime: updatedBooking.endTime,
+  }
+);
 
       return updatedBooking;
 
@@ -867,38 +852,24 @@ export const bookingService = {
         });
       }
 
-      if (eventType && reviewer) {
-        const oldFormattedDate = dayjs(booking.startTime).format("ddd, MMM D, YYYY");
-        const oldFormattedTime = `${dayjs(booking.startTime).format("h:mm A")} – ${dayjs(booking.endTime).format("h:mm A")}`;
-        const newFormattedDate = dayjs(newStartTime).format("ddd, MMM D, YYYY");
-        const newFormattedTime = `${dayjs(newStartTime).format("h:mm A")} – ${dayjs(newEndTime).format("h:mm A")}`;
-
-        const recipients = [
-          { email: booking.advisorEmail, name: booking.advisorName, role: "advisor" as const },
-          { email: reviewer.email, name: reviewer.name, role: "reviewer" as const },
-          ...(booking.internEmails ?? []).map((email) => ({ email, name: booking.internName, role: "intern" as const })),
-        ];
-
-        await Promise.all(
-          recipients.map(({ email, name, role }) => {
-            const { subject, html } = bookingRescheduledTemplate({
-              recipientName: name,
-              recipientRole: role,
-              eventTypeName: eventType.name,
-              reviewerName: reviewer.name,
-              advisorName: booking.advisorName,
-              oldFormattedDate,
-              oldFormattedTime,
-              newFormattedDate,
-              newFormattedTime,
-              meetLink: updatedBooking.meetLink,
-            });
-            return emailService.sendEmail({ to: email, subject, html }).catch((err) => {
-              console.error(`[Booking] Failed to send reschedule confirmation email to ${email}:`, err);
-            });
-          })
-        );
-      }
+      await bookingService.finalizeReschedule(
+  {
+    startTime: booking.startTime,
+    endTime: booking.endTime,
+  },
+  {
+    id: updatedBooking.id,
+    eventTypeId: updatedBooking.eventTypeId,
+    reviewerId: updatedBooking.reviewerId,
+    internName: updatedBooking.internName,
+    advisorName: updatedBooking.advisorName,
+    advisorEmail: updatedBooking.advisorEmail,
+    internEmails: updatedBooking.internEmails,
+    weekStage: updatedBooking.weekStage,
+    startTime: updatedBooking.startTime,
+    endTime: updatedBooking.endTime,
+  }
+);
 
       return updatedBooking;
 
@@ -1095,8 +1066,13 @@ export const bookingService = {
     }
 
     if (!meetLink && eventType.meetingLink) {
-      meetLink = eventType.meetingLink;
-    }
+  meetLink = eventType.meetingLink;
+
+  await db
+    .update(bookings)
+    .set({ meetLink })
+    .where(eq(bookings.id, newBooking.id));
+}
 
     const oldFormattedDate = dayjs(oldBooking.startTime).format("ddd, MMM D");
     const oldFormattedTime = `${dayjs(oldBooking.startTime).format("h:mm A")} – ${dayjs(oldBooking.endTime).format("h:mm A")}`;
