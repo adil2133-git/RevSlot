@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Modal from "@/components/common/Modal";
 import { XIcon, AlertTriangleIcon } from "./icons";
-import MonthCalendar from "./MonthCalender";
+import MonthCalendar from "./MonthCalendar";
 import SlotPicker from "./SlotPicker";
 import { useAvailableSlots } from "../hooks/useAvailableSlots";
 import { formatBookingDate, formatBookingTimeRange, isWithinCancelCutoff, CANCEL_CUTOFF_HOURS } from "../utils/bookingDisplay";

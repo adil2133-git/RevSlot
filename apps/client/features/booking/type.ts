@@ -16,6 +16,7 @@ export type BookingPageInfo = {
     githubUrl: string | null;
     portfolioUrl: string | null;
   };
+
   eventType: {
     id: number;
     name: string;
@@ -68,14 +69,17 @@ export type HoldResult = {
   holdExpiresAt: string;
 };
 
+export type BookingFormField = {
+  fieldKey: string;
+  label: string;
+  type: string;
+  category: string;
+  required: boolean;
+};
+
 export type BookingFormPayload = {
   holdToken: string;
-  advisorName: string;
-  advisorEmail: string;
-  internName: string;
-  batch: string;
-  internEmails?: string[];
-  weekStage: string;
+ formData: Record<string, string>;
 };
 
 export type MyBooking = {
@@ -86,6 +90,7 @@ export type MyBooking = {
   advisorName: string;
   advisorEmail: string;
   weekStage: string;
+  formData: Record<string, string>;
   startTime: string;
   endTime: string;
   status: "confirmed" | "completed" | "cancelled" | "no_show" | "rescheduled" | "reschedule_requested";
@@ -109,9 +114,21 @@ export type MyBookingsPagination = {
   totalPages: number;
 };
 
+export type BookingTabCounts = {
+  all: number;
+  ongoing: number;
+  upcoming: number;
+  reschedule_requested: number;
+  completed: number;
+  rescheduled: number;
+  cancelled: number;
+  no_show: number;
+};
+
 export type MyBookingsResponse = {
   bookings: MyBooking[];
   pagination: MyBookingsPagination;
+  counts?: BookingTabCounts;
 };
 
 export type GetMyBookingsParams = {

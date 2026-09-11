@@ -1,6 +1,6 @@
 import { pgTable, serial, integer, date, text, boolean, timestamp, index, check } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
-import { reviewers } from '../auth/reviewers.model.js';
+import { reviewers } from '../auth/reviewers.schema.js';
 
 export const vacationBlocks = pgTable(
   'vacation_blocks',

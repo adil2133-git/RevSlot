@@ -1,6 +1,6 @@
 import { and, desc, eq, count } from "drizzle-orm";
 import { db } from "../../config/db.js";
-import { notifications } from "./notification.model.js";
+import { notifications } from "./notification.schema.js";
 import { AppError } from "../../core/errors/AppError.js";
 
 export type NotificationTypeValue =
@@ -37,20 +37,25 @@ export const notificationService = {
   },
 
   listNotifications: async (reviewerId: number, limit: number) => {
-    const [rows, unreadResult] = await Promise.all([
-      db
-        .select()
-        .from(notifications)
-        .where(eq(notifications.reviewerId, reviewerId))
-        .orderBy(desc(notifications.createdAt))
-        .limit(limit),
-      db
-        .select({ total: count() })
-        .from(notifications)
-        .where(and(eq(notifications.reviewerId, reviewerId), eq(notifications.isRead, false))),
-    ]);
+    try {
+      const [rows, unreadResult] = await Promise.all([
+        db
+          .select()
+          .from(notifications)
+          .where(eq(notifications.reviewerId, reviewerId))
+          .orderBy(desc(notifications.createdAt))
+          .limit(limit),
+        db
+          .select({ total: count() })
+          .from(notifications)
+          .where(and(eq(notifications.reviewerId, reviewerId), eq(notifications.isRead, false))),
+      ]);
 
-    return { notifications: rows, unreadCount: unreadResult[0]?.total ?? 0 };
+      return { notifications: rows, unreadCount: unreadResult[0]?.total ?? 0 };
+    } catch (error) {
+      console.error("[Notification] Failed to fetch notifications:", error);
+      return { notifications: [], unreadCount: 0 };
+    }
   },
 
   markAsRead: async (reviewerId: number, id: number) => {

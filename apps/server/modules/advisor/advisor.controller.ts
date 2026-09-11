@@ -4,6 +4,8 @@ import {
   SendOtpSchema,
   VerifyOtpSchema,
   GetAdvisorBookingsQuerySchema,
+  CancelAdvisorBookingSchema,
+  RescheduleAdvisorBookingSchema,
 } from "./advisor.validation.js";
 import { BookingIdParamSchema } from "../booking/booking.validation.js";
 import { AppError } from "../../core/errors/AppError.js";
@@ -48,6 +50,22 @@ export const advisorController = {
     const advisorEmail = res.locals.advisorEmail;
     const id = parseBookingId(req.params);
     const result = await advisorService.getAdvisorBookingFeedback(advisorEmail, id);
+    res.status(200).json({ success: true, data: result });
+  },
+
+  cancelAdvisorBooking: async (req: Request, res: Response) => {
+    const advisorEmail = res.locals.advisorEmail;
+    const id = parseBookingId(req.params);
+    const body = CancelAdvisorBookingSchema.parse(req.body);
+    const result = await advisorService.cancelAdvisorBooking(advisorEmail, id, body);
+    res.status(200).json({ success: true, data: result });
+  },
+
+  rescheduleAdvisorBooking: async (req: Request, res: Response) => {
+    const advisorEmail = res.locals.advisorEmail;
+    const id = parseBookingId(req.params);
+    const body = RescheduleAdvisorBookingSchema.parse(req.body);
+    const result = await advisorService.rescheduleAdvisorBooking(advisorEmail, id, body);
     res.status(200).json({ success: true, data: result });
   },
 };

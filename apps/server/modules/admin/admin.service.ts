@@ -2,10 +2,10 @@ import dayjs from "dayjs";
 import bcrypt from "bcryptjs";
 import { eq, and, or, ilike, sql, gte, lte, desc, count } from "drizzle-orm";
 import { db } from "../../config/db.js";
-import { reviewers } from "../auth/reviewers.model.js";
+import { reviewers } from "../auth/reviewers.schema.js";
 import { bookings } from "../booking/bookings.schema.js";
-import { eventTypes } from "../eventType/eventTypes.model.js";
-import { admins } from "./admins.model.js";
+import { eventTypes } from "../eventType/eventTypes.schema.js";
+import { admins } from "./admins.schema.js";
 import { auditLogService } from "../auditLog/auditLog.service.js";
 import { AppError } from "../../core/errors/AppError.js";
 import type {
@@ -13,7 +13,7 @@ import type {
   UpdateReviewerStatusInput,
   ListBookingsQuery,
   UpdateAdminProfileInput,
-} from "./admin.schema.js";
+} from "./admin.validation.js";
 
 export const adminService = {
   // Task 7 — GET /api/admin/reviewers

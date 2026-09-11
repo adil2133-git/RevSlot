@@ -70,4 +70,27 @@ export const advisorApi = {
     });
     return res.data.data;
   },
+
+  cancelBooking: async (bookingId: number, data: { reason?: string }) => {
+    const token = getStoredAdvisorToken();
+    const res = await advisorClient.patch(`/advisor/bookings/${bookingId}/cancel`, data, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return res.data;
+  },
+
+  rescheduleBooking: async (
+    bookingId: number,
+    data: { date: string; startTime: string; endTime: string; reason?: string }
+  ) => {
+    const token = getStoredAdvisorToken();
+    const res = await advisorClient.patch(`/advisor/bookings/${bookingId}/reschedule`, data, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return res.data;
+  },
 };

@@ -1,0 +1,1 @@
+ALTER TABLE "reviewers" ADD COLUMN "booking_form_fields" jsonb DEFAULT '[]'::jsonb NOT NULL;

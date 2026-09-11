@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import * as feedbackService from "./feedback.service.js";
-import { InternHistoryQuerySchema, ListFeedbackQuerySchema } from "./feedback.schema.js";
+import { InternHistoryQuerySchema, ListFeedbackQuerySchema } from "./feedback.validation.js";
 
 function reviewerId(req: Request): number {
   return req.user!.userId;

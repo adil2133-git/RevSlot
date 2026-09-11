@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import dayjs from "dayjs";
-import MonthCalendar from "@/features/booking/components/MonthCalender";
+import MonthCalendar from "@/features/booking/components/MonthCalendar";
 import SlotPicker from "@/features/booking/components/SlotPicker";
 import { useAvailableSlots } from "@/features/booking/hooks/useAvailableSlots";
 import { fetchRescheduleRequestByToken, respondToRescheduleRequest } from "@/features/booking/api/bookingApi";

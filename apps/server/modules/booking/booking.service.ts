@@ -6,16 +6,19 @@ import { slots } from "../slot/slots.schema.js";
 import { bookings } from "./bookings.schema.js";
 import { AppError } from "../../core/errors/AppError.js";
 import type { CreateBookingInput, CancelBookingInput, RescheduleBookingInput, RequestRescheduleInput, RespondRescheduleInput } from "./booking.validation.js";
-import { eventTypes } from "../eventType/eventTypes.model.js";
-import { reviewers } from "../auth/reviewers.model.js";
+import { eventTypes } from "../eventType/eventTypes.schema.js";
+import { reviewers } from "../auth/reviewers.schema.js";
 import { calendarService } from "../calendar/calendar.service.js";
 import { emailService } from "../../services/email.service.js";
 import { bookingConfirmationTemplate } from "../../emails/templates/bookingConfirmation.js";
 import { bookingCancelledTemplate } from "../../emails/templates/bookingCancelled.js";
 import { bookingRescheduledTemplate } from "../../emails/templates/bookingRescheduled.js";
 import { bookingRescheduleRequestedTemplate } from "../../emails/templates/bookingRescheduleRequested.js";
-import { slotService } from "../slot/slot.service.js";
-import { feedback } from "../feedback/feedback.model.js";
+import { slotService } from "../slot/slot.service.js"; 
+import { feedback } from "../feedback/feedback.schema.js";
+import {
+  BOOKING_FIELD_DEFINITIONS,
+} from "./bookingFields.js";
 
 export interface GetMyBookingsOptions {
   page: number;
@@ -137,21 +140,45 @@ export const bookingService = {
       ).toDate();
       const endTimestamp = dayjs(`${slot.slotDate}T${slot.endTime}`).toDate();
 
+  const allowedKeys = new Set<string>([
+  "fullName",
+  "email",
+  "whatsappNumber",
+  "mainlyFocusedFor",
+  "comments",
+  ...Object.keys(BOOKING_FIELD_DEFINITIONS),
+]);
+
+  const submittedFormData: Record<string, string> =
+  data.formData ?? {};
+
+ const formData = Object.fromEntries(
+  Object.entries(submittedFormData)
+    .filter(([key]) => allowedKeys.has(key))
+    .map(([key, value]) => [key, value.trim()])
+);
+
       const [booking] = await tx
         .insert(bookings)
         .values({
-          eventTypeId: slot.eventTypeId,
-          reviewerId: slot.reviewerId,
-          internName: data.internName,
-          batch: data.batch,
-          advisorName: data.advisorName,
-          advisorEmail: data.advisorEmail,
-          internEmails: data.internEmails,
-          weekStage: data.weekStage,
-          startTime: startTimestamp,
-          endTime: endTimestamp,
-          status: "confirmed",
-        })
+           eventTypeId: slot.eventTypeId,
+           reviewerId: slot.reviewerId,
+           internName: formData.internName || formData.fullName || "",
+           batch: formData.batch || "",
+           advisorName: formData.advisorName || formData.fullName || "",
+           advisorEmail: formData.advisorEmail || formData.email || "",
+           internEmails: formData.internEmail
+            ? [formData.internEmail]
+            : undefined,
+           weekStage: formData.weekStage || "",
+
+          // New dynamic booking form data
+           formData,
+
+           startTime: startTimestamp,
+           endTime: endTimestamp,
+           status: "confirmed",
+       })
         .returning();
 
       if (!booking) {
@@ -339,7 +366,10 @@ export const bookingService = {
     const orderBy = scope === "upcoming" || scope === "ongoing"
       ? sql`${bookings.startTime} ASC`
       : sql`${bookings.createdAt} DESC`;
-    const [rows, countResult] = await Promise.all([
+
+    const reviewerCondition = eq(bookings.reviewerId, reviewerId);
+
+    const [rows, countResult, countsRes] = await Promise.all([
       db
         .select({
           id: bookings.id,
@@ -349,6 +379,7 @@ export const bookingService = {
           advisorName: bookings.advisorName,
           advisorEmail: bookings.advisorEmail,
           weekStage: bookings.weekStage,
+          formData: bookings.formData,
           startTime: bookings.startTime,
           endTime: bookings.endTime,
           status: bookings.status,
@@ -375,9 +406,23 @@ export const bookingService = {
         .select({ count: sql<number>`count(*)::int` })
         .from(bookings)
         .where(and(...conditions)),
+      db
+        .select({
+          all: sql<number>`count(*)::int`,
+          ongoing: sql<number>`count(case when ${bookings.startTime} <= ${now} and ${bookings.endTime} >= ${now} and ${bookings.status} != 'cancelled' then 1 end)::int`,
+          upcoming: sql<number>`count(case when ${bookings.startTime} >= ${now} and ${bookings.status} != 'cancelled' then 1 end)::int`,
+          reschedule_requested: sql<number>`count(case when ${bookings.status} = 'reschedule_requested' then 1 end)::int`,
+          completed: sql<number>`count(case when ${bookings.status} = 'completed' then 1 end)::int`,
+          rescheduled: sql<number>`count(case when ${bookings.status} = 'rescheduled' then 1 end)::int`,
+          cancelled: sql<number>`count(case when ${bookings.status} = 'cancelled' then 1 end)::int`,
+          no_show: sql<number>`count(case when ${bookings.status} = 'no_show' then 1 end)::int`,
+        })
+        .from(bookings)
+        .where(reviewerCondition),
     ]);
 
     const totalCount = countResult[0]?.count ?? 0;
+    const defaultCounts = { all: 0, ongoing: 0, upcoming: 0, reschedule_requested: 0, completed: 0, rescheduled: 0, cancelled: 0, no_show: 0 };
 
     return {
       bookings: rows,
@@ -387,6 +432,7 @@ export const bookingService = {
         totalCount,
         totalPages: Math.ceil(totalCount / limit),
       },
+      counts: countsRes[0] ?? defaultCounts,
     };
   },
 
@@ -401,6 +447,7 @@ export const bookingService = {
         advisorEmail: bookings.advisorEmail,
         internEmails: bookings.internEmails,
         weekStage: bookings.weekStage,
+        formData: bookings.formData,
         startTime: bookings.startTime,
         endTime: bookings.endTime,
         status: bookings.status,

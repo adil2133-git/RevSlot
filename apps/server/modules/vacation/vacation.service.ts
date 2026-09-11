@@ -4,10 +4,10 @@ import { db } from "../../config/db.js";
 
 import { vacationBlocks } from "./vacation.schema.js";
 import { bookings } from "../booking/bookings.schema.js";
-import { eventTypes } from "../eventType/eventTypes.model.js";
+import { eventTypes } from "../eventType/eventTypes.schema.js";
 import { emailService } from "../../services/email.service.js";
 import { bookingCancelledTemplate } from "../../emails/templates/bookingCancelled.js";
-import { reviewers } from "../auth/reviewers.model.js";
+import { reviewers } from "../auth/reviewers.schema.js";
 
 import { AppError } from "../../core/errors/AppError.js";
 

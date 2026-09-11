@@ -84,6 +84,29 @@ export default function BookingDetailsModal({ bookingId, onClose }: BookingDetai
               )}
             </div>
 
+                        {detail.formData && Object.keys(detail.formData).length > 0 && (
+              <div className="rounded-xl border border-slate-100 p-4">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  Submitted Details
+                </p>
+
+                <div className="space-y-3">
+                  {Object.entries(detail.formData).map(([key, value]) => (
+                    <div key={key}>
+                      <p className="text-xs text-slate-400">
+                        {key
+                          .replace(/([A-Z])/g, " $1")
+                          .replace(/^./, (char) => char.toUpperCase())}
+                      </p>
+                      <p className="mt-0.5 text-sm font-medium text-on-surface">
+                        {value || "—"}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
            {detail.meetLink &&
                (detail.status === "confirmed" || detail.status === "rescheduled") &&
                 Date.now() < new Date(detail.endTime).getTime() && (
