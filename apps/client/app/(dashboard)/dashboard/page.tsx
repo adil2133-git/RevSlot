@@ -111,7 +111,7 @@ export default function ReviewerDashboardPage() {
           {data.alerts && <AlertsStack alerts={data.alerts} />}
 
           <NextReviewCard
-              schedule={scheduleList}
+              nextReview={data.nextReview}
               onViewDetails={(bookingId) => setDetailsBookingId(bookingId)}
           />
           {/* 5. Today's Schedule */}

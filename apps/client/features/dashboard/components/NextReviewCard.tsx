@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import dayjs from "dayjs";
 import {
   CalendarDays,
@@ -12,7 +12,7 @@ import {
 import type { TodaysScheduleItem } from "../type";
 
 interface NextReviewCardProps {
-  schedule: TodaysScheduleItem[];
+  nextReview: TodaysScheduleItem | null;
   onViewDetails: (bookingId: number) => void;
 }
 
@@ -32,7 +32,7 @@ const formatRemainingTime = (startTime: string, now: number) => {
 };
 
 export const NextReviewCard: React.FC<NextReviewCardProps> = ({
-  schedule,
+  nextReview,
   onViewDetails,
 }) => {
   const [now, setNow] = useState(Date.now());
@@ -44,19 +44,6 @@ export const NextReviewCard: React.FC<NextReviewCardProps> = ({
 
     return () => window.clearInterval(interval);
   }, []);
-
-  const nextReview = useMemo(() => {
-    return schedule
-      .filter(
-        (item) =>
-          (item.status === "confirmed" || item.status === "rescheduled") &&
-          dayjs(item.endTime).isAfter(dayjs(now))
-      )
-      .sort(
-        (a, b) =>
-          dayjs(a.startTime).valueOf() - dayjs(b.startTime).valueOf()
-      )[0];
-  }, [schedule, now]);
 
   if (!nextReview) {
     return null;
