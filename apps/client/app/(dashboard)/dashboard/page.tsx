@@ -7,6 +7,8 @@ import { DashboardHeader } from "@/features/dashboard/components/DashboardHeader
 import { MetricsCards } from "@/features/dashboard/components/MetricsCards";
 import { AlertsStack } from "@/features/dashboard/components/AlertsStack";
 import { TodaysSchedule } from "@/features/dashboard/components/TodaysSchedule";
+import { NextReviewCard } from "@/features/dashboard/components/NextReviewCard";
+import BookingDetailsModal from "@/features/booking/components/BookingDetailsModal";
 import { ReferenceQuestionsDrawer } from "@/features/dashboard/components/ReferenceQuestionsDrawer";
 import { RecentActivityFeed } from "@/features/dashboard/components/RecentActivityFeed";
 import { QuickShareWidget } from "@/features/dashboard/components/QuickShareWidget";
@@ -22,6 +24,7 @@ export default function ReviewerDashboardPage() {
   // Reference Questions side drawer state
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
   const [activeBookingId, setActiveBookingId] = useState<number | null>(null);
+  const [detailsBookingId, setDetailsBookingId] = useState<number | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -107,6 +110,10 @@ export default function ReviewerDashboardPage() {
           {/* 4. Alerts Stack */}
           {data.alerts && <AlertsStack alerts={data.alerts} />}
 
+          <NextReviewCard
+              schedule={scheduleList}
+              onViewDetails={(bookingId) => setDetailsBookingId(bookingId)}
+          />
           {/* 5. Today's Schedule */}
           <TodaysSchedule
             schedule={scheduleList}
@@ -139,6 +146,14 @@ export default function ReviewerDashboardPage() {
         bookingId={activeBookingId}
         onClose={() => setDrawerOpen(false)}
       />
+
+      {/* Booking Details Modal */}
+      {detailsBookingId !== null && (
+      <BookingDetailsModal
+       bookingId={detailsBookingId}
+       onClose={() => setDetailsBookingId(null)}
+     />
+    )}
     </div>
   );
 }
