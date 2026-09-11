@@ -308,9 +308,14 @@ for (const [key, value] of Object.entries(formData)) {
       );
     }
 
-    if (!meetLink && eventType.meetingLink) {
+   if (!meetLink && eventType.meetingLink) {
       meetLink = eventType.meetingLink;
-    }
+
+  await db
+    .update(bookings)
+    .set({ meetLink })
+    .where(eq(bookings.id, booking.id));
+}
 
     const formattedDate = dayjs(booking.startTime).format("ddd, MMM D");
 
