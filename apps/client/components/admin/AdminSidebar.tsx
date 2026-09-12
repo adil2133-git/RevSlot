@@ -33,7 +33,7 @@ const NAV_ITEMS = [
       <path d="M8 2v4M16 2v4" />
     </svg>
   ) },
-  { href: "/admin/feedback", label: "Feedback History", enabled: false, icon: (
+  { href: "/admin/feedback", label: "Feedback History", enabled: true, icon: (
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
     </svg>
@@ -44,7 +44,7 @@ const NAV_ITEMS = [
       <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
     </svg>
   ) },
-  { href: "/admin/analytics", label: "Analytics", enabled: false, icon: (
+  { href: "/admin/analytics", label: "Analytics", enabled: true, icon: (
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 3v18h18" />
       <path d="M18 17V9M13 17V5M8 17v-3" />
@@ -68,42 +68,34 @@ export default function AdminSidebar() {
   };
 
   return (
-    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-slate-100 bg-surface-card">
+    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-slate-100 bg-white">
       <div className="flex h-16 flex-col justify-center px-6">
-        <Link href="/admin/dashboard" className="text-lg font-semibold tracking-tight text-primary">
-          RevSlot
+        <Link href="/admin/dashboard" className="flex items-center gap-2 text-lg font-bold tracking-tight text-[#003366]">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#003366] text-xs font-bold text-white">
+            R
+          </div>
+          <div>
+            <div className="leading-none">RevSlot</div>
+            <div className="text-[10px] font-semibold tracking-wider text-slate-400 uppercase">SUPER ADMIN</div>
+          </div>
         </Link>
-        <span className="text-[11px] font-medium text-slate-400">Super Admin</span>
       </div>
 
-      <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-2">
+      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
         {NAV_ITEMS.map((item) => {
           const active = pathname.startsWith(item.href);
-
-          if (!item.enabled) {
-            return (
-              <div
-                key={item.href}
-                title="Coming soon"
-                className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-300"
-              >
-                <span className="text-slate-300">{item.icon}</span>
-                {item.label}
-              </div>
-            );
-          }
 
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${
+              className={`group flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all ${
                 active
-                  ? "bg-primary text-on-primary shadow-surface"
-                  : "text-on-surface hover:bg-surface-hover"
+                  ? "bg-[#e8f0f8] text-[#003366] font-semibold shadow-xs"
+                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
               }`}
             >
-              <span className={active ? "text-on-primary" : "text-slate-400 group-hover:text-primary"}>
+              <span className={active ? "text-[#003366]" : "text-slate-400 group-hover:text-slate-600"}>
                 {item.icon}
               </span>
               {item.label}
@@ -112,13 +104,28 @@ export default function AdminSidebar() {
         })}
       </nav>
 
+      {/* Academic session badge */}
+      <div className="px-3 pb-2">
+        <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2.5 text-xs">
+          <div>
+            <div className="text-[10px] font-medium text-slate-400">Academic Session</div>
+            <div className="font-bold text-slate-800">2024-2025 Tier I</div>
+          </div>
+          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </div>
+        </div>
+      </div>
+
       <div className="relative border-t border-slate-100 p-3">
         {menuOpen && (
           <>
             <Link
               href="/admin/settings"
               onClick={() => setMenuOpen(false)}
-              className="mb-1 flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-on-surface transition-colors hover:bg-surface-hover"
+              className="mb-1 flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="3" />
@@ -128,7 +135,7 @@ export default function AdminSidebar() {
             </Link>
             <button
               onClick={handleLogout}
-              className="mb-1 flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-error transition-colors hover:bg-error-container"
+              className="mb-1 flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -141,16 +148,16 @@ export default function AdminSidebar() {
         )}
         <button
           onClick={() => setMenuOpen((v) => !v)}
-          className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-surface-hover"
+          className="flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left transition-colors hover:bg-slate-50"
         >
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-semibold text-primary">
-            {user ? initials(user.name) : "…"}
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#003366] text-xs font-semibold text-white">
+            {user ? initials(user.name) : "AD"}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-on-surface">
-              {user?.name ?? "Loading…"}
+            <p className="truncate text-xs font-bold text-slate-900">
+              {user?.name ?? "Super Administrator"}
             </p>
-            <p className="truncate text-xs capitalize text-slate-400">{user?.role}</p>
+            <p className="truncate text-[11px] capitalize text-slate-400">Super Administrator</p>
           </div>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-slate-400">
             <path d="m18 15-6-6-6 6" />
