@@ -93,6 +93,7 @@ export interface DashboardSummaryData {
   metrics: DashboardMetrics;
   alerts: DashboardAlerts;
   todaysSchedule: TodaysScheduleItem[];
+  nextReview: TodaysScheduleItem | null;
   activityFeed: ActivityFeedItem[];
   quickShareEventTypes: QuickShareEventType[];
   availabilityOverview: AvailabilityOverview;

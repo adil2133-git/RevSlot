@@ -38,7 +38,7 @@ export function buildBookingSchema(fields: BookingFormField[]) {
         .url(`Enter a valid ${field.label.toLowerCase()}`);
     }
 
-    shape[field.fieldKey] = validator.optional();
+    shape[field.fieldKey] = validator.or(z.literal("")).optional();
   }
 
   return z.object(shape);
