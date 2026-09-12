@@ -10,6 +10,7 @@ import {
   UpdateReviewerStatusSchema,
   ListBookingsQuerySchema,
   UpdateAdminProfileSchema,
+  ListFeedbackHistoryQuerySchema,
 } from "./admin.validation.js";
 import { ListAuditLogQuerySchema } from "../auditLog/auditLog.validation.js";
 
@@ -22,6 +23,10 @@ router.get("/me", catchAsync(adminController.getProfile));
 router.patch("/me", validate(UpdateAdminProfileSchema), catchAsync(adminController.updateProfile));
 
 router.get("/dashboard-stats", catchAsync(adminController.getDashboardStats));
+router.get("/analytics", catchAsync(adminController.getAnalytics));
+router.get("/analytics/export/csv", catchAsync(adminController.exportCSV));
+
+router.get("/feedback", validateQuery(ListFeedbackHistoryQuerySchema), catchAsync(adminController.listFeedback));
 
 router.get("/reviewers", validateQuery(ListReviewersQuerySchema), catchAsync(adminController.listReviewers));
 router.patch(
