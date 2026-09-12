@@ -1,1 +1,1 @@
-ALTER TABLE "bookings" ADD COLUMN "form_data" jsonb DEFAULT '{}'::jsonb NOT NULL;
+ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "form_data" jsonb DEFAULT '{}'::jsonb NOT NULL;

@@ -10,6 +10,9 @@ import type {
   UpdateAdminProfileInput,
   ListAuditLogParams,
   ListAuditLogResponse,
+  AnalyticsOverviewData,
+  ListFeedbackParams,
+  ListFeedbackResponse,
 } from "../types";
 
 export async function listReviewers(params: ListReviewersParams = {}) {
@@ -36,11 +39,41 @@ export async function listBookings(params: ListBookingsParams = {}) {
   return data.data;
 }
 
+export async function listFeedbackHistory(params: ListFeedbackParams = {}) {
+  const { data } = await api.get<{ success: boolean; data: ListFeedbackResponse }>(
+    "/admin/feedback",
+    { params }
+  );
+  return data.data;
+}
+
 export async function getDashboardStats() {
   const { data } = await api.get<{ success: boolean; data: DashboardStats }>(
     "/admin/dashboard-stats"
   );
   return data.data;
+}
+
+export async function getAnalyticsData() {
+  const { data } = await api.get<{ success: boolean; data: AnalyticsOverviewData }>(
+    "/admin/analytics"
+  );
+  return data.data;
+}
+
+export async function downloadAnalyticsCSV() {
+  const response = await api.get("/admin/analytics/export/csv", {
+    responseType: "blob",
+  });
+  const blob = new Blob([response.data], { type: "text/csv;charset=utf-8;" });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute("download", `analytics_overview_${Date.now()}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
 }
 
 export async function getProfile() {

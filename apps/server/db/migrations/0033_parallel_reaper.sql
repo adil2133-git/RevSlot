@@ -1,1 +1,1 @@
-ALTER TABLE "reviewers" DROP COLUMN "booking_form_fields";
+ALTER TABLE "reviewers" DROP COLUMN IF EXISTS "booking_form_fields";
