@@ -35,6 +35,18 @@ export const ListBookingsQuerySchema = z.object({
 
 export type ListBookingsQuery = z.infer<typeof ListBookingsQuerySchema>;
 
+// GET /api/admin/feedback — Feedback History
+export const ListFeedbackHistoryQuerySchema = z.object({
+  search: z.string().trim().max(150).optional(),
+  reviewerId: z.coerce.number().int().positive().optional(),
+  fromDate: z.string().optional(),
+  toDate: z.string().optional(),
+  page: z.coerce.number().int().min(1).optional().default(1),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
+});
+
+export type ListFeedbackHistoryQuery = z.infer<typeof ListFeedbackHistoryQuerySchema>;
+
 // PATCH /api/admin/me — profile/settings update
 export const UpdateAdminProfileSchema = z
   .object({
