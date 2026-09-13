@@ -236,6 +236,34 @@ export const dashboardService = {
       )
       .orderBy(bookings.startTime);
 
+      // 8. Next Review — nearest active booking from now
+const [nextReview] = await db
+  .select({
+    id: bookings.id,
+    eventTypeId: bookings.eventTypeId,
+    eventTypeName: eventTypes.name,
+    internName: bookings.internName,
+    batch: bookings.batch,
+    advisorName: bookings.advisorName,
+    advisorEmail: bookings.advisorEmail,
+    weekStage: bookings.weekStage,
+    startTime: bookings.startTime,
+    endTime: bookings.endTime,
+    status: bookings.status,
+    meetLink: bookings.meetLink,
+  })
+  .from(bookings)
+  .innerJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
+  .where(
+    and(
+      eq(bookings.reviewerId, reviewerId),
+      inArray(bookings.status, ["confirmed", "rescheduled"]),
+      sql`${bookings.endTime} > ${now}`
+    )
+  )
+  .orderBy(bookings.startTime)
+  .limit(1);
+
     // 8. Dynamic Activity Feed from bookings table
     const recentBookings = await db
       .select({
@@ -337,6 +365,7 @@ export const dashboardService = {
         vacationNotice: vacationAlert,
       },
       todaysSchedule,
+      nextReview: nextReview ?? null,
       activityFeed,
       quickShareEventTypes,
       availabilityOverview: {

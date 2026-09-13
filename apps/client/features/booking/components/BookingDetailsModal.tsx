@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Modal from "@/components/common/Modal";
+import dayjs from "dayjs";
 import { XIcon, MailIcon, CalendarIcon, ClockIcon, ExternalLinkIcon } from "./icons";
 import StatusBadge from "./StatusBadge";
 import { formatBookingDate, formatBookingTimeRange } from "../utils/bookingDisplay";
@@ -25,9 +26,15 @@ export default function BookingDetailsModal({ bookingId, onClose }: BookingDetai
       .finally(() => setLoading(false));
   }, [bookingId]);
 
+    const canJoinMeet =
+    !!detail?.meetLink &&
+    (detail.status === "confirmed" || detail.status === "rescheduled") &&
+    dayjs().isAfter(dayjs(detail.startTime).subtract(10, "minute")) &&
+    dayjs().isBefore(dayjs(detail.endTime));
+
   return (
-    <Modal onClose={onClose} widthClassName="max-w-lg">
-      <div className="flex items-center justify-between border-b border-slate-100 p-6">
+    <Modal onClose={onClose} widthClassName="max-w-lg max-h-[90vh]">
+     <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-6 py-4">
         <h2 className="text-xl font-bold text-on-surface">Booking Details</h2>
         <button
           onClick={onClose}
@@ -38,7 +45,7 @@ export default function BookingDetailsModal({ bookingId, onClose }: BookingDetai
         </button>
       </div>
 
-      <div className="p-6">
+      <div className="max-h-[calc(90vh-73px)] overflow-y-auto px-6 py-5">
         {loading && <p className="text-slate-400">Loading...</p>}
         {error && <p className="text-error">{error}</p>}
 
@@ -84,7 +91,7 @@ export default function BookingDetailsModal({ bookingId, onClose }: BookingDetai
               )}
             </div>
 
-                        {detail.formData && Object.keys(detail.formData).length > 0 && (
+            {detail.formData && Object.keys(detail.formData).length > 0 && (
               <div className="rounded-xl border border-slate-100 p-4">
                 <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
                   Submitted Details
@@ -107,19 +114,17 @@ export default function BookingDetailsModal({ bookingId, onClose }: BookingDetai
               </div>
             )}
 
-           {detail.meetLink &&
-               (detail.status === "confirmed" || detail.status === "rescheduled") &&
-                Date.now() < new Date(detail.endTime).getTime() && (
-            <a 
-                href={detail.meetLink}
+          {canJoinMeet && (
+              <a
+                href={detail.meetLink!}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 font-semibold text-on-primary transition hover:opacity-90"
-              >
-                Join Meet
-                <ExternalLinkIcon />
-              </a>
-            )}
+               >
+              Join Meet
+            <ExternalLinkIcon />
+            </a>
+          )}
 
             {detail.status === "cancelled" && detail.cancelledReason && (
               <div className="rounded-xl border-l-4 border-error bg-error-container p-4">
