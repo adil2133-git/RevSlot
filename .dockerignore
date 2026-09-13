@@ -6,6 +6,8 @@ apps/client/node_modules
 apps/client/.next
 
 apps/server/node_modules
+apps/server/dist
+dist
 
 .env
 .env.*

@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
-    // File Layout — flat structure, compile in place
+    // File Layout — flat structure, compile into dist
     "rootDir": ".",
-    "outDir": ".",
+    "outDir": "./dist",
 
     // Environment Settings
     "module": "nodenext",
