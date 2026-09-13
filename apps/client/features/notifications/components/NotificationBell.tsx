@@ -61,10 +61,18 @@ export default function NotificationBell() {
     }
   };
 
+const handleBellClick = () => {
+  setOpen((v) => !v);
+
+  if (unreadCount > 0) {
+    markAllAsRead();
+  }
+};
+
   return (
     <div ref={panelRef} className="relative">
       <button
-        onClick={() => setOpen((v) => !v)}
+        onClick={handleBellClick}
         className="relative flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-surface-hover hover:text-on-surface"
         aria-label="Notifications"
       >

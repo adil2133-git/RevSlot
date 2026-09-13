@@ -1,6 +1,6 @@
-import { pgTable, serial, integer, varchar, text, timestamp, type AnyPgColumn } from 'drizzle-orm/pg-core';
-import { reviewers } from '../auth/reviewers.model.js';
-import { eventTypes } from '../eventType/eventTypes.model.js';
+import { pgTable, serial, integer, varchar, text, jsonb, timestamp, type AnyPgColumn } from 'drizzle-orm/pg-core';
+import { reviewers } from '../auth/reviewers.schema.js';
+import { eventTypes } from '../eventType/eventTypes.schema.js';
 import { bookingStatus } from '../../db/schema/enums.js';
 
 export const bookings = pgTable('bookings', {
@@ -20,7 +20,10 @@ export const bookings = pgTable('bookings', {
   advisorEmail: varchar('advisor_email', { length: 255 }).notNull(),
   internEmails: text('intern_emails').array(),
   weekStage: varchar('week_stage', { length: 255 }).notNull(),
-
+  formData: jsonb("form_data")
+  .$type<Record<string, string>>()
+  .notNull()
+  .default({}),
   startTime: timestamp('start_time', { withTimezone: true }).notNull(),
   endTime: timestamp('end_time', { withTimezone: true }).notNull(),
 
@@ -37,6 +40,14 @@ export const bookings = pgTable('bookings', {
     (): AnyPgColumn => bookings.id,
     { onDelete: 'set null' }
   ),
+
+  // Two-way reschedule request fields
+  proposedStartTime: timestamp('proposed_start_time', { withTimezone: true }),
+  proposedEndTime: timestamp('proposed_end_time', { withTimezone: true }),
+  rescheduleRequestedBy: varchar('reschedule_requested_by', { length: 50 }),
+  rescheduleReason: text('reschedule_reason'),
+  rescheduleToken: varchar('reschedule_token', { length: 255 }),
+  rescheduleTokenExpiresAt: timestamp('reschedule_token_expires_at', { withTimezone: true }),
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });

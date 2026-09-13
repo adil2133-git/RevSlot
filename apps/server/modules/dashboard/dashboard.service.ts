@@ -1,15 +1,15 @@
 import { eq, and, gte, lte, desc, count, inArray, sql } from "drizzle-orm";
 import { db } from "../../config/db.js";
-import { reviewers } from "../auth/reviewers.model.js";
+import { reviewers } from "../auth/reviewers.schema.js";
 import { bookings } from "../booking/bookings.schema.js";
-import { eventTypes } from "../eventType/eventTypes.model.js";
+import { eventTypes } from "../eventType/eventTypes.schema.js";
 import { vacationBlocks } from "../vacation/vacation.schema.js";
-import { availabilityTemplates } from "../availability/models/availabilityTemplates.schema.js";
-import { templateTimeBlocks } from "../availability/models/templateTimeBlocks.schema.js";
-import { questionBanks } from "../questionBank/questionBanks.model.js";
-import { questions } from "../questionBank/questions.model.js";
+import { availabilityTemplates } from "../availability/schema/availabilityTemplates.schema.js";
+import { templateTimeBlocks } from "../availability/schema/templateTimeBlocks.schema.js";
+import { questionBanks } from "../questionBank/questionBanks.schema.js";
+import { questions } from "../questionBank/questions.schema.js";
 import { AppError } from "../../core/errors/AppError.js";
-import { feedbackForms, feedbackFormQuestions } from "../feedback/feedback.model.js";
+import { feedbackForms, feedbackFormQuestions, feedback } from "../feedback/feedback.schema.js";
 import type { GetDashboardSummaryQueryInput } from "./dashboard.validation.js";
 
 export const dashboardService = {
@@ -157,21 +157,25 @@ export const dashboardService = {
         id: bookings.id,
         internName: bookings.internName,
         weekStage: bookings.weekStage,
+        status: bookings.status,
       })
       .from(bookings)
+      .leftJoin(feedback, eq(feedback.bookingId, bookings.id))
       .where(
         and(
           eq(bookings.reviewerId, reviewerId),
-          eq(bookings.status, 'confirmed'),
-          lte(bookings.endTime, now)
+          lte(bookings.endTime, now),
+          sql`(${bookings.status} = 'confirmed' OR (${bookings.status} = 'completed' AND ${feedback.id} IS NULL))`
         )
-      );
+      )
+      .orderBy(desc(bookings.endTime));
 
     let pendingEvalAlert = null;
     if (pendingEvalBookings.length > 0) {
       pendingEvalAlert = {
         count: pendingEvalBookings.length,
-        message: `Action Required: You have ${pendingEvalBookings.length} past sessions with pending evaluation scores/feedback.`,
+        bookingId: pendingEvalBookings[0]?.id,
+        message: `Action Required: You have ${pendingEvalBookings.length} past session(s) with pending evaluation scores/feedback.`,
         actionLabel: "Complete Evaluation",
       };
     }
@@ -231,6 +235,34 @@ export const dashboardService = {
         )
       )
       .orderBy(bookings.startTime);
+
+      // 8. Next Review — nearest active booking from now
+const [nextReview] = await db
+  .select({
+    id: bookings.id,
+    eventTypeId: bookings.eventTypeId,
+    eventTypeName: eventTypes.name,
+    internName: bookings.internName,
+    batch: bookings.batch,
+    advisorName: bookings.advisorName,
+    advisorEmail: bookings.advisorEmail,
+    weekStage: bookings.weekStage,
+    startTime: bookings.startTime,
+    endTime: bookings.endTime,
+    status: bookings.status,
+    meetLink: bookings.meetLink,
+  })
+  .from(bookings)
+  .innerJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
+  .where(
+    and(
+      eq(bookings.reviewerId, reviewerId),
+      inArray(bookings.status, ["confirmed", "rescheduled"]),
+      sql`${bookings.endTime} > ${now}`
+    )
+  )
+  .orderBy(bookings.startTime)
+  .limit(1);
 
     // 8. Dynamic Activity Feed from bookings table
     const recentBookings = await db
@@ -333,6 +365,7 @@ export const dashboardService = {
         vacationNotice: vacationAlert,
       },
       todaysSchedule,
+      nextReview: nextReview ?? null,
       activityFeed,
       quickShareEventTypes,
       availabilityOverview: {

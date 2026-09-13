@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { adminService } from "./admin.service.js";
-import type { ListReviewersQuery, ListBookingsQuery, UpdateAdminProfileInput } from "./admin.schema.js";
+import type { ListReviewersQuery, ListBookingsQuery, UpdateAdminProfileInput } from "./admin.validation.js";
 
 export const adminController = {
   listReviewers: async (req: Request, res: Response) => {
@@ -26,6 +26,24 @@ export const adminController = {
   getDashboardStats: async (_req: Request, res: Response) => {
     const stats = await adminService.getDashboardStats();
     res.status(200).json({ success: true, data: stats });
+  },
+
+  getAnalytics: async (_req: Request, res: Response) => {
+    const analytics = await adminService.getAnalyticsData();
+    res.status(200).json({ success: true, data: analytics });
+  },
+
+  exportCSV: async (_req: Request, res: Response) => {
+    const csvData = await adminService.exportAnalyticsCSV();
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", `attachment; filename=revslot_analytics_${Date.now()}.csv`);
+    res.status(200).send(csvData);
+  },
+
+  listFeedback: async (_req: Request, res: Response) => {
+    const query = res.locals.query;
+    const result = await adminService.listFeedbackHistory(query);
+    res.status(200).json({ success: true, data: result });
   },
 
   getProfile: async (req: Request, res: Response) => {

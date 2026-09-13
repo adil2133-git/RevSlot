@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Modal from "@/components/common/Modal";
 import { XIcon, AlertTriangleIcon } from "./icons";
-import MonthCalendar from "./MonthCalender";
+import MonthCalendar from "./MonthCalendar";
 import SlotPicker from "./SlotPicker";
 import { useAvailableSlots } from "../hooks/useAvailableSlots";
 import { formatBookingDate, formatBookingTimeRange, isWithinCancelCutoff, CANCEL_CUTOFF_HOURS } from "../utils/bookingDisplay";
@@ -34,6 +34,7 @@ export default function RescheduleBookingModal({
   const [selectedDate, setSelectedDate] = useState(dayjs().format("YYYY-MM-DD"));
   const [use12Hour, setUse12Hour] = useState(true);
   const [selectedSlot, setSelectedSlot] = useState<SlotItem | null>(null);
+  const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,10 +52,11 @@ export default function RescheduleBookingModal({
         date: selectedSlot.date,
         startTime: selectedSlot.startTime,
         endTime: selectedSlot.endTime,
+        reason: reason.trim() || undefined,
       });
       onRescheduled();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to reschedule booking.");
+      setError(err instanceof Error ? err.message : "Failed to send reschedule request.");
     } finally {
       setSubmitting(false);
     }
@@ -63,7 +65,10 @@ export default function RescheduleBookingModal({
   return (
     <Modal onClose={onClose} widthClassName="max-w-lg">
       <div className="flex items-center justify-between border-b border-slate-100 p-6">
-        <h2 className="text-xl font-bold text-on-surface">Reschedule Booking</h2>
+        <div>
+          <h2 className="text-xl font-bold text-on-surface">Request Reschedule</h2>
+          <p className="text-xs text-slate-500 mt-0.5">Send a proposed date & time to the Advisor to accept or change.</p>
+        </div>
         <button
           onClick={onClose}
           className="rounded-lg p-1 text-slate-400 hover:bg-surface-hover hover:text-on-surface"
@@ -74,8 +79,8 @@ export default function RescheduleBookingModal({
       </div>
 
       <div className="max-h-[70vh] space-y-5 overflow-y-auto p-6">
-        <div className="rounded-xl border border-slate-100 p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Current time</p>
+        <div className="rounded-xl border border-slate-100 p-4 bg-slate-50">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Current Session Time</p>
           <p className="mt-1 font-medium text-on-surface">{formatBookingDate(booking.startTime)}</p>
           <p className="text-sm text-slate-400">{formatBookingTimeRange(booking.startTime, booking.endTime)}</p>
         </div>
@@ -117,11 +122,26 @@ export default function RescheduleBookingModal({
             />
 
             {selectedSlot && (
-              <div className="rounded-xl border border-primary bg-secondary p-4">
-                <p className="text-sm font-semibold text-on-secondary">
-                  New time: {dayjs(selectedSlot.date).format("MMM D, YYYY")} at{" "}
-                  {dayjs(`2000-01-01T${selectedSlot.startTime}`).format("h:mm A")}
-                </p>
+              <div className="space-y-3">
+                <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
+                  <p className="text-sm font-semibold text-primary">
+                    Proposed New Time: {dayjs(selectedSlot.date).format("MMM D, YYYY")} at{" "}
+                    {dayjs(`2000-01-01T${selectedSlot.startTime}`).format("h:mm A")}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                    Message / Reason for Advisor (Optional)
+                  </label>
+                  <textarea
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder="e.g. Mandatory faculty meeting scheduled at original time..."
+                    rows={2}
+                    className="w-full rounded-xl border border-slate-200 p-3 text-sm focus:border-primary focus:outline-none"
+                  />
+                </div>
               </div>
             )}
 
@@ -135,7 +155,7 @@ export default function RescheduleBookingModal({
           onClick={onClose}
           className="rounded-lg px-5 py-2.5 font-semibold text-slate-400 hover:bg-surface-hover"
         >
-          Close
+          Cancel
         </button>
         {!withinCutoff && (
           <button
@@ -143,7 +163,7 @@ export default function RescheduleBookingModal({
             disabled={!selectedSlot || submitting}
             className="rounded-lg bg-primary px-5 py-2.5 font-semibold text-on-primary transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {submitting ? "Rescheduling..." : "Confirm Reschedule"}
+            {submitting ? "Sending Request..." : "Send Reschedule Request"}
           </button>
         )}
       </div>

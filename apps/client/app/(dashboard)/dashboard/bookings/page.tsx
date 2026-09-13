@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { RefreshIcon, CalendarIcon } from "@/features/booking/components/icons";
 import BookingCard from "@/features/booking/components/BookingCard";
 import BookingDetailsModal from "@/features/booking/components/BookingDetailsModal";
@@ -8,27 +9,38 @@ import CancelBookingModal from "@/features/booking/components/CancelBookingModal
 import RescheduleBookingModal from "@/features/booking/components/RescheduleBookingModal";
 import SubmitFeedbackModal from "@/features/feedback/components/SubmitFeedbackModal";
 import Pagination from "@/features/booking/components/Pagination";
-import { fetchMyBookings, markBookingOutcome } from "@/features/booking/api/bookingApi";
-import type { MyBooking } from "@/features/booking/type";
+import { fetchMyBookings, markBookingOutcome, fetchBookingById } from "@/features/booking/api/bookingApi";
+import type { MyBooking, BookingTabCounts } from "@/features/booking/type";
 import FeedbackDetailsModal from "@/features/feedback/components/FeedbackDetailsModal";
 
-type BookingFilterTab = "all" | "ongoing" | "upcoming" | "completed" | "no_show" | "rescheduled" | "cancelled";
+type BookingFilterTab = "all" | "ongoing" | "upcoming" | "reschedule_requested" | "completed" | "rescheduled" | "cancelled" | "no_show";
 
 const FILTER_TABS: { id: BookingFilterTab; label: string }[] = [
   { id: "all", label: "All Bookings" },
   { id: "ongoing", label: "Ongoing" },
   { id: "upcoming", label: "Upcoming" },
+  { id: "reschedule_requested", label: "Reschedule Requests" },
   { id: "completed", label: "Completed" },
   { id: "rescheduled", label: "Rescheduled" },
   { id: "cancelled", label: "Cancelled" },
   { id: "no_show", label: "No-show" },
 ];
 
-export default function BookingsPage() {
-  const [activeTab, setActiveTab] = useState<BookingFilterTab>("all");
+function BookingsContent() {
+  const searchParams = useSearchParams();
+  const tabFromUrl = searchParams.get("tab") as BookingFilterTab | null;
+  const [activeTab, setActiveTab] = useState<BookingFilterTab>(tabFromUrl || "all");
+
+  useEffect(() => {
+    if (tabFromUrl && FILTER_TABS.some((t) => t.id === tabFromUrl)) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [tabFromUrl]);
+  const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
 
   const [bookings, setBookings] = useState<MyBooking[]>([]);
+  const [tabCounts, setTabCounts] = useState<BookingTabCounts | null>(null);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -46,16 +58,20 @@ export default function BookingsPage() {
       setLoading(true);
 
       let scopeParam: "upcoming" | "past" | "ongoing" | undefined = undefined;
-      let statusParam: ("confirmed" | "completed" | "rescheduled" | "cancelled" | "no_show")[] | undefined = undefined;
+      let statusParam: ("confirmed" | "completed" | "rescheduled" | "cancelled" | "no_show" | "reschedule_requested")[] | undefined = undefined;
 
       if (activeTab === "ongoing") {
         scopeParam = "ongoing";
       } else if (activeTab === "upcoming") {
         scopeParam = "upcoming";
+      } else if (activeTab === "reschedule_requested") {
+        statusParam = ["reschedule_requested"];
       } else if (activeTab === "completed") {
         statusParam = ["completed"];
       } else if (activeTab === "rescheduled") {
         statusParam = ["rescheduled"];
+      } else if (activeTab === "cancelled") {
+        statusParam = ["cancelled"];
       } else if (activeTab === "no_show") {
         statusParam = ["no_show"];
       }
@@ -65,21 +81,80 @@ export default function BookingsPage() {
         limit: 10,
         status: statusParam,
         scope: scopeParam,
+        search: search.trim() || undefined,
       });
 
       setBookings(result.bookings);
       setTotalPages(result.pagination.totalPages);
+      if (result.counts) {
+        setTabCounts(result.counts);
+      }
       setError(null);
     } catch {
       setError("Failed to load bookings. Please try again.");
     } finally {
       setLoading(false);
     }
-  }, [page, activeTab]);
+  }, [page, activeTab, search]);
+
+  const bookingIdFromUrl = searchParams.get("bookingId");
+  const actionFromUrl = searchParams.get("action");
+  const [autoOpenedBookingId, setAutoOpenedBookingId] = useState<number | null>(null);
 
   useEffect(() => {
     loadBookings();
   }, [loadBookings]);
+
+  useEffect(() => {
+    if (!bookingIdFromUrl || actionFromUrl !== "feedback") return;
+
+    const targetId = Number(bookingIdFromUrl);
+    if (!targetId || autoOpenedBookingId === targetId) return;
+
+    const openTargetModal = async () => {
+      let targetBooking: MyBooking | null = bookings.find((b) => b.id === targetId) || null;
+
+      if (!targetBooking) {
+        try {
+          const detail = await fetchBookingById(targetId);
+          if (detail) {
+            targetBooking = {
+              ...detail,
+              formData: detail.formData || {},
+            };
+          }
+        } catch {
+          return;
+        }
+      }
+
+      if (!targetBooking) return;
+
+      setAutoOpenedBookingId(targetId);
+
+      if (targetBooking.status === "completed" && !targetBooking.hasFeedback) {
+        setSelectedFeedbackBooking(targetBooking);
+      } else if (targetBooking.status === "confirmed" && new Date(targetBooking.endTime).getTime() <= Date.now()) {
+        try {
+          await markBookingOutcome(targetBooking.id, { outcome: "completed" });
+          setSelectedFeedbackBooking({
+            ...targetBooking,
+            status: "completed",
+            hasFeedback: false,
+          });
+          loadBookings();
+        } catch {
+          setSelectedFeedbackBooking(targetBooking);
+        }
+      } else if (targetBooking.status === "completed" && targetBooking.hasFeedback) {
+        setSelectedViewFeedbackBooking(targetBooking);
+      }
+    };
+
+    if (!loading) {
+      openTargetModal();
+    }
+  }, [loading, bookings, bookingIdFromUrl, actionFromUrl, autoOpenedBookingId, loadBookings]);
 
   const handleTabChange = (tab: BookingFilterTab) => {
     setActiveTab(tab);
@@ -107,38 +182,97 @@ export default function BookingsPage() {
           <h1 className="text-2xl font-bold tracking-tight text-on-surface">Bookings</h1>
           <p className="mt-1 text-sm text-slate-500">View and manage your project review sessions.</p>
         </div>
-        <div>
-          <button
-            onClick={loadBookings}
-            disabled={loading}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200/80 bg-surface-card px-4 py-2 text-xs font-semibold text-on-surface shadow-2xs transition-all hover:bg-slate-50 disabled:opacity-50"
-          >
-            <RefreshIcon className={loading ? "animate-spin text-primary" : "text-slate-500"} />
-            Refresh
-          </button>
-        </div>
+        <div className="flex items-center gap-2">
+  <a
+    href="https://calendar.google.com/calendar/u/0/r"
+    target="_blank"
+    rel="noopener noreferrer"
+    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200/80 bg-surface-card px-4 py-2 text-xs font-semibold text-on-surface shadow-2xs transition-all hover:bg-slate-50"
+  >
+    <CalendarIcon className="text-slate-500" />
+    Go to Google Calendar
+  </a>
+
+  <button
+    onClick={loadBookings}
+    disabled={loading}
+    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200/80 bg-surface-card px-4 py-2 text-xs font-semibold text-on-surface shadow-2xs transition-all hover:bg-slate-50 disabled:opacity-50"
+  >
+    <RefreshIcon className={loading ? "animate-spin text-primary" : "text-slate-500"} />
+    Refresh
+  </button>
+</div>
       </div>
 
-      {/* Clean Filter Tabs Bar (No scrollbars, clean wrap) */}
-      <div className="mb-6 rounded-xl border border-slate-200/80 bg-surface-card p-1.5 shadow-surface">
-        <div className="flex flex-wrap items-center gap-1">
-          {FILTER_TABS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => handleTabChange(tab.id)}
-              className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all ${
-                activeTab === tab.id
-                  ? "bg-primary text-on-primary shadow-2xs"
-                  : "text-slate-600 hover:bg-slate-100 hover:text-on-surface"
-              }`}
-            >
-              {tab.label}
-              {tab.id === "ongoing" && (
-                <span className="ml-1.5 inline-block h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-              )}
-            </button>
-          ))}
+      {/* Live Search Bar */}
+      <div className="relative mb-4">
+        <div className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+        </div>
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(1);
+          }}
+          placeholder="Search by intern name, batch, stage, advisor..."
+          className="w-full rounded-xl border border-slate-200 bg-surface-card pl-10 pr-4 py-2.5 text-xs font-medium text-on-surface placeholder:text-slate-400 shadow-2xs focus:border-primary focus:outline-none"
+        />
+      </div>
+
+      {/* Clean Filter Tabs Bar */}
+      <div className="mb-6 rounded-xl border border-slate-200/80 bg-surface-card p-2 shadow-surface">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {FILTER_TABS.map((tab) => {
+            const count = tabCounts?.[tab.id];
+            const isActive = activeTab === tab.id;
+            const isOngoing = tab.id === "ongoing";
+            const isRescheduleReq = tab.id === "reschedule_requested";
+            const hasOngoing = isOngoing && count !== undefined && count > 0;
+            const hasRescheduleReq = isRescheduleReq && count !== undefined && count > 0;
+
+            let extraStyle = "text-slate-600 hover:bg-slate-100 hover:text-on-surface";
+            if (isActive) {
+              extraStyle = "bg-[#003366] text-white shadow-2xs";
+            } else if (hasOngoing) {
+              extraStyle = "bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100";
+            } else if (hasRescheduleReq) {
+              extraStyle = "bg-purple-50 text-purple-800 border border-purple-200 hover:bg-purple-100";
+            }
+
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => handleTabChange(tab.id)}
+                className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold transition-all ${extraStyle}`}
+              >
+                <span>{tab.label}</span>
+
+                {isOngoing && (
+                  <span className={`inline-block h-2 w-2 rounded-full ${hasOngoing ? "bg-emerald-500 animate-pulse" : "bg-slate-300"}`} />
+                )}
+
+                {(hasOngoing || hasRescheduleReq) && (
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-bold transition-all ${
+                      isActive
+                        ? "bg-white/20 text-white"
+                        : hasRescheduleReq
+                        ? "bg-purple-200 text-purple-900"
+                        : "bg-emerald-200 text-emerald-900"
+                    }`}
+                  >
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -258,5 +392,13 @@ export default function BookingsPage() {
       )}
       
     </div>
+  );
+}
+
+export default function BookingsPage() {
+  return (
+    <Suspense fallback={null}>
+      <BookingsContent />
+    </Suspense>
   );
 }

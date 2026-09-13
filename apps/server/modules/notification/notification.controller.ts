@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { notificationService } from "./notification.service.js";
 import { AppError } from "../../core/errors/AppError.js";
-import type { ListNotificationsQuery } from "./notification.schema.js";
+import type { ListNotificationsQuery } from "./notification.validation.js";
 
 export const notificationController = {
   listNotifications: async (req: Request, res: Response) => {

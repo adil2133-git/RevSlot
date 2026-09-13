@@ -1,25 +1,32 @@
+import crypto from "crypto";
 import dayjs from "dayjs";
+import { z } from "zod";
 import { eq, and, ne, inArray, gte, lte, lt, sql } from "drizzle-orm";
 import { db } from "../../config/db.js";
 import { slots } from "../slot/slots.schema.js";
 import { bookings } from "./bookings.schema.js";
 import { AppError } from "../../core/errors/AppError.js";
-import type { CreateBookingInput, CancelBookingInput, RescheduleBookingInput } from "./booking.validation.js";
-import { eventTypes } from "../eventType/eventTypes.model.js";
-import { reviewers } from "../auth/reviewers.model.js";
+import type { CreateBookingInput, CancelBookingInput, RescheduleBookingInput, RequestRescheduleInput, RespondRescheduleInput } from "./booking.validation.js";
+import { eventTypes } from "../eventType/eventTypes.schema.js";
+import { reviewers } from "../auth/reviewers.schema.js";
 import { calendarService } from "../calendar/calendar.service.js";
 import { emailService } from "../../services/email.service.js";
 import { bookingConfirmationTemplate } from "../../emails/templates/bookingConfirmation.js";
 import { bookingCancelledTemplate } from "../../emails/templates/bookingCancelled.js";
 import { bookingRescheduledTemplate } from "../../emails/templates/bookingRescheduled.js";
-import { slotService } from "../slot/slot.service.js";
-import { feedback } from "../feedback/feedback.model.js";
+import { bookingRescheduleRequestedTemplate } from "../../emails/templates/bookingRescheduleRequested.js";
+import { slotService } from "../slot/slot.service.js"; 
+import { feedback } from "../feedback/feedback.schema.js";
+import {
+  BOOKING_FIELD_DEFINITIONS,
+} from "./bookingFields.js";
 
 export interface GetMyBookingsOptions {
   page: number;
   limit: number;
-  status?: ("confirmed" | "completed" | "rescheduled" | "cancelled" | "no_show")[] | undefined;
+  status?: ("confirmed" | "completed" | "rescheduled" | "cancelled" | "no_show" | "reschedule_requested")[] | undefined;
   scope?: "upcoming" | "past" | "ongoing" | undefined;
+  search?: string | undefined;
 }
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -134,21 +141,92 @@ export const bookingService = {
       ).toDate();
       const endTimestamp = dayjs(`${slot.slotDate}T${slot.endTime}`).toDate();
 
+  const allowedKeys = new Set<string>([
+  "fullName",
+  "email",
+  "whatsappNumber",
+  "mainlyFocusedFor",
+  "comments",
+  ...Object.keys(BOOKING_FIELD_DEFINITIONS),
+]);
+
+  const submittedFormData: Record<string, string> =
+  data.formData ?? {};
+
+ const formData = Object.fromEntries(
+  Object.entries(submittedFormData)
+    .filter(([key]) => allowedKeys.has(key))
+    .map(([key, value]) => [key, value.trim()])
+);
+
+    const requiredFields = [
+  "fullName",
+  "email",
+  "whatsappNumber",
+  "mainlyFocusedFor",
+] as const;
+
+for (const key of requiredFields) {
+  if (!formData[key]) {
+    throw new AppError(`${key} is required`, 400);
+  }
+}
+
+if (!z.string().email().safeParse(formData.email).success) {
+  throw new AppError("Invalid email address", 400);
+}
+
+if (
+  !formData.whatsappNumber ||
+  !/^\d+$/.test(formData.whatsappNumber)
+) {
+  throw new AppError("WhatsApp number must contain digits only", 400);
+}
+
+for (const [key, value] of Object.entries(formData)) {
+  const definition =
+    BOOKING_FIELD_DEFINITIONS[
+      key as keyof typeof BOOKING_FIELD_DEFINITIONS
+    ];
+
+  if (!definition || !value) continue;
+
+  if (
+    definition.type === "email" &&
+    !z.string().email().safeParse(value).success
+  ) {
+    throw new AppError(`Invalid ${definition.label}`, 400);
+  }
+
+  if (
+    definition.type === "url" &&
+    !z.string().url().safeParse(value).success
+  ) {
+    throw new AppError(`Invalid ${definition.label}`, 400);
+  }
+}
+
       const [booking] = await tx
         .insert(bookings)
         .values({
-          eventTypeId: slot.eventTypeId,
-          reviewerId: slot.reviewerId,
-          internName: data.internName,
-          batch: data.batch,
-          advisorName: data.advisorName,
-          advisorEmail: data.advisorEmail,
-          internEmails: data.internEmails,
-          weekStage: data.weekStage,
-          startTime: startTimestamp,
-          endTime: endTimestamp,
-          status: "confirmed",
-        })
+           eventTypeId: slot.eventTypeId,
+           reviewerId: slot.reviewerId,
+           internName: formData.internName || formData.fullName || "",
+           batch: formData.batch || "",
+           advisorName: formData.advisorName || formData.fullName || "",
+           advisorEmail: formData.advisorEmail || formData.email || "",
+           internEmails: formData.internEmail
+            ? [formData.internEmail]
+            : undefined,
+           weekStage: formData.weekStage || "",
+
+          // New dynamic booking form data
+           formData,
+
+           startTime: startTimestamp,
+           endTime: endTimestamp,
+           status: "confirmed",
+       })
         .returning();
 
       if (!booking) {
@@ -230,9 +308,14 @@ export const bookingService = {
       );
     }
 
-    if (!meetLink && eventType.meetingLink) {
+   if (!meetLink && eventType.meetingLink) {
       meetLink = eventType.meetingLink;
-    }
+
+  await db
+    .update(bookings)
+    .set({ meetLink })
+    .where(eq(bookings.id, booking.id));
+}
 
     const formattedDate = dayjs(booking.startTime).format("ddd, MMM D");
 
@@ -301,7 +384,7 @@ export const bookingService = {
     reviewerId: number,
     options: GetMyBookingsOptions
   ) => {
-    const { page, limit, status, scope } = options;
+    const { page, limit, status, scope, search } = options;
     const offset = (page - 1) * limit;
     const now = new Date();
 
@@ -320,10 +403,26 @@ export const bookingService = {
       conditions.push(gte(bookings.endTime, now));
     }
 
+    if (search && search.trim() !== "") {
+      const pattern = `%${search.trim().toLowerCase()}%`;
+      conditions.push(
+        sql`(
+          LOWER(${bookings.internName}) LIKE ${pattern} OR
+          LOWER(${bookings.batch}) LIKE ${pattern} OR
+          LOWER(${bookings.weekStage}) LIKE ${pattern} OR
+          LOWER(${bookings.advisorName}) LIKE ${pattern} OR
+          LOWER(${eventTypes.name}) LIKE ${pattern}
+        )`
+      );
+    }
+
     const orderBy = scope === "upcoming" || scope === "ongoing"
       ? sql`${bookings.startTime} ASC`
       : sql`${bookings.createdAt} DESC`;
-    const [rows, countResult] = await Promise.all([
+
+    const reviewerCondition = eq(bookings.reviewerId, reviewerId);
+
+    const [rows, countResult, countsRes] = await Promise.all([
       db
         .select({
           id: bookings.id,
@@ -333,12 +432,18 @@ export const bookingService = {
           advisorName: bookings.advisorName,
           advisorEmail: bookings.advisorEmail,
           weekStage: bookings.weekStage,
+          formData: bookings.formData,
           startTime: bookings.startTime,
           endTime: bookings.endTime,
           status: bookings.status,
           meetLink: bookings.meetLink,
           cancelledAt: bookings.cancelledAt,
           cancelledReason: bookings.cancelledReason,
+          proposedStartTime: bookings.proposedStartTime,
+          proposedEndTime: bookings.proposedEndTime,
+          rescheduleRequestedBy: bookings.rescheduleRequestedBy,
+          rescheduleReason: bookings.rescheduleReason,
+          rescheduleToken: bookings.rescheduleToken,
           eventTypeName: eventTypes.name,
           bookingWindowDays: eventTypes.bookingWindowDays,
           hasFeedback: sql<boolean>`${feedback.id} is not null`,
@@ -354,9 +459,23 @@ export const bookingService = {
         .select({ count: sql<number>`count(*)::int` })
         .from(bookings)
         .where(and(...conditions)),
+      db
+        .select({
+          all: sql<number>`count(*)::int`,
+          ongoing: sql<number>`count(case when ${bookings.startTime} <= ${now} and ${bookings.endTime} >= ${now} and ${bookings.status} != 'cancelled' then 1 end)::int`,
+          upcoming: sql<number>`count(case when ${bookings.startTime} >= ${now} and ${bookings.status} != 'cancelled' then 1 end)::int`,
+          reschedule_requested: sql<number>`count(case when ${bookings.status} = 'reschedule_requested' then 1 end)::int`,
+          completed: sql<number>`count(case when ${bookings.status} = 'completed' then 1 end)::int`,
+          rescheduled: sql<number>`count(case when ${bookings.status} = 'rescheduled' then 1 end)::int`,
+          cancelled: sql<number>`count(case when ${bookings.status} = 'cancelled' then 1 end)::int`,
+          no_show: sql<number>`count(case when ${bookings.status} = 'no_show' then 1 end)::int`,
+        })
+        .from(bookings)
+        .where(reviewerCondition),
     ]);
 
     const totalCount = countResult[0]?.count ?? 0;
+    const defaultCounts = { all: 0, ongoing: 0, upcoming: 0, reschedule_requested: 0, completed: 0, rescheduled: 0, cancelled: 0, no_show: 0 };
 
     return {
       bookings: rows,
@@ -366,6 +485,7 @@ export const bookingService = {
         totalCount,
         totalPages: Math.ceil(totalCount / limit),
       },
+      counts: countsRes[0] ?? defaultCounts,
     };
   },
 
@@ -380,6 +500,7 @@ export const bookingService = {
         advisorEmail: bookings.advisorEmail,
         internEmails: bookings.internEmails,
         weekStage: bookings.weekStage,
+        formData: bookings.formData,
         startTime: bookings.startTime,
         endTime: bookings.endTime,
         status: bookings.status,
@@ -387,6 +508,11 @@ export const bookingService = {
         cancelledAt: bookings.cancelledAt,
         cancelledReason: bookings.cancelledReason,
         rescheduledFromBookingId: bookings.rescheduledFromBookingId,
+        proposedStartTime: bookings.proposedStartTime,
+        proposedEndTime: bookings.proposedEndTime,
+        rescheduleRequestedBy: bookings.rescheduleRequestedBy,
+        rescheduleReason: bookings.rescheduleReason,
+        rescheduleToken: bookings.rescheduleToken,
         eventTypeName: eventTypes.name,
         bookingWindowDays: eventTypes.bookingWindowDays,
         hasFeedback: sql<boolean>`${feedback.id} is not null`,
@@ -541,6 +667,329 @@ export const bookingService = {
     return updatedBooking;
   },
 
+  requestReschedule: async (reviewerId: number, bookingId: number, data: RequestRescheduleInput) => {
+    const booking = await getOwnedBookingOrThrow(reviewerId, bookingId);
+
+    if (booking.status !== "confirmed" && booking.status !== "rescheduled" && booking.status !== "reschedule_requested") {
+      throw new AppError("Only confirmed or rescheduled bookings can have a reschedule requested", 400);
+    }
+
+    assertOutsideCutoff(booking.startTime);
+
+    // Hold the proposed slot
+    await slotService.holdSlot({
+      eventTypeId: booking.eventTypeId,
+      date: data.date,
+      startTime: data.startTime,
+      endTime: data.endTime,
+    });
+
+    const proposedStartTime = dayjs(`${data.date}T${data.startTime}`).toDate();
+    const proposedEndTime = dayjs(`${data.date}T${data.endTime}`).toDate();
+    const rescheduleToken = crypto.randomUUID();
+    const rescheduleTokenExpiresAt = dayjs().add(48, "hour").toDate();
+
+    const [updated] = await db
+      .update(bookings)
+      .set({
+        status: "reschedule_requested",
+        proposedStartTime,
+        proposedEndTime,
+        rescheduleRequestedBy: "reviewer",
+        rescheduleReason: data.reason || null,
+        rescheduleToken,
+        rescheduleTokenExpiresAt,
+      })
+      .where(eq(bookings.id, bookingId))
+      .returning();
+
+    const [eventType] = await db
+      .select({ name: eventTypes.name })
+      .from(eventTypes)
+      .where(eq(eventTypes.id, booking.eventTypeId))
+      .limit(1);
+
+    const [reviewer] = await db
+      .select({ name: reviewers.name, email: reviewers.email })
+      .from(reviewers)
+      .where(eq(reviewers.id, reviewerId))
+      .limit(1);
+
+    if (eventType && reviewer) {
+      const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:3000";
+      const actionUrl = `${CLIENT_URL}/reschedule-request/${rescheduleToken}`;
+      const currentFormattedDate = dayjs(booking.startTime).format("ddd, MMM D, YYYY");
+      const currentFormattedTime = `${dayjs(booking.startTime).format("h:mm A")} – ${dayjs(booking.endTime).format("h:mm A")}`;
+      const proposedFormattedDate = dayjs(proposedStartTime).format("ddd, MMM D, YYYY");
+      const proposedFormattedTime = `${dayjs(proposedStartTime).format("h:mm A")} – ${dayjs(proposedEndTime).format("h:mm A")}`;
+
+      const recipients = [
+        { email: booking.advisorEmail, name: booking.advisorName },
+        ...(booking.internEmails ?? []).map((email) => ({ email, name: booking.internName })),
+      ];
+
+      await Promise.all(
+        recipients.map(({ email, name }) => {
+          const { subject, html } = bookingRescheduleRequestedTemplate({
+            recipientName: name,
+            eventTypeName: eventType.name,
+            reviewerName: reviewer.name,
+            advisorName: booking.advisorName,
+            internName: booking.internName,
+            currentFormattedDate,
+            currentFormattedTime,
+            proposedFormattedDate,
+            proposedFormattedTime,
+            reason: data.reason,
+            actionUrl,
+          });
+          return emailService.sendEmail({ to: email, subject, html }).catch((err) => {
+            console.error(`[Booking] Failed to send reschedule request email to ${email}:`, err);
+          });
+        })
+      );
+    }
+
+    return updated;
+  },
+
+  getRescheduleRequestByToken: async (token: string) => {
+    const [booking] = await db
+      .select()
+      .from(bookings)
+      .where(and(eq(bookings.rescheduleToken, token), eq(bookings.status, "reschedule_requested")))
+      .limit(1);
+
+    if (!booking) {
+      throw new AppError("Reschedule request not found or link has expired", 404);
+    }
+
+    if (booking.rescheduleTokenExpiresAt && dayjs().isAfter(dayjs(booking.rescheduleTokenExpiresAt))) {
+      throw new AppError("This reschedule request link has expired", 410);
+    }
+
+    const [reviewer] = await db
+      .select({ id: reviewers.id, name: reviewers.name, email: reviewers.email })
+      .from(reviewers)
+      .where(eq(reviewers.id, booking.reviewerId))
+      .limit(1);
+
+    const [eventType] = await db
+      .select({ id: eventTypes.id, name: eventTypes.name, durationMinutes: eventTypes.durationMinutes, slug: eventTypes.slug })
+      .from(eventTypes)
+      .where(eq(eventTypes.id, booking.eventTypeId))
+      .limit(1);
+
+    return {
+      booking,
+      reviewer,
+      eventType,
+    };
+  },
+
+  respondToReschedule: async (token: string, data: RespondRescheduleInput) => {
+    const { booking, reviewer, eventType } = await bookingService.getRescheduleRequestByToken(token);
+
+    if (data.action === "accept") {
+      if (!booking.proposedStartTime || !booking.proposedEndTime) {
+        throw new AppError("No proposed time found for this reschedule request", 400);
+      }
+      const newStartTime = booking.proposedStartTime;
+      const newEndTime = booking.proposedEndTime;
+
+      const updatedBooking = await db.transaction(async (tx) => {
+        await releaseBookingSlot(tx, booking);
+
+        const [updated] = await tx
+          .update(bookings)
+          .set({
+            startTime: newStartTime,
+            endTime: newEndTime,
+            status: "confirmed",
+            proposedStartTime: null,
+            proposedEndTime: null,
+            rescheduleRequestedBy: null,
+            rescheduleReason: null,
+            rescheduleToken: null,
+            rescheduleTokenExpiresAt: null,
+            meetLink: null,
+            googleEventId: null,
+          })
+          .where(eq(bookings.id, booking.id))
+          .returning();
+
+        if (!updated) {
+          throw new AppError("Failed to update booking", 500);
+        }
+
+        return updated;
+      });
+
+      if (booking.googleEventId) {
+        await calendarService.cancelMeetEvent(booking.reviewerId, booking.googleEventId).catch((err) => {
+          console.error(`[Booking] Failed to cancel old Calendar event for booking ${booking.id}:`, err);
+        });
+      }
+
+  await bookingService.finalizeReschedule({
+    startTime: booking.startTime,
+    endTime: booking.endTime,
+  },
+  {
+    id: updatedBooking.id,
+    eventTypeId: updatedBooking.eventTypeId,
+    reviewerId: updatedBooking.reviewerId,
+    internName: updatedBooking.internName,
+    advisorName: updatedBooking.advisorName,
+    advisorEmail: updatedBooking.advisorEmail,
+    internEmails: updatedBooking.internEmails,
+    weekStage: updatedBooking.weekStage,
+    startTime: updatedBooking.startTime,
+    endTime: updatedBooking.endTime,
+  }
+);
+
+      return updatedBooking;
+
+    } else if (data.action === "counter") {
+      if (!data.date || !data.startTime || !data.endTime) {
+        throw new AppError("Date, start time, and end time are required to pick a new slot", 400);
+      }
+
+      const hold = await slotService.holdSlot({
+        eventTypeId: booking.eventTypeId,
+        date: data.date,
+        startTime: data.startTime,
+        endTime: data.endTime,
+      });
+
+      const newStartTime = dayjs(`${data.date}T${data.startTime}`).toDate();
+      const newEndTime = dayjs(`${data.date}T${data.endTime}`).toDate();
+
+      const updatedBooking = await db.transaction(async (tx) => {
+        await releaseBookingSlot(tx, booking);
+
+        const [updated] = await tx
+          .update(bookings)
+          .set({
+            startTime: newStartTime,
+            endTime: newEndTime,
+            status: "confirmed",
+            proposedStartTime: null,
+            proposedEndTime: null,
+            rescheduleRequestedBy: null,
+            rescheduleReason: null,
+            rescheduleToken: null,
+            rescheduleTokenExpiresAt: null,
+            meetLink: null,
+            googleEventId: null,
+          })
+          .where(eq(bookings.id, booking.id))
+          .returning();
+
+        if (!updated) {
+          throw new AppError("Failed to update booking", 500);
+        }
+
+        await tx
+          .update(slots)
+          .set({ status: "booked", holdToken: null, holdExpiresAt: null, updatedAt: new Date() })
+          .where(eq(slots.id, hold.slotId));
+
+        return updated;
+      });
+
+      if (booking.googleEventId) {
+        await calendarService.cancelMeetEvent(booking.reviewerId, booking.googleEventId).catch((err) => {
+          console.error(`[Booking] Failed to cancel old Calendar event for booking ${booking.id}:`, err);
+        });
+      }
+
+      await bookingService.finalizeReschedule(
+  {
+    startTime: booking.startTime,
+    endTime: booking.endTime,
+  },
+  {
+    id: updatedBooking.id,
+    eventTypeId: updatedBooking.eventTypeId,
+    reviewerId: updatedBooking.reviewerId,
+    internName: updatedBooking.internName,
+    advisorName: updatedBooking.advisorName,
+    advisorEmail: updatedBooking.advisorEmail,
+    internEmails: updatedBooking.internEmails,
+    weekStage: updatedBooking.weekStage,
+    startTime: updatedBooking.startTime,
+    endTime: updatedBooking.endTime,
+  }
+);
+
+      return updatedBooking;
+
+    } else if (data.action === "decline") {
+      const reason = data.declineReason || "Reschedule request declined by advisor";
+
+      const cancelledBooking = await db.transaction(async (tx) => {
+        await releaseBookingSlot(tx, booking);
+
+        const [updated] = await tx
+          .update(bookings)
+          .set({
+            status: "cancelled",
+            cancelledAt: new Date(),
+            cancelledReason: reason,
+            proposedStartTime: null,
+            proposedEndTime: null,
+            rescheduleRequestedBy: null,
+            rescheduleReason: null,
+            rescheduleToken: null,
+            rescheduleTokenExpiresAt: null,
+          })
+          .where(eq(bookings.id, booking.id))
+          .returning();
+
+        return updated;
+      });
+
+      if (booking.googleEventId) {
+        await calendarService.cancelMeetEvent(booking.reviewerId, booking.googleEventId).catch((err) => {
+          console.error(`[Booking] Failed to cancel Calendar event:`, err);
+        });
+      }
+
+      if (eventType && reviewer) {
+        const formattedDate = dayjs(booking.startTime).format("ddd, MMM D, YYYY");
+        const formattedTime = `${dayjs(booking.startTime).format("h:mm A")} – ${dayjs(booking.endTime).format("h:mm A")}`;
+
+        const recipients = [
+          { email: booking.advisorEmail, name: booking.advisorName, role: "advisor" as const },
+          { email: reviewer.email, name: reviewer.name, role: "reviewer" as const },
+          ...(booking.internEmails ?? []).map((email) => ({ email, name: booking.internName, role: "intern" as const })),
+        ];
+
+        await Promise.all(
+          recipients.map(({ email, name, role }) => {
+            const { subject, html } = bookingCancelledTemplate({
+              recipientName: name,
+              recipientRole: role,
+              eventTypeName: eventType.name,
+              reviewerName: reviewer.name,
+              advisorName: booking.advisorName,
+              formattedDate,
+              formattedTime,
+              reason,
+            });
+            return emailService.sendEmail({ to: email, subject, html }).catch((err) => {
+              console.error(`[Booking] Failed to send cancellation email to ${email}:`, err);
+            });
+          })
+        );
+      }
+
+      return cancelledBooking;
+    }
+  },
+
   markOutcome: async (
     reviewerId: number,
     bookingId: number,
@@ -670,8 +1119,13 @@ export const bookingService = {
     }
 
     if (!meetLink && eventType.meetingLink) {
-      meetLink = eventType.meetingLink;
-    }
+  meetLink = eventType.meetingLink;
+
+  await db
+    .update(bookings)
+    .set({ meetLink })
+    .where(eq(bookings.id, newBooking.id));
+}
 
     const oldFormattedDate = dayjs(oldBooking.startTime).format("ddd, MMM D");
     const oldFormattedTime = `${dayjs(oldBooking.startTime).format("h:mm A")} – ${dayjs(oldBooking.endTime).format("h:mm A")}`;

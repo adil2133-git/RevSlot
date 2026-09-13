@@ -1,63 +1,138 @@
 "use client";
 
-import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useMemo, useState } from "react";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+
 import { createBooking } from "../api/bookingApi";
-import type { HoldResult } from "../type";
-import { bookingSchema, type BookingFormValues } from "../validation/BookingSchema";
+import type { BookingFormField, HoldResult } from "../type";
+import {
+  BOOKING_FIELD_DEFINITIONS,
+  type BookingFieldKey,
+} from "../../../features/bookingFields/bookingFieldLibrary";
+import {
+  buildBookingSchema,
+  DEFAULT_BOOKING_FORM_VALUES,
+  type BookingFormValues,
+} from "../validation/BookingSchema";
 
 export type { BookingFormValues };
 
-export function useBookingForm(holdResult: HoldResult | null) {
+export function useBookingForm(
+  holdResult: HoldResult | null,
+) {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [bookingDone, setBookingDone] = useState(false);
   const [meetLink, setMeetLink] = useState<string | null>(null);
+  const [selectedFieldKeys, setSelectedFieldKeys] =
+  useState<BookingFieldKey[]>([]);
+
+  const addField = (fieldKey: BookingFieldKey) => {
+  setSelectedFieldKeys((prev) =>
+    prev.includes(fieldKey)
+      ? prev
+      : [...prev, fieldKey]
+  );
+};
+
+  const removeField = (fieldKey: BookingFieldKey) => {
+  unregister(fieldKey);
+
+  setSelectedFieldKeys((prev) =>
+    prev.filter((key) => key !== fieldKey)
+  );
+};
+
+  const fields: BookingFormField[] = [
+  {
+    fieldKey: "fullName",
+    label: "Full Name",
+    type: "text",
+    category: "Basic",
+    required: true,
+  },
+  {
+    fieldKey: "email",
+    label: "Email Address",
+    type: "email",
+    category: "Basic",
+    required: true,
+  },
+  {
+    fieldKey: "whatsappNumber",
+    label: "WhatsApp Number",
+    type: "tel",
+    category: "Basic",
+    required: true,
+  },
+  {
+  fieldKey: "mainlyFocusedFor",
+  label: "Mainly Focused For",
+  type: "text",
+  category: "Basic",
+  required: true,
+  },
+  {
+    fieldKey: "comments",
+    label: "Comments / Message",
+    type: "textarea",
+    category: "Basic",
+    required: false,
+  },
+
+...selectedFieldKeys.map((fieldKey): BookingFormField => ({
+    fieldKey,
+    label: BOOKING_FIELD_DEFINITIONS[fieldKey].label,
+    type: BOOKING_FIELD_DEFINITIONS[fieldKey].type,
+    category: BOOKING_FIELD_DEFINITIONS[fieldKey].category,
+    required: false,
+  })),
+];
+
+  const bookingSchema = useMemo(
+    () => buildBookingSchema(fields),
+    [fields]
+  );
 
   const {
     register,
     handleSubmit,
     watch,
+    unregister,
     formState: { errors },
   } = useForm<BookingFormValues>({
-    resolver: zodResolver(bookingSchema),
-    defaultValues: {
-      advisorName: "",
-      advisorEmail: "",
-      internName: "",
-      batch: "",
-      internEmails: "",
-      weekStage: "",
-    },
+    resolver: zodResolver(bookingSchema) as Resolver<BookingFormValues>,
+    defaultValues: DEFAULT_BOOKING_FORM_VALUES,
   });
 
-  // Confirmation screen needs advisorEmail even before the booking is
-  // submitted (see BookingConfirmation usage in page.tsx) — watch keeps it
-  // in sync without lifting state out of react-hook-form.
-  const advisorEmail = watch("advisorEmail");
+  const email = watch("email");
 
   const onSubmit = handleSubmit(async (values) => {
-    if (!holdResult) return;
-    setSubmitError(null);
+    if (!holdResult) {
+      return;
+    }
+
     setSubmitting(true);
+    setSubmitError(null);
+
     try {
       const result = await createBooking({
-      holdToken: holdResult.holdToken,
-      advisorName: values.advisorName,
-      advisorEmail: values.advisorEmail,
-      internName: values.internName,
-      batch: values.batch,
-      weekStage: values.weekStage,
-      internEmails: values.internEmails
-        ? values.internEmails.split(",").map((e) => e.trim()).filter(Boolean)
-        : undefined,
-});
-setMeetLink(result.meetLink ?? null);
-setBookingDone(true);
-    } catch (err) {
+        holdToken: holdResult.holdToken,
+        formData: Object.fromEntries(
+          Object.entries(values).map(([key, value]) => [
+            key,
+            String(value ?? ""),
+          ])
+        ),
+      });
+       setMeetLink(result.meetLink ?? null);
+       setBookingDone(true);
+    } catch (error) {
       setSubmitError(
-        err instanceof Error ? err.message : "Could not confirm the booking"
+        error instanceof Error
+          ? error.message
+          : "Failed to create booking."
       );
     } finally {
       setSubmitting(false);
@@ -65,13 +140,17 @@ setBookingDone(true);
   });
 
   return {
-    register,
-    errors,
-    advisorEmail,
-    submitting,
-    submitError,
-    bookingDone,
-    meetLink,
-    onSubmit,
+      register,
+      errors,
+      advisorEmail: email,
+      submitting,
+      submitError,
+      bookingDone,
+      meetLink,
+      onSubmit,
+      fields,
+      selectedFieldKeys,
+      addField,
+      removeField,
   };
 }

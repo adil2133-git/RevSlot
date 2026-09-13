@@ -11,11 +11,17 @@ export interface AdvisorBookingItem {
   weekStage: string;
   startTime: string;
   endTime: string;
-  status: "confirmed" | "completed" | "rescheduled" | "cancelled" | "no_show";
+  status: "confirmed" | "completed" | "rescheduled" | "cancelled" | "no_show" | "reschedule_requested";
   meetLink?: string | null;
   cancelledAt?: string | null;
   cancelledReason?: string | null;
+  proposedStartTime?: string | null;
+  proposedEndTime?: string | null;
+  rescheduleReason?: string | null;
+  rescheduleToken?: string | null;
+  rescheduleRequestedBy?: string | null;
   eventTypeName: string;
+  bookingWindowDays?: number;
   reviewerName: string;
   timezone: string;
   hasFeedback?: boolean;

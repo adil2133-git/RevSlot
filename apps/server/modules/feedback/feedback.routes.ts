@@ -3,7 +3,7 @@ import * as feedbackController from "./feedback.controller.js";
 import { validate } from "../../core/middlewares/validate.middleware.js";
 import { requireReviewer } from "../../core/middlewares/auth.middleware.js";
 import { catchAsync } from "../../core/utils/catchAsync.js";
-import { CreateFormSchema, UpdateFormSchema, SubmitFeedbackSchema, UpdateFeedbackSchema, UpdatePendingQuestionStatusSchema } from "./feedback.schema.js";
+import { CreateFormSchema, UpdateFormSchema, SubmitFeedbackSchema, UpdateFeedbackSchema, UpdatePendingQuestionStatusSchema } from "./feedback.validation.js";
 
 // Feedback form CRUD — mount at /api/feedback-forms in server.ts.
 const formRouter = Router();

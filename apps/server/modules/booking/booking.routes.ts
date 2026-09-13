@@ -6,6 +6,8 @@ import {
   GetMyBookingsQuerySchema,
   CancelBookingSchema,
   RescheduleBookingSchema,
+  RequestRescheduleSchema,
+  RespondRescheduleSchema,
   MarkOutcomeSchema,
 } from "./booking.validation.js";
 import { catchAsync } from "../../core/utils/catchAsync.js";
@@ -17,6 +19,17 @@ router.post(
   "/",
   validate(CreateBookingSchema),
   catchAsync(bookingController.createBooking)
+);
+
+// Public tokenized endpoints for Advisor responding to reschedule requests
+router.get(
+  "/reschedule-request/:token",
+  catchAsync(bookingController.getRescheduleRequestByToken)
+);
+router.post(
+  "/reschedule-request/:token/respond",
+  validate(RespondRescheduleSchema),
+  catchAsync(bookingController.respondToReschedule)
 );
 
 // Reviewer-only — returns the logged-in reviewer's own bookings
@@ -37,8 +50,14 @@ router.patch(
 router.patch(
   "/:id/reschedule",
   requireReviewer,
-  validate(RescheduleBookingSchema),
-  catchAsync(bookingController.rescheduleBooking)
+  validate(RequestRescheduleSchema),
+  catchAsync(bookingController.requestReschedule)
+);
+router.post(
+  "/:id/reschedule-request",
+  requireReviewer,
+  validate(RequestRescheduleSchema),
+  catchAsync(bookingController.requestReschedule)
 );
 router.patch(
   "/:id/status",

@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { eventTypeService } from "./eventType.service.js";
-import { BookingPageParamsSchema, ReviewerProfileParamsSchema } from "./eventType.schema.js";
+import { BookingPageParamsSchema, ReviewerProfileParamsSchema } from "./eventType.validation.js";
 
 export const eventTypeController = {
   getBookingPageInfo: async (req: Request, res: Response) => {
