@@ -36,7 +36,7 @@ export const bookings = pgTable('bookings', {
   cancelledReason: varchar('cancelled_reason', { length: 255 }),
 
   // Self-reference: the new booking created by a reschedule points back
-  // to the booking it replaced. Nullable — most bookings are never rescheduled.
+  // to the booking it replaced. Nullable — most bookings are never rescheduled
   rescheduledFromBookingId: integer('rescheduled_from_booking_id').references(
     (): AnyPgColumn => bookings.id,
     { onDelete: 'set null' }

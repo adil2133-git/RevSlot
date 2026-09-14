@@ -1,4 +1,5 @@
 import express from 'express';
+import helmet from "helmet"
 import cors from 'cors';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
@@ -24,6 +25,7 @@ import { pool } from "./config/db.js"
 dotenv.config();
 
 const app = express();
+app.use(helmet())
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:3000',
   credentials: true,
