@@ -30,7 +30,8 @@ export const bookings = pgTable('bookings', {
   status: bookingStatus('status').default('confirmed'),
   meetLink: text('meet_link'),
   googleEventId: varchar('google_event_id', { length: 255 }),
-
+  razorpayOrderId: varchar('razorpay_order_id', { length: 100 }),
+  razorpayPaymentId: varchar('razorpay_payment_id', { length: 100 }),
   cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
   cancelledReason: varchar('cancelled_reason', { length: 255 }),
 

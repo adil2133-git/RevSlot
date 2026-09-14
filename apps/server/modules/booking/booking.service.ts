@@ -136,6 +136,29 @@ export const bookingService = {
         );
       }
 
+      const [priceCheckEventType] = await tx
+        .select({ price: eventTypes.price })
+        .from(eventTypes)
+        .where(eq(eventTypes.id, slot.eventTypeId))
+        .limit(1);
+
+      if (priceCheckEventType && priceCheckEventType.price > 0) {
+        const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = data;
+
+        if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
+          throw new AppError("Payment is required for this session", 402);
+        }
+
+        const expectedSignature = crypto
+          .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET!)
+          .update(`${razorpayOrderId}|${razorpayPaymentId}`)
+          .digest("hex");
+
+        if (expectedSignature !== razorpaySignature) {
+          throw new AppError("Payment verification failed", 400);
+        }
+      }
+
       const startTimestamp = dayjs(
         `${slot.slotDate}T${slot.startTime}`
       ).toDate();
@@ -226,6 +249,8 @@ for (const [key, value] of Object.entries(formData)) {
            startTime: startTimestamp,
            endTime: endTimestamp,
            status: "confirmed",
+           razorpayOrderId: data.razorpayOrderId,
+           razorpayPaymentId: data.razorpayPaymentId,
        })
         .returning();
 
