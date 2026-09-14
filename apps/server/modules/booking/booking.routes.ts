@@ -12,11 +12,15 @@ import {
 } from "./booking.validation.js";
 import { catchAsync } from "../../core/utils/catchAsync.js";
 import { bookingController } from "./booking.controller.js";
+import {
+  bookingCreateLimiter,
+} from "../../core/middlewares/rateLimit.middleware.js";
 
 const router = Router();
 
 router.post(
   "/",
+  bookingCreateLimiter,
   validate(CreateBookingSchema),
   catchAsync(bookingController.createBooking)
 );

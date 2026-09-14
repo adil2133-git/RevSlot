@@ -3,6 +3,10 @@ import { validate, validateQuery } from "../../core/middlewares/validate.middlew
 import { GetAvailableSlotsQuerySchema, HoldSlotSchema, ReleaseSlotSchema } from "./slot.validation.js";
 import { catchAsync } from "../../core/utils/catchAsync.js";
 import { slotController } from "./slot.controller.js";
+import {
+  slotHoldLimiter,
+  slotReleaseLimiter,
+} from "../../core/middlewares/rateLimit.middleware.js";
 
 const router = Router();
 
@@ -12,6 +16,7 @@ router.get("/available", validateQuery(GetAvailableSlotsQuerySchema), catchAsync
 // Public — holds a slot while the advisor fills out the booking form
 router.post(
   "/hold",
+  slotHoldLimiter,
   validate(HoldSlotSchema),
   catchAsync(slotController.holdSlot)
 );
@@ -20,6 +25,7 @@ router.post(
 // frees the row instead of leaving it stuck in the DB until expiry.
 router.post(
   "/release",
+  slotReleaseLimiter,
   validate(ReleaseSlotSchema),
   catchAsync(slotController.releaseSlot)
 );

@@ -5,7 +5,14 @@ import { LoginSchema, RegisterSchema, ForgotPasswordSchema, ResetPasswordSchema,
 import { catchAsync } from "../../core/utils/catchAsync.js";
 import { authController } from "./auth.controller.js";
 import { requireAuth, requireAdmin } from "../../core/middlewares/auth.middleware.js";
-import { loginLimiter, registerLimiter, refreshLimiter } from "../../core/middlewares/rateLimit.middleware.js";
+import { 
+  loginLimiter, 
+  registerLimiter, 
+  refreshLimiter, 
+  passwordResetLimiter,
+  verificationLimiter,
+  googleAuthLimiter, 
+} from "../../core/middlewares/rateLimit.middleware.js";
 import { uploadAvatar } from "../../core/middlewares/upload.middleware.js";
 
 const router = Router();
@@ -22,11 +29,11 @@ router.patch("/profile/username", requireAuth, validate(UpdateUsernameSchema), c
 router.patch("/profile/password", requireAuth, validate(ChangePasswordSchema), catchAsync(authController.changePassword));
 router.patch("/profile/avatar", requireAuth, uploadAvatar, catchAsync(authController.updateAvatar));
 
-router.post("/forgot-password", validate(ForgotPasswordSchema), catchAsync(authController.forgotPassword));
-router.post("/reset-password", validate(ResetPasswordSchema), catchAsync(authController.resetPassword));
+router.post("/forgot-password", passwordResetLimiter, validate(ForgotPasswordSchema), catchAsync(authController.forgotPassword));
+router.post("/reset-password", passwordResetLimiter, validate(ResetPasswordSchema), catchAsync(authController.resetPassword));
 router.post("/verify-email", validate(VerifyEmailSchema), catchAsync(authController.verifyEmail));
-router.post("/resend-verification", validate(ResendVerificationSchema), catchAsync(authController.resendVerification));
-router.post("/google", validate(GoogleAuthSchema), catchAsync(authController.googleAuth));
+router.post("/resend-verification",  verificationLimiter, validate(ResendVerificationSchema), catchAsync(authController.resendVerification));
+router.post("/google",  googleAuthLimiter, validate(GoogleAuthSchema), catchAsync(authController.googleAuth));
 
 // for testing only
 router.get("/admin/test", requireAdmin, (req, res) => {

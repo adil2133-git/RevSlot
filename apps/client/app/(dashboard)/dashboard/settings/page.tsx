@@ -17,42 +17,10 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "account", label: "Account" },
 ];
 
-function initials(name: string) {
-  return name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
-}
-
 export default function SettingsPage() {
   const router = useRouter();
-  const { user, updateProfile, changePassword } = useAuthStore();
+  const { user, changePassword } = useAuthStore();
   const [activeTab, setActiveTab] = useState<Tab>("profile");
-
-  // ---- Profile tab ----
-  const [name, setName] = useState(user?.name ?? "");
-  const [bio, setBio] = useState(user?.bio ?? "");
-  const [whatsappNumber, setWhatsappNumber] = useState(user?.whatsappNumber ?? "");
-  const [profileSaving, setProfileSaving] = useState(false);
-  const [profileError, setProfileError] = useState<string | null>(null);
-  const [profileSaved, setProfileSaved] = useState(false);
-
-  const profileDirty =
-    name !== (user?.name ?? "") ||
-    bio !== (user?.bio ?? "") ||
-    whatsappNumber !== (user?.whatsappNumber ?? "");
-
-  const handleProfileSave = async () => {
-    setProfileSaving(true);
-    setProfileError(null);
-    setProfileSaved(false);
-    try {
-      await updateProfile({ name, bio, whatsappNumber });
-      setProfileSaved(true);
-      setTimeout(() => setProfileSaved(false), 2500);
-    } catch (err) {
-      setProfileError(err instanceof ApiError ? err.message : "Something went wrong.");
-    } finally {
-      setProfileSaving(false);
-    }
-  };
 
   // ---- Account tab (email/username + password) ----
   const [currentPassword, setCurrentPassword] = useState("");
@@ -185,7 +153,7 @@ export default function SettingsPage() {
               )}
             </div>
           </div>
-          
+
            {/* Password & Security */}
 {user.hasPassword && (
   <div className="rounded-xl border border-slate-100 bg-surface-card p-6 shadow-surface">
