@@ -5,7 +5,6 @@ import { io, type Socket } from "socket.io-client";
 import type {
   MeetingMessage,
   MeetingParticipant,
-  MeetingRole,
   MeetingSignal,
 } from "../types/meeting.types";
 
@@ -15,7 +14,7 @@ const SOCKET_URL = (
 
 export type ClientToServerEvents = {
   "meeting:join": (
-    payload: { name: string; role: MeetingRole },
+    payload: { name: string },
     ack: (response: {
       ok: boolean;
       participants?: MeetingParticipant[];

@@ -12,6 +12,7 @@ import type {
   UpdateProfilePayload,
   ChangePasswordPayload,
 } from "../types";
+
 import {
   loginReviewer,
   loginAdmin,
@@ -168,14 +169,6 @@ export const useAuthStore = create<AuthState>((set) => ({
       const user = await getMe();
       set({ user, isHydrated: true });
     } catch (err) {
-      // No valid refresh cookie, or getMe failed after a refresh that
-      // did succeed — either way, no session. Make sure axios doesn't
-      // keep a half-set token around from a partial failure.
-      if (err instanceof ApiError && err.status === 429) {
-        set({ isHydrated: true });
-        return;
-      }
-
       setAccessToken(null);
       set({ user: null, isHydrated: true });
     }

@@ -12,7 +12,6 @@ export const JoinMeetingSchema = z.object({
   token: z.string().min(16),
   participantId: z.string().min(1).max(100),
   name: z.string().trim().min(1).max(200),
-  role: z.enum(["reviewer", "advisor", "intern", "guest"]),
 });
 
 export const HeartbeatSchema = z.object({

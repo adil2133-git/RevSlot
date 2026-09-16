@@ -6,7 +6,7 @@ import {
   useState,
 } from "react";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { useAuthStore } from "@/features/auth/store/authStore";
 import {
@@ -34,6 +34,10 @@ export default function MeetingRoom({
 }: Props) {
   const router = useRouter();
 
+  const searchParams = useSearchParams();
+  const participantType =
+  searchParams.get("participant");
+
   const meeting = useMeeting({
     bookingId,
     token,
@@ -46,31 +50,17 @@ export default function MeetingRoom({
     (state) => state.user
   );
 
-  /*
-   * Get advisor token.
-   */
   const advisorToken =
     typeof window !== "undefined"
       ? getStoredAdvisorToken()
       : null;
 
-  /*
-   * Prevent duplicate automatic joins.
-   */
   const autoJoinStartedRef =
     useRef(false);
 
-  /*
-   * Prevent automatic re-join after
-   * the user clicks Leave.
-   */
   const manuallyLeftRef =
     useRef(false);
 
-  /*
-   * Prevent JoinMeeting flash while deciding
-   * whether this is Reviewer / Advisor.
-   */
   const [autoJoinResolved, setAutoJoinResolved] =
     useState(false);
 
@@ -82,7 +72,7 @@ export default function MeetingRoom({
 
   /*
    * --------------------------------------------------
-   * Reset lifecycle when meeting changes
+   * RESET LIFECYCLE WHEN MEETING CHANGES
    * --------------------------------------------------
    */
   useEffect(() => {
@@ -101,7 +91,8 @@ export default function MeetingRoom({
       bookingId,
       token,
       joined: meeting.joined,
-      participantId: meeting.participantIdRef.current,
+      participantId:
+        meeting.participantIdRef.current,
       participants: meeting.participants,
       localStreamRef,
       socket: meeting.socket,
@@ -117,7 +108,8 @@ export default function MeetingRoom({
     useMeetingChat({
       joined: meeting.joined,
       socket: meeting.socket,
-      initialMessages: meeting.initialMessages,
+      initialMessages:
+        meeting.initialMessages,
       setError: meeting.setError,
     });
 
@@ -128,95 +120,63 @@ export default function MeetingRoom({
    *
    * Reviewer -> automatic
    * Advisor  -> automatic
-   * Guest    -> JoinMeeting screen
+   * Intern   -> manual JoinMeeting
+   * Guest    -> manual JoinMeeting
+   *
+   * Role is used only for business-level
+   * auto-join decision.
+   *
+   * Role is NOT sent to WebRTC participant
+   * identity or Socket.IO meeting:join payload.
    */
   useEffect(() => {
     if (!meeting.info) {
       return;
     }
 
-    /*
-     * Already inside meeting.
-     */
     if (meeting.joined) {
       setAutoJoinResolved(true);
       return;
     }
 
-    /*
-     * User explicitly left.
-     *
-     * NEVER auto-join again.
-     */
     if (manuallyLeftRef.current) {
       setAutoJoinResolved(true);
       return;
     }
 
-    /*
-     * Automatic join already started.
-     */
     if (autoJoinStartedRef.current) {
       return;
     }
 
-    let participantName: string | null =
-      null;
+    let participantName: string | null = null;
 
-    let participantRole:
-      | "reviewer"
-      | "advisor"
-      | null = null;
-
-    /*
-     * ------------------------------------------------
-     * REVIEWER
-     * ------------------------------------------------
-     */
-    if (
-      user?.role === "reviewer" &&
-      user.name
-    ) {
-      participantName = user.name;
-      participantRole = "reviewer";
-    }
+if (
+  participantType === "advisor" &&
+  meeting.info.advisorName
+) {
+  participantName = meeting.info.advisorName;
+} else if (
+  participantType === "reviewer" &&
+  user?.name
+) {
+  participantName = user.name;
+}
 
     /*
      * ------------------------------------------------
-     * ADVISOR
-     * ------------------------------------------------
-     */
-    else if (
-      advisorToken &&
-      meeting.info.advisorName
-    ) {
-      participantName =
-        meeting.info.advisorName;
-
-      participantRole = "advisor";
-    }
-
-    /*
-     * ------------------------------------------------
-     * GUEST / INTERN
+     * INTERN / GUEST
      * ------------------------------------------------
      *
-     * No authenticated identity.
-     * Show JoinMeeting.
+     * No automatic identity.
+     *
+     * Show JoinMeeting so the participant
+     * can enter their own name.
      */
-    if (
-      !participantName ||
-      !participantRole
-    ) {
+    if (!participantName) {
       setAutoJoinResolved(true);
       return;
     }
 
-    /*
-     * IMPORTANT:
-     *
-     * Mark this BEFORE starting async operation.
-     */
     autoJoinStartedRef.current = true;
 
     const autoJoin = async () => {
@@ -237,16 +197,15 @@ export default function MeetingRoom({
 
         /*
          * Join meeting.
+         *
+         * IMPORTANT:
+         * No role is passed here.
          */
         const result =
           await meeting.join(
-            participantName,
-            participantRole
+            participantName
           );
 
-        /*
-         * Join failed.
-         */
         if (!result) {
           webRTC.stopLocalMedia();
 
@@ -258,16 +217,10 @@ export default function MeetingRoom({
           return;
         }
 
-        /*
-         * Successfully joined.
-         */
         setAutoJoinResolved(true);
       } catch (err: unknown) {
         webRTC.stopLocalMedia();
 
-        /*
-         * Don't show error if user already left.
-         */
         if (!manuallyLeftRef.current) {
           meeting.setError(
             err instanceof Error
@@ -292,7 +245,7 @@ export default function MeetingRoom({
     webRTC.getLocalMedia,
     webRTC.stopLocalMedia,
     user,
-    advisorToken,
+    participantType,
   ]);
 
   /*
@@ -311,9 +264,6 @@ export default function MeetingRoom({
 
     meeting.setError(null);
 
-    /*
-     * Manual join is intentional.
-     */
     manuallyLeftRef.current = false;
 
     try {
@@ -340,41 +290,18 @@ export default function MeetingRoom({
    * --------------------------------------------------
    * LEAVE MEETING
    * --------------------------------------------------
-   *
-   * IMPORTANT:
-   *
-   * We don't render JoinMeeting after leaving.
-   *
-   * We completely navigate away from
-   * /meeting/[bookingId].
    */
   const leave = async () => {
-    /*
-     * STOP AUTO JOIN FIRST.
-     */
     manuallyLeftRef.current = true;
 
-    /*
-     * Stop WebRTC connections.
-     */
     webRTC.cleanupPeers();
 
-    /*
-     * Stop camera + microphone.
-     */
     webRTC.stopLocalMedia();
 
-    /*
-     * Tell backend that participant left.
-     */
     await meeting.leave();
 
     /*
-     * Completely exit meeting page.
-     *
-     * Reviewer -> dashboard bookings
-     * Advisor  -> my bookings
-     * Guest    -> browser back
+     * Reviewer
      */
     if (user?.role === "reviewer") {
       router.replace(
@@ -384,6 +311,9 @@ export default function MeetingRoom({
       return;
     }
 
+    /*
+     * Advisor
+     */
     if (advisorToken) {
       router.replace("/my-bookings");
 
@@ -391,7 +321,7 @@ export default function MeetingRoom({
     }
 
     /*
-     * Guest / Intern
+     * Intern / Guest
      */
     router.back();
   };
@@ -409,12 +339,9 @@ export default function MeetingRoom({
 
       setCopied(true);
 
-      window.setTimeout(
-        () => {
-          setCopied(false);
-        },
-        1500
-      );
+      window.setTimeout(() => {
+        setCopied(false);
+      }, 1500);
     } catch {
       meeting.setError(
         "Unable to copy the meeting link."
@@ -453,11 +380,8 @@ export default function MeetingRoom({
 
   /*
    * --------------------------------------------------
-   * WAITING FOR AUTO JOIN
+   * WAITING FOR AUTO JOIN DECISION
    * --------------------------------------------------
-   *
-   * This prevents JoinMeeting from flashing
-   * for Reviewer / Advisor.
    */
   if (
     !meeting.joined &&
@@ -472,7 +396,7 @@ export default function MeetingRoom({
 
   /*
    * --------------------------------------------------
-   * GUEST / INTERN JOIN SCREEN
+   * INTERN / GUEST JOIN SCREEN
    * --------------------------------------------------
    */
   if (!meeting.joined) {
@@ -480,19 +404,19 @@ export default function MeetingRoom({
       <JoinMeeting
         info={meeting.info}
         name={meeting.name}
-        role={meeting.role}
         joining={meeting.joining}
         error={meeting.error}
         setName={meeting.setName}
-        setRole={meeting.setRole}
-        onJoin={() => void join()}
+        onJoin={() =>
+          void join()
+        }
       />
     );
   }
 
   /*
    * --------------------------------------------------
-   * ACTUAL WEBRTC ROOM
+   * ACTUAL WEBRTC MEETING ROOM
    * --------------------------------------------------
    */
   return (

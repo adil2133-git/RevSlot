@@ -16,7 +16,6 @@ import type {
   MeetingInfo,
   MeetingMessage,
   MeetingParticipant,
-  MeetingRole,
 } from "../types/meeting.types";
 
 const makeId = () => {
@@ -27,8 +26,15 @@ const makeId = () => {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 };
 
-const getParticipantId = (bookingId: number) => {
-  const key = `revslot-meeting-participant-${bookingId}`;
+const getParticipantId = (
+  bookingId: number,
+  displayName = ""
+) => {
+  const normalizedName = displayName.trim().toLowerCase();
+
+  const key = normalizedName
+    ? `revslot-meeting-participant-${bookingId}-${normalizedName}`
+    : `revslot-meeting-participant-${bookingId}`;
 
   if (typeof window === "undefined") {
     return makeId();
@@ -36,10 +42,14 @@ const getParticipantId = (bookingId: number) => {
 
   const existing = window.localStorage.getItem(key);
 
-  if (existing) return existing;
+  if (existing) {
+    return existing;
+  }
 
   const id = makeId();
+
   window.localStorage.setItem(key, id);
+
   return id;
 };
 
@@ -60,7 +70,11 @@ const waitForSocketConnection = (
 
     const timer = window.setTimeout(() => {
       cleanup();
-      reject(new Error("Unable to connect to the meeting server."));
+      reject(
+        new Error(
+          "Unable to connect to the meeting server."
+        )
+      );
     }, timeoutMs);
 
     const onConnect = () => {
@@ -83,23 +97,48 @@ const waitForSocketConnection = (
     socket.once("connect_error", onError);
   });
 
-export function useMeeting({ bookingId, token }: UseMeetingProps) {
-  const [info, setInfo] = useState<MeetingInfo | null>(null);
-  const [name, setName] = useState("");
-  const [role, setRole] = useState<MeetingRole>("guest");
-  const [joined, setJoined] = useState(false);
-  const [joining, setJoining] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [participants, setParticipants] = useState<MeetingParticipant[]>([]);
-  const [initialMessages, setInitialMessages] = useState<MeetingMessage[]>([]);
-  const [socket, setSocket] = useState<MeetingSocket | null>(null);
+export function useMeeting({
+  bookingId,
+  token,
+}: UseMeetingProps) {
+  const [info, setInfo] =
+    useState<MeetingInfo | null>(null);
 
-  const socketRef = useRef<MeetingSocket | null>(null);
-  const participantIdRef = useRef(getParticipantId(bookingId));
-  const joinedRef = useRef(false);
+  const [name, setName] = useState("");
+
+  const [joined, setJoined] = useState(false);
+
+  const [joining, setJoining] = useState(false);
+
+  const [error, setError] =
+    useState<string | null>(null);
+
+  const [participants, setParticipants] =
+    useState<MeetingParticipant[]>([]);
+
+  const [initialMessages, setInitialMessages] =
+    useState<MeetingMessage[]>([]);
+
+  const [socket, setSocket] =
+    useState<MeetingSocket | null>(null);
+
+  const socketRef =
+    useRef<MeetingSocket | null>(null);
+
+  const participantIdRef =
+    useRef("");
+
+  const joinedRef =
+    useRef(false);
+
+  const joiningRef =
+    useRef(false);
+
+  const reconnectingRef =
+    useRef(false);
 
   useEffect(() => {
-    participantIdRef.current = getParticipantId(bookingId);
+    participantIdRef.current = "";
   }, [bookingId]);
 
   useEffect(() => {
@@ -111,10 +150,14 @@ export function useMeeting({ bookingId, token }: UseMeetingProps) {
     meetingApi
       .getInfo(bookingId, token)
       .then((meetingInfo) => {
-        if (!cancelled) setInfo(meetingInfo);
+        if (!cancelled) {
+          setInfo(meetingInfo);
+        }
       })
       .catch((err: unknown) => {
-        if (cancelled) return;
+        if (cancelled) {
+          return;
+        }
 
         setError(
           err instanceof Error
@@ -133,115 +176,190 @@ export function useMeeting({ bookingId, token }: UseMeetingProps) {
   }, [joined]);
 
   useEffect(() => {
-    const activeSocket = socketRef.current;
+    const activeSocket =
+      socketRef.current;
 
-    if (!activeSocket) return;
+    if (!activeSocket) {
+      return;
+    }
 
-    const onParticipantJoined = (participant: MeetingParticipant) => {
+    const onParticipantJoined = (
+      participant: MeetingParticipant
+    ) => {
       setParticipants((current) => {
         const existing = current.some(
           (item) => item.id === participant.id
         );
 
-        if (!existing) return [...current, participant];
+        if (!existing) {
+          return [...current, participant];
+        }
 
         return current.map((item) =>
-          item.id === participant.id ? participant : item
+          item.id === participant.id
+            ? participant
+            : item
         );
       });
     };
 
-    const onParticipantLeft = ({ participantId }: { participantId: string }) => {
+    const onParticipantLeft = ({
+      participantId,
+    }: {
+      participantId: string;
+    }) => {
       setParticipants((current) =>
-        current.filter((item) => item.id !== participantId)
+        current.filter(
+          (item) => item.id !== participantId
+        )
       );
     };
 
-    const onMeetingError = ({ message }: { message: string }) => {
+    const onMeetingError = ({
+      message,
+    }: {
+      message: string;
+    }) => {
       setError(message);
     };
 
-    activeSocket.on("participant:joined", onParticipantJoined);
-    activeSocket.on("participant:left", onParticipantLeft);
-    activeSocket.on("meeting:error", onMeetingError);
+    activeSocket.on(
+      "participant:joined",
+      onParticipantJoined
+    );
+
+    activeSocket.on(
+      "participant:left",
+      onParticipantLeft
+    );
+
+    activeSocket.on(
+      "meeting:error",
+      onMeetingError
+    );
 
     return () => {
-      activeSocket.off("participant:joined", onParticipantJoined);
-      activeSocket.off("participant:left", onParticipantLeft);
-      activeSocket.off("meeting:error", onMeetingError);
+      activeSocket.off(
+        "participant:joined",
+        onParticipantJoined
+      );
+
+      activeSocket.off(
+        "participant:left",
+        onParticipantLeft
+      );
+
+      activeSocket.off(
+        "meeting:error",
+        onMeetingError
+      );
     };
   }, [socket]);
 
   const join = useCallback(
-    async (
-      nameOverride?: string,
-      roleOverride?: MeetingRole
-    ) => {
-      const joinName = (nameOverride ?? name).trim();
-      const joinRole = roleOverride ?? role;
+    async (nameOverride?: string) => {
+      const joinName =
+        (nameOverride ?? name).trim();
 
       if (!joinName) {
-        setError("Enter your name before joining.");
+        setError(
+          "Enter your name before joining."
+        );
+
         return null;
       }
 
-      if (joining || joinedRef.current) {
+      if (
+        joiningRef.current ||
+        joinedRef.current
+      ) {
         return null;
       }
 
+      joiningRef.current = true;
       setJoining(true);
       setError(null);
 
-      const participantId = participantIdRef.current;
-      const meetingSocket = createMeetingSocket({
-        bookingId,
-        token,
-        participantId,
-      });
+      const participantId =
+        getParticipantId(
+          bookingId,
+          joinName
+        );
 
-      socketRef.current = meetingSocket;
+      participantIdRef.current =
+        participantId;
+
+      const meetingSocket =
+        createMeetingSocket({
+          bookingId,
+          token,
+          participantId,
+        });
+
+      socketRef.current =
+        meetingSocket;
+
       setSocket(meetingSocket);
 
       try {
-        await waitForSocketConnection(meetingSocket);
+        await waitForSocketConnection(
+          meetingSocket
+        );
 
-        const result = await new Promise<{
-          participants: MeetingParticipant[];
-          messages: MeetingMessage[];
-          maxParticipants: number;
-        }>((resolve, reject) => {
-           meetingSocket.emit(
-  "meeting:join",
-  { name: joinName, role: joinRole },
-  (response: {
-    ok: boolean;
-    error?: string;
-    participants?: MeetingParticipant[];
-    messages?: MeetingMessage[];
-    maxParticipants?: number;
-  }) => {
-    if (!response.ok) {
-      reject(
-        new Error(
-          response.error ?? "Could not join the meeting."
-        )
-      );
-      return;
-    }
+        const result =
+          await new Promise<{
+            participants: MeetingParticipant[];
+            messages: MeetingMessage[];
+            maxParticipants: number;
+          }>((resolve, reject) => {
+            meetingSocket.emit(
+              "meeting:join",
+              {
+                name: joinName,
+              },
+              (response: {
+                  ok: boolean;
+                  participants?: MeetingParticipant[];
+                  messages?: MeetingMessage[];
+                  maxParticipants?: number;
+                  error?: string;
+                }) => {
+              if (!response.ok) {
+                  reject(
+                    new Error(
+                      response.error ??
+                        "Could not join the meeting."
+                    )
+                  );
+                  return;
+                }
 
-    resolve({
-      participants: response.participants ?? [],
-      messages: response.messages ?? [],
-      maxParticipants: response.maxParticipants ?? 8,
-    });
-  }
-);
-        });
+                resolve({
+                  participants:
+                    response.participants ??
+                    [],
+
+                  messages:
+                    response.messages ??
+                    [],
+
+                  maxParticipants:
+                    response.maxParticipants ??
+                    8,
+                });
+              }
+            );
+          });
 
         setName(joinName);
-        setRole(joinRole);
-        setParticipants(result.participants);
-        setInitialMessages(result.messages);
+
+        setParticipants(
+          result.participants
+        );
+
+        setInitialMessages(
+          result.messages
+        );
 
         joinedRef.current = true;
         setJoined(true);
@@ -250,8 +368,11 @@ export function useMeeting({ bookingId, token }: UseMeetingProps) {
       } catch (err: unknown) {
         joinedRef.current = false;
         setJoined(false);
+
         meetingSocket.disconnect();
+
         socketRef.current = null;
+
         setSocket(null);
 
         setError(
@@ -262,71 +383,180 @@ export function useMeeting({ bookingId, token }: UseMeetingProps) {
 
         return null;
       } finally {
+        joiningRef.current = false;
         setJoining(false);
       }
     },
-    [bookingId, token, name, role, joining]
+    [bookingId, token, name]
   );
 
-  const leave = useCallback(async () => {
-    if (!joinedRef.current) return;
+  const leave = useCallback(
+    async () => {
+      if (
+        !joinedRef.current &&
+        !joiningRef.current
+      ) {
+        return;
+      }
 
-    joinedRef.current = false;
-    setJoined(false);
-    setParticipants([]);
-    setInitialMessages([]);
-    setJoining(false);
+      joiningRef.current = false;
 
-    const activeSocket = socketRef.current;
-    socketRef.current = null;
-    setSocket(null);
+      joinedRef.current = false;
 
-    if (!activeSocket) return;
+      setJoined(false);
+      setParticipants([]);
+      setInitialMessages([]);
+      setJoining(false);
 
-    try {
-      await new Promise<void>((resolve) => {
-        if (!activeSocket.connected) {
-          resolve();
-          return;
-        }
+      const activeSocket =
+        socketRef.current;
 
-        activeSocket.timeout(2_000).emit(
-          "meeting:leave",
-          { participantId: participantIdRef.current },
-          () => resolve()
+      socketRef.current = null;
+
+      setSocket(null);
+
+      if (!activeSocket) {
+        return;
+      }
+
+      try {
+        await new Promise<void>(
+          (resolve) => {
+            if (!activeSocket.connected) {
+              resolve();
+              return;
+            }
+
+            activeSocket
+              .timeout(2_000)
+              .emit(
+                "meeting:leave",
+                {
+                  participantId:
+                    participantIdRef.current,
+                },
+                () => resolve()
+              );
+          }
         );
-      });
-    } finally {
-      activeSocket.disconnect();
-    }
-  }, []);
+      } finally {
+        activeSocket.disconnect();
+      }
+    },
+    []
+  );
 
   useEffect(() => {
-    if (!joined || !socket) return;
+    if (!socket) {
+      return;
+    }
+
+    const handleReconnect = () => {
+      if (
+        !joinedRef.current ||
+        reconnectingRef.current
+      ) {
+        return;
+      }
+
+      reconnectingRef.current = true;
+
+      socket.emit(
+        "meeting:join",
+        {
+          name: name.trim(),
+        },
+        (response) => {
+          reconnectingRef.current =
+            false;
+
+          if (!response.ok) {
+            setError(
+              response.error ??
+                "The meeting connection could not be restored."
+            );
+
+            return;
+          }
+
+          setParticipants(
+            response.participants ?? []
+          );
+
+          setInitialMessages(
+            response.messages ?? []
+          );
+
+          setError(null);
+        }
+      );
+    };
+
+    socket.on(
+      "connect",
+      handleReconnect
+    );
+
+    return () => {
+      socket.off(
+        "connect",
+        handleReconnect
+      );
+    };
+  }, [socket, name]);
+
+  useEffect(() => {
+    if (!joined || !socket) {
+      return;
+    }
 
     const heartbeat = () => {
-      if (!joinedRef.current || !socket.connected) return;
+      if (
+        !joinedRef.current ||
+        !socket.connected
+      ) {
+        return;
+      }
 
-      socket.emit("meeting:heartbeat", {
-        participantId: participantIdRef.current,
-      });
+      socket.emit(
+        "meeting:heartbeat",
+        {
+          participantId:
+            participantIdRef.current,
+        }
+      );
     };
 
     heartbeat();
 
-    const timer = window.setInterval(heartbeat, 30_000);
+    const timer =
+      window.setInterval(
+        heartbeat,
+        30_000
+      );
 
-    return () => window.clearInterval(timer);
+    return () =>
+      window.clearInterval(timer);
   }, [joined, socket]);
 
   useEffect(() => {
     return () => {
-      const activeSocket = socketRef.current;
+      const activeSocket =
+        socketRef.current;
 
-      if (!activeSocket) return;
+      if (!activeSocket) {
+        return;
+      }
 
       socketRef.current = null;
+
       joinedRef.current = false;
+
+      joiningRef.current = false;
+
+      reconnectingRef.current =
+        false;
+
       activeSocket.disconnect();
     };
   }, [bookingId, token]);
@@ -335,8 +565,6 @@ export function useMeeting({ bookingId, token }: UseMeetingProps) {
     info,
     name,
     setName,
-    role,
-    setRole,
     joined,
     joining,
     error,

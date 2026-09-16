@@ -2,30 +2,23 @@
 
 import { Video } from "lucide-react";
 
-import type {
-  MeetingInfo,
-  MeetingRole,
-} from "../types/meeting.types";
+import type { MeetingInfo } from "../types/meeting.types";
 
 type JoinMeetingProps = {
   info: MeetingInfo;
   name: string;
-  role: MeetingRole;
   joining: boolean;
   error: string | null;
   setName: (value: string) => void;
-  setRole: (value: MeetingRole) => void;
   onJoin: () => void;
 };
 
 export default function JoinMeeting({
   info,
   name,
-  role,
   joining,
   error,
   setName,
-  setRole,
   onJoin,
 }: JoinMeetingProps) {
   return (
@@ -55,9 +48,7 @@ export default function JoinMeeting({
 
         <input
           value={name}
-          onChange={(event) =>
-            setName(event.target.value)
-          }
+          onChange={(event) => setName(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter") {
               event.preventDefault();
@@ -67,25 +58,6 @@ export default function JoinMeeting({
           className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-primary"
           placeholder="Enter your name"
         />
-
-        <label className="mt-4 block text-sm font-semibold text-slate-700">
-          Participant type
-        </label>
-
-        <select
-          value={role}
-          onChange={(event) =>
-            setRole(
-              event.target.value as MeetingRole
-            )
-          }
-          className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-primary"
-        >
-          <option value="guest">Guest</option>
-          <option value="advisor">Advisor</option>
-          <option value="intern">Intern</option>
-          <option value="reviewer">Reviewer</option>
-        </select>
 
         {error && (
           <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">

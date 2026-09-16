@@ -62,7 +62,7 @@ export default function MeetingControls({
       <ControlButton
         active={sharing}
         onClick={onShareScreen}
-        label="Share screen"
+        label={sharing ? "Stop sharing" : "Share screen"}
       >
         <MonitorUp />
       </ControlButton>

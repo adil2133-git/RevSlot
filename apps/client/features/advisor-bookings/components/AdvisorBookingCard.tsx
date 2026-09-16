@@ -142,7 +142,7 @@ export default function AdvisorBookingCard({
               </a>
           ) : isJoinAvailable && booking.meetLink ? (
               <a
-               href={booking.meetLink}
+               href={`${booking.meetLink}&participant=advisor`}
                target="_blank"
                rel="noopener noreferrer"
                className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-xs font-semibold text-on-primary shadow-sm transition hover:bg-primary/90"

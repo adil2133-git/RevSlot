@@ -19,16 +19,9 @@ if (!MEETING_ROOM_SECRET) {
 
 const MAX_PARTICIPANTS = 8;
 
-export type MeetingRole =
-  | "reviewer"
-  | "advisor"
-  | "intern"
-  | "guest";
-
 export type MeetingParticipant = {
   id: string;
   name: string;
-  role: MeetingRole;
   lastSeen: number;
 };
 
@@ -36,7 +29,6 @@ export type ChatMessage = {
   id: number;
   participantId: string;
   name: string;
-  role: MeetingRole;
   message: string;
   createdAt: number;
 };
@@ -230,17 +222,6 @@ export const meetingService = {
     }
   },
 
-  getParticipants: async (
-    bookingId: number,
-    token: string
-  ) => {
-    await meetingService.validateAccess(bookingId, token);
-
-    return [
-      ...(rooms.get(bookingId)?.participants.values() ?? []),
-    ];
-  },
-
   addMessage: async (
     bookingId: number,
     token: string,
@@ -269,7 +250,6 @@ export const meetingService = {
       id: room.nextMessageId++,
       participantId,
       name: participant.name,
-      role: participant.role,
       message: cleanMessage,
       createdAt: Date.now(),
     };
@@ -283,17 +263,4 @@ export const meetingService = {
     return item;
   },
 
-  getMessages: async (
-    bookingId: number,
-    token: string,
-    afterId?: number
-  ) => {
-    await meetingService.validateAccess(bookingId, token);
-
-    const messages = rooms.get(bookingId)?.messages ?? [];
-
-    return messages.filter(
-      (message) => !afterId || message.id > afterId
-    );
-  },
 };

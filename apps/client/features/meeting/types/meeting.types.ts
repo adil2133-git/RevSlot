@@ -1,13 +1,6 @@
-export type MeetingRole =
-  | "reviewer"
-  | "advisor"
-  | "intern"
-  | "guest";
-
 export type MeetingParticipant = {
   id: string;
   name: string;
-  role: MeetingRole;
   lastSeen: number;
 };
 
@@ -15,7 +8,6 @@ export type MeetingMessage = {
   id: number;
   participantId: string;
   name: string;
-  role: MeetingRole;
   message: string;
   createdAt: number;
 };

@@ -39,7 +39,6 @@ export type ClientToServerEvents = {
   "meeting:join": (
     payload: {
       name: string;
-      role: "reviewer" | "advisor" | "intern" | "guest";
     },
     ack: (response: MeetingJoinAck) => void
   ) => void;
@@ -86,7 +85,6 @@ export type ServerToClientEvents = {
 type MeetingParticipant = {
   id: string;
   name: string;
-  role: "reviewer" | "advisor" | "intern" | "guest";
   lastSeen: number;
 };
 
@@ -94,7 +92,6 @@ type MeetingMessage = {
   id: number;
   participantId: string;
   name: string;
-  role: MeetingParticipant["role"];
   message: string;
   createdAt: number;
 };
@@ -204,7 +201,6 @@ export const registerMeetingSocket = (
           token,
           participantId,
           name: payload.name,
-          role: payload.role,
         });
 
         const existingSocket = getSocketForParticipant(
@@ -231,7 +227,6 @@ export const registerMeetingSocket = (
           {
             id: input.participantId,
             name: input.name,
-            role: input.role,
           }
         );
 
@@ -252,7 +247,6 @@ export const registerMeetingSocket = (
           {
             id: input.participantId,
             name: input.name,
-            role: input.role,
             lastSeen: Date.now(),
           }
         );
