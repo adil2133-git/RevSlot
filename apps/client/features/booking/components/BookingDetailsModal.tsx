@@ -26,11 +26,10 @@ export default function BookingDetailsModal({ bookingId, onClose }: BookingDetai
       .finally(() => setLoading(false));
   }, [bookingId]);
 
-    const canJoinMeet =
-    !!detail?.meetLink &&
-    (detail.status === "confirmed" || detail.status === "rescheduled") &&
-    dayjs().isAfter(dayjs(detail.startTime).subtract(10, "minute")) &&
-    dayjs().isBefore(dayjs(detail.endTime));
+ const canJoinMeet =
+  !!detail?.meetLink &&
+  (detail.status === "confirmed" || detail.status === "rescheduled") &&
+  dayjs().isBefore(dayjs(detail.endTime));
 
   return (
     <Modal onClose={onClose} widthClassName="max-w-lg max-h-[90vh]">

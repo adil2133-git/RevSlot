@@ -85,7 +85,7 @@ export default function BookingCard({
 
   const isUpcoming = isActiveBooking && now < startTime;
   const msUntilStart = startTime - now;
-  const isJoinAvailable = isActiveBooking && now >= startTime - 10 * 60 * 1000 && now < endTime;
+  const isJoinAvailable = isActiveBooking && now < endTime;
   const isUrgent = isUpcoming && msUntilStart <= 10 * 60 * 1000; // last 10 minutes
 
   const statusBorderColor = isOutcomeRequired
@@ -204,41 +204,39 @@ export default function BookingCard({
               No feedback available
             </span>
           )}
-            
-          {booking.meetLink && isActiveBooking && now < endTime && (
-              <div className="flex items-center gap-2">
-                {isUpcoming ? (
-                  <span
-                    className={`inline-flex items-center gap-1 whitespace-nowrap rounded-lg border px-3 py-1.5 text-xs font-semibold ${
-                      isUrgent
-                        ? "animate-pulse border-rose-200 bg-rose-50 text-rose-600"
-                        : "border-slate-200 bg-surface text-slate-500"
-                    }`}
-                  >
-                    {isUrgent ? "🔴" : "🕐"} Starts in {formatCountdown(msUntilStart)}
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600">
-                    🟢 Live now
-                  </span>
-                )}
 
-            {isJoinAvailable ? (
-                <a
-                  href={booking.meetLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-on-primary shadow-2xs hover:shadow-surface transition-shadow"
-                 >
-                 Join Meet
-               </a>
-              ) : (
-           <span className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg bg-primary/40 px-3 py-1.5 text-xs font-semibold text-on-primary/70">
-              Join Meet
-           </span>
-           )}
-       </div>
-       )}
+          {/* Meeting */}
+<div className="flex items-center gap-2">
+  {isActiveBooking && now < endTime && (
+    isUpcoming ? (
+      <span
+        className={`inline-flex items-center gap-1 whitespace-nowrap rounded-lg border px-3 py-1.5 text-xs font-semibold ${
+          isUrgent
+            ? "animate-pulse border-rose-200 bg-rose-50 text-rose-600"
+            : "border-slate-200 bg-surface text-slate-500"
+        }`}
+      >
+        {isUrgent ? "🔴" : "🕐"} Starts in {formatCountdown(msUntilStart)}
+      </span>
+    ) : (
+      <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600">
+        🟢 Live now
+      </span>
+    )
+  )}
+
+{isJoinAvailable && (
+  <a
+    href={booking.meetLink || `/meeting/${booking.id}`}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-on-primary shadow-2xs hover:shadow-surface transition-shadow"
+  >
+    Join Meet
+  </a>
+)}
+</div>
+            
           <BookingActionsMenu
             booking={booking}
             onViewDetails={() => onViewDetails?.(booking)}

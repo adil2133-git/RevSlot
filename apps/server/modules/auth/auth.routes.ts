@@ -33,7 +33,7 @@ router.post("/forgot-password", passwordResetLimiter, validate(ForgotPasswordSch
 router.post("/reset-password", passwordResetLimiter, validate(ResetPasswordSchema), catchAsync(authController.resetPassword));
 router.post("/verify-email", validate(VerifyEmailSchema), catchAsync(authController.verifyEmail));
 router.post("/resend-verification",  verificationLimiter, validate(ResendVerificationSchema), catchAsync(authController.resendVerification));
-router.post("/google",  googleAuthLimiter, validate(GoogleAuthSchema), catchAsync(authController.googleAuth));
+router.post("/google", googleAuthLimiter, validate(GoogleAuthSchema), catchAsync(authController.googleAuth));
 
 // for testing only
 router.get("/admin/test", requireAdmin, (req, res) => {

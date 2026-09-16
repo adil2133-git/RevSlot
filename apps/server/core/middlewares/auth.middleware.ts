@@ -4,7 +4,7 @@ import { verifyAccessToken, verifyAdvisorToken } from "../utils/jwt.js";
 // Access token now arrives as "Authorization: Bearer <token>" — it's no
 // longer a cookie, since the frontend holds it in memory and attaches
 // it manually via an axios request interceptor.
-const extractBearerToken = (req: Request): string | undefined => {
+export const extractBearerToken = (req: Request): string | undefined => {
   const header = req.headers.authorization;
   if (!header?.startsWith("Bearer ")) return undefined;
   return header.slice("Bearer ".length);
@@ -106,4 +106,54 @@ export const requireAdvisor = (req: Request, res: Response, next: NextFunction) 
       message: "Invalid or expired token",
     });
   }
+};
+
+export const requireMeetingParticipant = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  const token = extractBearerToken(req);
+
+  if (!token) {
+    return res.status(401).json({
+      success: false,
+      message: "Authorization token required",
+    });
+  }
+
+  try {
+    const payload = verifyAccessToken(token);
+
+    if (payload.role === "reviewer") {
+      req.meetingIdentity = {
+        role: "reviewer",
+        reviewerId: payload.userId,
+      };
+
+      return next();
+    }
+  } catch {
+    // Try advisor token below
+  }
+
+  try {
+    const payload = verifyAdvisorToken(token);
+
+    if (payload.role === "advisor") {
+      req.meetingIdentity = {
+        role: "advisor",
+        advisorEmail: payload.advisorEmail,
+      };
+
+      return next();
+    }
+  } catch {
+    // Invalid advisor token
+  }
+
+  return res.status(401).json({
+    success: false,
+    message: "Invalid or expired token",
+  });
 };
