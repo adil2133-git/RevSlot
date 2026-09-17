@@ -22,16 +22,16 @@ function getRoleIntro(params: RescheduledEmailParams): string {
 }
 
 export function bookingRescheduledTemplate(params: RescheduledEmailParams) {
-  var recipientName = params.recipientName;
-  var oldFormattedDate = params.oldFormattedDate;
-  var oldFormattedTime = params.oldFormattedTime;
-  var newFormattedDate = params.newFormattedDate;
-  var newFormattedTime = params.newFormattedTime;
-  var meetLink = params.meetLink;
+  const recipientName = params.recipientName;
+  const oldFormattedDate = params.oldFormattedDate;
+  const oldFormattedTime = params.oldFormattedTime;
+  const newFormattedDate = params.newFormattedDate;
+  const newFormattedTime = params.newFormattedTime;
+  const meetLink = params.meetLink;
 
-  var subject = "Booking rescheduled: " + params.eventTypeName;
+  const subject = "Booking rescheduled: " + params.eventTypeName;
 
-  var meetSection = "";
+  let meetSection = "";
   if (meetLink) {
     meetSection =
       '<div style="margin: 24px 0; padding: 16px; background: #f3f4f6; border-radius: 8px; text-align: center;">' +
@@ -40,7 +40,7 @@ export function bookingRescheduledTemplate(params: RescheduledEmailParams) {
       '</div>';
   }
 
-  var html =
+  const html =
     '<div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px;">' +
     '<h2 style="color: #111827; margin-bottom: 8px;">Booking rescheduled</h2>' +
     '<p style="color: #374151; font-size: 15px; line-height: 1.6;">Hi ' + recipientName + ',</p>' +
