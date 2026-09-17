@@ -150,15 +150,19 @@ export const availabilityService = {
 
   // Creates a new availability template for the reviewer, rejecting duplicate names
   createTemplate: async (reviewerId: number, data: CreateTemplateInput) => {
-    // Check if reviewer has a username set before allowing availability creation
+    // Check if reviewer has a username and whatsappNumber set before allowing availability creation
     const [reviewer] = await db
-      .select({ username: reviewers.username })
+      .select({ username: reviewers.username, whatsappNumber: reviewers.whatsappNumber })
       .from(reviewers)
       .where(eq(reviewers.id, reviewerId))
       .limit(1);
 
     if (!reviewer || !reviewer.username || reviewer.username.trim().length === 0) {
       throw new AppError("Username is required before setting availability", 400);
+    }
+
+    if (!reviewer.whatsappNumber || reviewer.whatsappNumber.trim().length === 0) {
+      throw new AppError("WhatsApp number is required before setting availability. Please add your WhatsApp number in your profile.", 400);
     }
     const [existing] = await db
       .select()

@@ -767,11 +767,6 @@ export const authService = {
           .where(eq(reviewers.id, existingByEmail.id))
           .returning();
       } else {
-        // Genuinely new user — need a WhatsApp number to create the account
-        if (!data.whatsappNumber) {
-          throw new AppError("WhatsApp number is required for new account registration", 422);
-        }
-
         const username = await generateUniqueUsername(name ?? "reviewer", email);
 
         [reviewer] = await db
@@ -782,7 +777,7 @@ export const authService = {
             username,
             googleId,
             avatarUrl: picture,
-            whatsappNumber: data.whatsappNumber,
+            whatsappNumber: data.whatsappNumber ?? null,
             emailVerified: true, // Google already verified this email
           })
           .returning();

@@ -10,7 +10,7 @@ export const reviewers = pgTable(
     email: varchar('email', { length: 255 }).notNull().unique(),
     passwordHash: text('password_hash'),
     googleId: varchar('google_id', { length: 255 }).unique(), // ← new
-    whatsappNumber: varchar('whatsapp_number', { length: 20 }).notNull(),
+    whatsappNumber: varchar('whatsapp_number', { length: 20 }),
     googleCalendarRefreshToken: text('google_calendar_refresh_token'),
     googleCalendarEmail: varchar('google_calendar_email', { length: 255 }),
     googleCalendarConnected: boolean('google_calendar_connected').notNull().default(false),
