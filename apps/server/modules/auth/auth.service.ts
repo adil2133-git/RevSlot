@@ -143,6 +143,66 @@ const issueSession = async (
   };
 };
 
+async function generateUniqueUsername(name: string, email: string): Promise<string> {
+  // 1. Derive base from name
+  let base = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  // Fallback to email prefix if base is empty or too short (< 3 chars)
+  if (!base || base.length < 3) {
+    const emailPrefix = email.split("@")[0] || "";
+    base = emailPrefix
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+  }
+
+  // Fallback to "reviewer" if still invalid or too short
+  if (!base || base.length < 3) {
+    base = "reviewer";
+  }
+
+  // Cap base length to 22 chars so we have room for random suffix up to 30 chars
+  if (base.length > 22) {
+    base = base.slice(0, 22).replace(/-+$/, "");
+    if (base.length < 3) {
+      base = "reviewer";
+    }
+  }
+
+  // Check if base is available
+  const [existing] = await db
+    .select({ id: reviewers.id })
+    .from(reviewers)
+    .where(eq(reviewers.username, base))
+    .limit(1);
+
+  if (!existing) {
+    return base;
+  }
+
+  // If collision, generate random suffix
+  for (let i = 0; i < 10; i++) {
+    const suffix = Math.floor(100 + Math.random() * 900); // 3 digits
+    const candidate = `${base.slice(0, 26).replace(/-+$/, "")}-${suffix}`;
+    const [found] = await db
+      .select({ id: reviewers.id })
+      .from(reviewers)
+      .where(eq(reviewers.username, candidate))
+      .limit(1);
+
+    if (!found) {
+      return candidate;
+    }
+  }
+
+  // Fallback with timestamp suffix
+  const timestampSuffix = Date.now().toString().slice(-4);
+  return `${base.slice(0, 25).replace(/-+$/, "")}-${timestampSuffix}`;
+}
+
 export const authService = {
 
   // Reviewer Registration — creates the account but does NOT log the
@@ -160,22 +220,14 @@ export const authService = {
 
     const passwordHash = await bcrypt.hash(data.password, 12);
 
-    const existingUsername = await db
-      .select()
-      .from(reviewers)
-      .where(eq(reviewers.username, data.username))
-      .limit(1);
-
-if (existingUsername.length > 0) {
-  throw new AppError("Username is already taken", 409);
-}
+    const username = await generateUniqueUsername(data.name, data.email);
 
     const [newReviewer] = await db
       .insert(reviewers)
       .values({
         name: data.name,
         email: data.email,
-        username: data.username,
+        username,
         passwordHash,
         whatsappNumber: data.whatsappNumber,
       })
@@ -361,49 +413,31 @@ if (existingUsername.length > 0) {
 
   // Updates username for a logged-in reviewer
   updateUsername: async (userId: number, role: "reviewer" | "admin", usernameInput: string) => {
-    if (role !== "reviewer") {
-      throw new AppError("Only reviewers can set a username", 403);
-    }
-
-    const cleanUsername = usernameInput.toLowerCase().trim();
-
-    // Check if username is already taken by another reviewer
-    const [existing] = await db
-      .select({ id: reviewers.id })
-      .from(reviewers)
-      .where(eq(reviewers.username, cleanUsername))
-      .limit(1);
-
-    if (existing && existing.id !== userId) {
-      throw new AppError("Username is already taken", 409);
-    }
-
-    const [updated] = await db
-      .update(reviewers)
-      .set({ username: cleanUsername, updatedAt: new Date() })
-      .where(eq(reviewers.id, userId))
-      .returning();
-
-    if (!updated) {
-      throw new AppError("User not found", 404);
-    }
-
-    return {
-      id: updated.id,
-      name: updated.name,
-      username: updated.username,
-      email: updated.email,
-      role: "reviewer" as const,
-      avatarUrl: updated.avatarUrl,
-      bio: updated.bio,
-    };
+    return authService.updateProfile(userId, role, { username: usernameInput });
   },
 
-    // Updates profile fields (name / bio / whatsappNumber) for a logged-in
+    // Updates profile fields (name / bio / whatsappNumber / username) for a logged-in
   // user. All fields optional — only what's sent in the request gets touched.
   updateProfile: async (userId: number, role: "reviewer" | "admin", input: UpdateProfileInput) => {
     if (Object.keys(input).length === 0) {
       throw new AppError("No fields to update", 400);
+    }
+
+    if (input.username !== undefined) {
+      if (role !== "reviewer") {
+        throw new AppError("Only reviewers can set a username", 403);
+      }
+      const cleanUsername = input.username.toLowerCase().trim();
+      const [existing] = await db
+        .select({ id: reviewers.id })
+        .from(reviewers)
+        .where(eq(reviewers.username, cleanUsername))
+        .limit(1);
+
+      if (existing && existing.id !== userId) {
+        throw new AppError("Username is already taken", 409);
+      }
+      input.username = cleanUsername;
     }
 
     const table = role === "admin" ? admins : reviewers;
@@ -733,34 +767,17 @@ if (existingUsername.length > 0) {
           .where(eq(reviewers.id, existingByEmail.id))
           .returning();
       } else {
-        // Genuinely new user — need a WhatsApp number to create the account
-        if (!data.whatsappNumber) {
-          throw new AppError("WhatsApp number is required for new account registration", 422);
-        }
-
-        if (!data.username) {
-  throw new AppError("Username is required for new account registration", 422);
-}
-
-const existingUsername = await db
-      .select()
-      .from(reviewers)
-      .where(eq(reviewers.username, data.username))
-      .limit(1);
-
-if (existingUsername.length > 0) {
-  throw new AppError("Username is already taken", 409);
-}
+        const username = await generateUniqueUsername(name ?? "reviewer", email);
 
         [reviewer] = await db
           .insert(reviewers)
           .values({
             name: name ?? "Reviewer",
             email,
-            username: data.username,
+            username,
             googleId,
             avatarUrl: picture,
-            whatsappNumber: data.whatsappNumber,
+            whatsappNumber: data.whatsappNumber ?? null,
             emailVerified: true, // Google already verified this email
           })
           .returning();

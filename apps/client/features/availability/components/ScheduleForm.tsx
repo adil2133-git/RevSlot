@@ -17,6 +17,7 @@ import { useAvailabilityStore } from "../store/availability.store";
 import { useAuthStore } from "@/features/auth/store/authStore";
 import { guessTimezone } from "../utils/timezones";
 import { normalizeTime } from "../utils/time";
+import WhatsappRequiredModal from "@/components/common/WhatsappRequiredModal";
 
 const DAYS_ORDER = [
     { dayOfWeek: 1, label: "Mon" },
@@ -65,6 +66,7 @@ export default function ScheduleForm({ mode, templateId }: ScheduleFormProps) {
     const [loading, setLoading] = useState(mode === "edit");
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [whatsappModalOpen, setWhatsappModalOpen] = useState(false);
 
     useEffect(() => {
         (async () => {
@@ -184,6 +186,11 @@ export default function ScheduleForm({ mode, templateId }: ScheduleFormProps) {
 
         if (!user?.username) {
             setError("Username is required before setting availability. Please set your username first in your profile.");
+            return;
+        }
+
+        if (!user?.whatsappNumber) {
+            setWhatsappModalOpen(true);
             return;
         }
 
@@ -351,6 +358,14 @@ export default function ScheduleForm({ mode, templateId }: ScheduleFormProps) {
                     {saving ? "Saving…" : "Save schedule"}
                 </button>
             </div>
+
+            <WhatsappRequiredModal
+                isOpen={whatsappModalOpen}
+                onClose={() => setWhatsappModalOpen(false)}
+                onSuccess={() => handleSave()}
+                title="WhatsApp Number Required"
+                description="A WhatsApp number is required before setting availability so bookers have a fallback if you're not on Meet."
+            />
         </div>
     );
 }

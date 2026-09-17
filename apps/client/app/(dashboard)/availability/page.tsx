@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import dayjs from "dayjs";
 import { useAvailabilityStore } from "@/features/availability/store/availability.store";
 import { useAuthStore } from "@/features/auth/store/authStore";
+import WhatsappRequiredModal from "@/components/common/WhatsappRequiredModal";
 
 const PlusIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round">
@@ -28,6 +29,7 @@ export default function AvailabilityPage() {
   const user = useAuthStore((state) => state.user);
   const { templates, isLoading, error, loadTemplates, removeTemplate } = useAvailabilityStore();
   const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [whatsappModalOpen, setWhatsappModalOpen] = useState(false);
 
   // UI Interactive States
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
@@ -57,6 +59,10 @@ export default function AvailabilityPage() {
   const handleNewAvailability = () => {
     if (!user?.username) {
       setUsernameError("Username is required before setting availability. Please set your username first.");
+      return;
+    }
+    if (!user?.whatsappNumber) {
+      setWhatsappModalOpen(true);
       return;
     }
     router.push("/availability/new");
@@ -138,6 +144,14 @@ export default function AvailabilityPage() {
           New Availability
         </button>
       </div>
+
+      <WhatsappRequiredModal
+        isOpen={whatsappModalOpen}
+        onClose={() => setWhatsappModalOpen(false)}
+        onSuccess={() => router.push("/availability/new")}
+        title="WhatsApp Number Required"
+        description="A WhatsApp number is required before creating an availability schedule so bookers have a fallback if you're not on Meet."
+      />
 
       {isLoading && templates.length === 0 && (
         <p className="text-slate-400">Loading availability…</p>

@@ -14,6 +14,7 @@ import { RecentActivityFeed } from "@/features/dashboard/components/RecentActivi
 import { QuickShareWidget } from "@/features/dashboard/components/QuickShareWidget";
 import { AvailabilityWidget } from "@/features/dashboard/components/AvailabilityWidget";
 import GoogleCalendarCard from "@/features/calendar/components/GoogleCalendarCard";
+import WhatsappReminderBanner from "@/components/common/WhatsappReminderBanner";
 
 export default function ReviewerDashboardPage() {
   const [timeframe, setTimeframe] = useState<"today" | "week" | "month">("today");
@@ -70,6 +71,9 @@ export default function ReviewerDashboardPage() {
 
   return (
     <div className="space-y-6 pb-12">
+      {/* 0. WhatsApp Setup Reminder if missing */}
+      <WhatsappReminderBanner />
+
       {/* 1. Header & Welcome */}
       <DashboardHeader reviewer={data?.reviewer} todayCount={todaySessionCount} />
 

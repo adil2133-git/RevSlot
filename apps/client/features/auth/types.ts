@@ -37,7 +37,6 @@ export type LoginPayload = {
 export type RegisterPayload = {
   name: string;
   email: string;
-  username: string;
   whatsappNumber: string;
   password: string;
 };
@@ -50,6 +49,7 @@ export type RegisterResponse = ApiDataEnvelope<{
 
 export type UpdateProfilePayload = {
   name?: string;
+  username?: string;
   bio?: string;
   whatsappNumber?: string;
   professionalHeadline?: string;
@@ -96,7 +96,6 @@ export type ResendVerificationPayload = {
 export type GoogleAuthPayload = {
   idToken: string;
   whatsappNumber?: string;
-  username?: string;
 };
 
 // ---- Raw backend envelopes ----

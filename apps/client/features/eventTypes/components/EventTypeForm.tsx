@@ -6,8 +6,10 @@ import Switch from "@/components/common/Switch";
 import { fetchTemplates } from "@/features/availability/api/availability.api";
 import type { AvailabilityTemplate } from "@/features/availability/types";
 import { useEventTypeStore } from "@/features/eventTypes/store/eventType.store";
+import { useAuthStore } from "@/features/auth/store/authStore";
 import { getEventTypeByIdRequest } from "@/features/eventTypes/api/eventType.api";
 import { slugify } from "../utils/slugify";
+import WhatsappRequiredModal from "@/components/common/WhatsappRequiredModal";
 
 interface EventTypeFormProps {
   mode: "create" | "edit";
@@ -16,6 +18,7 @@ interface EventTypeFormProps {
 
 export default function EventTypeForm({ mode, eventTypeId }: EventTypeFormProps) {
   const router = useRouter();
+  const user = useAuthStore((state) => state.user);
   const { addEventType, editEventType } = useEventTypeStore();
 
   const [name, setName] = useState("");
@@ -31,6 +34,7 @@ export default function EventTypeForm({ mode, eventTypeId }: EventTypeFormProps)
   const [loading, setLoading] = useState(mode === "edit");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [whatsappModalOpen, setWhatsappModalOpen] = useState(false);
 
   // The backend always derives the slug from `name` server-side — this is
   // a preview only, so people can see the URL before saving. Editing it
@@ -38,39 +42,47 @@ export default function EventTypeForm({ mode, eventTypeId }: EventTypeFormProps)
   const slugPreview = slugify(name);
 
   useEffect(() => {
-  (async () => {
-    try {
-      const list = await fetchTemplates();
-      setTemplates(list);
-    } catch {
-      // Non-fatal.
-    }
-  })();
-}, []);
+    fetchTemplates()
+      .then((data) => {
+        setTemplates(data);
+        if (data.length > 0 && !availabilityTemplateId) {
+          const defaultTpl = data.find((t) => t.isDefault) ?? data[0];
+          setAvailabilityTemplateId(String(defaultTpl.id));
+        }
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : "Failed to load availability templates");
+      });
+  }, []);
 
   useEffect(() => {
-    if (mode !== "edit" || !eventTypeId) return;
-    (async () => {
-      try {
-        const eventType = await getEventTypeByIdRequest(eventTypeId);
-        setName(eventType.name);
-        setDescription(eventType.description ?? "");
-        setDurationMinutes(String(eventType.durationMinutes));
-        setPrice(String(eventType.price));
-        setBufferBeforeMinutes(String(eventType.bufferBeforeMinutes));
-        setBufferAfterMinutes(String(eventType.bufferAfterMinutes));
-        setAvailabilityTemplateId(String(eventType.availabilityTemplateId));
-        setIsActive(eventType.isActive);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load event type");
-      } finally {
-        setLoading(false);
-      }
-    })();
+    if (mode === "edit" && eventTypeId) {
+      setLoading(true);
+      getEventTypeByIdRequest(eventTypeId)
+        .then((et) => {
+          setName(et.name);
+          setDescription(et.description ?? "");
+          setDurationMinutes(String(et.durationMinutes));
+          setPrice(String(et.price));
+          setBufferBeforeMinutes(String(et.bufferBeforeMinutes));
+          setBufferAfterMinutes(String(et.bufferAfterMinutes));
+          setAvailabilityTemplateId(String(et.availabilityTemplateId));
+          setIsActive(et.isActive);
+        })
+        .catch((err) => {
+          setError(err instanceof Error ? err.message : "Failed to load event type");
+        })
+        .finally(() => setLoading(false));
+    }
   }, [mode, eventTypeId]);
 
   async function handleSave() {
     setError(null);
+
+    if (!user?.whatsappNumber) {
+      setWhatsappModalOpen(true);
+      return;
+    }
 
     if (name.trim().length < 1) {
       setError("Event name is required.");
@@ -324,6 +336,16 @@ export default function EventTypeForm({ mode, eventTypeId }: EventTypeFormProps)
           </div>
         )}
       </div>
+
+      <WhatsappRequiredModal
+        isOpen={whatsappModalOpen}
+        onClose={() => setWhatsappModalOpen(false)}
+        onSuccess={() => {
+          handleSave();
+        }}
+        title="WhatsApp Number Required"
+        description="A WhatsApp number is required before creating an event type so bookers have a fallback if you're not on Meet."
+      />
     </div>
   );
 }
