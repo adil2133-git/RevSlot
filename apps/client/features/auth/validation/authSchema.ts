@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 // Public URL slug: /:username/:eventSlug — must mirror the server's rules.
-const usernameSchema = z
+export const usernameSchema = z
   .string()
   .trim()
   .toLowerCase()
@@ -13,7 +13,6 @@ export const registerSchema = z
   .object({
     name: z.string().min(2, "Enter your full name"),
     email: z.string().email("Enter a valid email address"),
-    username: usernameSchema,
     whatsappNumber: z
       .string()
       .min(10, "Enter a valid WhatsApp number")
@@ -63,7 +62,6 @@ export const googleWhatsappSchema = z.object({
     .min(10, "Enter a valid WhatsApp number")
     .max(15, "Number is too long")
     .regex(/^\+?[0-9\s-]+$/, "Numbers only"),
-  username: usernameSchema,
 });
 
 export type GoogleWhatsappFormValues = z.infer<typeof googleWhatsappSchema>;

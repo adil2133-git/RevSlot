@@ -154,7 +154,16 @@ export default function SettingsPage() {
               {user.username && (
                 <div className="flex items-center justify-between">
                   <span className="text-slate-400">Username</span>
-                  <span className="font-medium text-on-surface">@{user.username}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-on-surface">@{user.username}</span>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("profile")}
+                      className="text-xs font-semibold text-primary hover:underline"
+                    >
+                      Edit in Profile
+                    </button>
+                  </div>
                 </div>
               )}
 

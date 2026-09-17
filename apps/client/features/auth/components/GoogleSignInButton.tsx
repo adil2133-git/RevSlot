@@ -108,7 +108,6 @@ function GoogleSignInButton() {
             await googleAuth({
                 idToken: pendingIdToken.current,
                 whatsappNumber: values.whatsappNumber,
-                username: values.username,
             });
             // replace (not push): already signed in, so Back shouldn't
             // return to the WhatsApp-number prompt.
@@ -130,16 +129,6 @@ function GoogleSignInButton() {
                 <p className="text-xs text-slate-600">
                     Advisors use this as a fallback if you don&apos;t show up on Meet.
                 </p>
-
-                <input
-                   placeholder="username"
-                   maxLength={30}
-                   {...register("username")}
-                   className="..."
-                 />
-                {errors.username && (
-                    <p className="text-sm text-error">{errors.username.message}</p>
-                )}
 
                 <input
                     placeholder="+91 98765 43210"
