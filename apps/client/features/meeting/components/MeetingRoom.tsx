@@ -6,7 +6,10 @@ import {
   useState,
 } from "react";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import {
+  useRouter,
+  useSearchParams,
+} from "next/navigation";
 
 import { useAuthStore } from "@/features/auth/store/authStore";
 import {
@@ -35,8 +38,8 @@ export default function MeetingRoom({
   const router = useRouter();
 
   const searchParams = useSearchParams();
-  const participantType =
-  searchParams.get("participant");
+  const meetingSource =
+  searchParams.get("source");
 
   const meeting = useMeeting({
     bookingId,
@@ -151,15 +154,17 @@ export default function MeetingRoom({
     let participantName: string | null = null;
 
 if (
-  participantType === "advisor" &&
+  meetingSource === "reviewer" &&
+  user?.role === "reviewer" &&
+  user.name
+) {
+  participantName = user.name;
+} else if (
+  meetingSource === "advisor" &&
+  advisorToken &&
   meeting.info.advisorName
 ) {
   participantName = meeting.info.advisorName;
-} else if (
-  participantType === "reviewer" &&
-  user?.name
-) {
-  participantName = user.name;
 }
 
     /*
@@ -245,7 +250,8 @@ if (
     webRTC.getLocalMedia,
     webRTC.stopLocalMedia,
     user,
-    participantType,
+    advisorToken,
+    meetingSource
   ]);
 
   /*
@@ -332,22 +338,25 @@ if (
    * --------------------------------------------------
    */
   const copyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(
-        window.location.href
-      );
+  try {
+    const meetingLink =
+      `${window.location.origin}/meeting/${bookingId}?token=${encodeURIComponent(token)}`;
 
-      setCopied(true);
+    await navigator.clipboard.writeText(
+      meetingLink
+    );
 
-      window.setTimeout(() => {
-        setCopied(false);
-      }, 1500);
-    } catch {
-      meeting.setError(
-        "Unable to copy the meeting link."
-      );
-    }
-  };
+    setCopied(true);
+
+    window.setTimeout(() => {
+      setCopied(false);
+    }, 1500);
+  } catch {
+    meeting.setError(
+      "Unable to copy the meeting link."
+    );
+  }
+};
 
   /*
    * --------------------------------------------------
