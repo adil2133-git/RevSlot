@@ -16,7 +16,7 @@ import {
   getStoredAdvisorToken,
 } from "@/features/advisor-bookings/services/advisorApi";
 
-import { useMeeting } from "../hooks/useMeeting";
+import { getGuestSession, useMeeting } from "../hooks/useMeeting";
 import { useMeetingChat } from "../hooks/useMeetingChat";
 import { useMeetingWebRTC } from "../hooks/useMeetingWebRTC";
 
@@ -94,8 +94,7 @@ export default function MeetingRoom({
       bookingId,
       token,
       joined: meeting.joined,
-      participantId:
-        meeting.participantIdRef.current,
+      participantId: meeting.participantIdRef.current ?? "",
       participants: meeting.participants,
       localStreamRef,
       socket: meeting.socket,
@@ -165,6 +164,14 @@ if (
   meeting.info.advisorName
 ) {
   participantName = meeting.info.advisorName;
+} else if (!meetingSource) {
+  const guestSession = getGuestSession(bookingId);
+
+  if (guestSession) {
+    participantName = guestSession.name;
+    meeting.participantIdRef.current =
+      guestSession.participantId;
+  }
 }
 
     /*
@@ -251,7 +258,8 @@ if (
     webRTC.stopLocalMedia,
     user,
     advisorToken,
-    meetingSource
+    meetingSource,
+    bookingId,
   ]);
 
   /*
@@ -298,39 +306,38 @@ if (
    * --------------------------------------------------
    */
   const leave = async () => {
-    manuallyLeftRef.current = true;
+  manuallyLeftRef.current = true;
 
-    webRTC.cleanupPeers();
+  webRTC.cleanupPeers();
 
-    webRTC.stopLocalMedia();
+  webRTC.stopLocalMedia();
 
-    await meeting.leave();
+  await meeting.leave();
 
-    /*
-     * Reviewer
-     */
-    if (user?.role === "reviewer") {
-      router.replace(
-        "/dashboard/bookings"
-      );
+  /*
+   * Reviewer entered from Reviewer dashboard.
+   */
+  if (meetingSource === "reviewer") {
+    router.replace("/dashboard/bookings");
+    return;
+  }
 
-      return;
-    }
+  /*
+   * Advisor entered from Advisor dashboard.
+   */
+  if (meetingSource === "advisor") {
+    router.replace("/my-bookings");
+    return;
+  }
 
-    /*
-     * Advisor
-     */
-    if (advisorToken) {
-      router.replace("/my-bookings");
-
-      return;
-    }
-
-    /*
-     * Intern / Guest
-     */
-    router.back();
-  };
+  /*
+   * Guest / shared meeting link.
+   *
+   * Do NOT use authenticated user or advisor token here.
+   * The browser may already contain reviewer/advisor auth.
+   */
+  router.back();
+};
 
   /*
    * --------------------------------------------------
@@ -456,9 +463,7 @@ if (
             participants={
               meeting.participants
             }
-            participantId={
-              meeting.participantIdRef.current
-            }
+            participantId={meeting.participantIdRef.current ?? ""}
             remoteStreams={
               webRTC.remoteStreams
             }
@@ -471,6 +476,9 @@ if (
             }
             sharing={
               webRTC.sharing
+            }
+            screenShareNeedsResume={
+              webRTC.screenShareNeedsResume
             }
             chatOpen={chatOpen}
             onToggleMic={
@@ -497,9 +505,7 @@ if (
           <MeetingChat
             messages={chat.messages}
             message={chat.message}
-            participantId={
-              meeting.participantIdRef.current
-            }
+            participantId={meeting.participantIdRef.current ?? ""}
             messagesEndRef={
               chat.messagesEndRef
             }

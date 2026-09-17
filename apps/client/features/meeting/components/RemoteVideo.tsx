@@ -43,21 +43,56 @@ export default function RemoteVideo({
     };
   }, [stream]);
 
-  const handleFullscreen = async () => {
-  const container = containerRef.current;
+    const handleFullscreen = async () => {
+    const video = videoRef.current;
+    const container = containerRef.current;
 
-  if (!container) return;
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+        return;
+      }
 
-  try {
-    if (document.fullscreenElement) {
-      await document.exitFullscreen();
-    } else {
-      await container.requestFullscreen();
+      if (video?.requestFullscreen) {
+        await video.requestFullscreen();
+      } else if (container) {
+        await container.requestFullscreen();
+      }
+    } catch {
+      // Fullscreen not supported or permission denied.
     }
-  } catch {
-    // Fullscreen not supported or permission denied.
-  }
-};
+  };
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+      const recoverFromStall = () => {
+      // Only react if THIS video was the one that entered/exited
+      // fullscreen — not some other participant's tile.
+      const isThisVideoInvolved =
+        document.fullscreenElement === video ||
+        document.fullscreenElement === null;
+
+      if (!isThisVideoInvolved) return;
+
+      const currentStream = video.srcObject;
+      if (!currentStream) return;
+
+      video.srcObject = null;
+      requestAnimationFrame(() => {
+        video.srcObject = currentStream;
+        void video.play().catch(() => {
+          // Browser autoplay restriction.
+        });
+      });
+    };
+
+    document.addEventListener("fullscreenchange", recoverFromStall);
+    return () => {
+      document.removeEventListener("fullscreenchange", recoverFromStall);
+    };
+  }, []);
 
   return (
    <div

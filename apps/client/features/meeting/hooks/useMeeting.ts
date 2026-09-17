@@ -26,31 +26,61 @@ const makeId = () => {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 };
 
-const getParticipantId = (
-  bookingId: number,
-  displayName = ""
-) => {
-  const normalizedName = displayName.trim().toLowerCase();
+type GuestSession = {
+  participantId: string;
+  name: string;
+};
 
-  const key = normalizedName
-    ? `revslot-meeting-participant-${bookingId}-${normalizedName}`
-    : `revslot-meeting-participant-${bookingId}`;
+const getGuestSessionKey = (bookingId: number) =>
+  `revslot:meeting:${bookingId}:guest`;
 
+export const getGuestSession = (
+  bookingId: number
+): GuestSession | null => {
   if (typeof window === "undefined") {
-    return makeId();
+    return null;
   }
 
-  const existing = window.localStorage.getItem(key);
+  const stored = window.sessionStorage.getItem(
+  getGuestSessionKey(bookingId)
+);
 
-  if (existing) {
-    return existing;
+  if (!stored) {
+    return null;
   }
 
-  const id = makeId();
+  try {
+    const parsed = JSON.parse(stored);
 
-  window.localStorage.setItem(key, id);
+    if (
+      typeof parsed?.participantId !== "string" ||
+      typeof parsed?.name !== "string" ||
+      !parsed.name.trim()
+    ) {
+      return null;
+    }
 
-  return id;
+    return {
+      participantId: parsed.participantId,
+      name: parsed.name.trim(),
+    };
+  } catch {
+    return null;
+  }
+};
+
+const saveGuestSession = (
+  bookingId: number,
+  session: GuestSession
+) => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.sessionStorage.setItem(
+  getGuestSessionKey(bookingId),
+  JSON.stringify(session)
+);
 };
 
 type UseMeetingProps = {
@@ -125,8 +155,7 @@ export function useMeeting({
   const socketRef =
     useRef<MeetingSocket | null>(null);
 
-  const participantIdRef =
-    useRef("");
+  const participantIdRef = useRef<string | null>(null);
 
   const joinedRef =
     useRef(false);
@@ -136,10 +165,6 @@ export function useMeeting({
 
   const reconnectingRef =
     useRef(false);
-
-  useEffect(() => {
-    participantIdRef.current = "";
-  }, [bookingId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -280,14 +305,25 @@ export function useMeeting({
       setJoining(true);
       setError(null);
 
-      const participantId =
-        getParticipantId(
-          bookingId,
-          joinName
-        );
+      let participantId = participantIdRef.current;
 
-      participantIdRef.current =
-        participantId;
+if (!participantId) {
+  const guestSession = getGuestSession(bookingId);
+
+  if (guestSession && guestSession.name === joinName) {
+    participantId = guestSession.participantId;
+  } else {
+    participantId = makeId();
+  }
+
+  participantIdRef.current = participantId;
+}
+
+      
+saveGuestSession(bookingId, {
+  participantId,
+  name: joinName,
+});
 
       const meetingSocket =
         createMeetingSocket({
@@ -427,16 +463,22 @@ export function useMeeting({
               return;
             }
 
-            activeSocket
-              .timeout(2_000)
-              .emit(
-                "meeting:leave",
-                {
-                  participantId:
-                    participantIdRef.current,
-                },
-                () => resolve()
-              );
+           const participantId = participantIdRef.current;
+
+if (!participantId) {
+  resolve();
+  return;
+}
+
+activeSocket
+  .timeout(2_000)
+  .emit(
+    "meeting:leave",
+    {
+      participantId,
+    },
+    () => resolve()
+  );
           }
         );
       } finally {
@@ -518,13 +560,15 @@ export function useMeeting({
         return;
       }
 
-      socket.emit(
-        "meeting:heartbeat",
-        {
-          participantId:
-            participantIdRef.current,
-        }
-      );
+     const participantId = participantIdRef.current;
+
+if (!participantId) {
+  return;
+}
+
+socket.emit("meeting:heartbeat", {
+  participantId,
+});
     };
 
     heartbeat();

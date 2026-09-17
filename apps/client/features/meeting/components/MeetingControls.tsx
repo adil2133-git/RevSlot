@@ -14,6 +14,7 @@ type MeetingControlsProps = {
   muted: boolean;
   cameraOff: boolean;
   sharing: boolean;
+  screenShareNeedsResume: boolean;
   chatOpen: boolean;
   onToggleMic: () => void;
   onToggleCamera: () => void;
@@ -26,6 +27,7 @@ export default function MeetingControls({
   muted,
   cameraOff,
   sharing,
+  screenShareNeedsResume,
   chatOpen,
   onToggleMic,
   onToggleCamera,
@@ -62,7 +64,13 @@ export default function MeetingControls({
       <ControlButton
         active={sharing}
         onClick={onShareScreen}
-        label={sharing ? "Stop sharing" : "Share screen"}
+        label={
+          sharing
+          ? "Stop sharing"
+          : screenShareNeedsResume
+          ? "Resume screen sharing"
+          : "Share screen"
+       }
       >
         <MonitorUp />
       </ControlButton>

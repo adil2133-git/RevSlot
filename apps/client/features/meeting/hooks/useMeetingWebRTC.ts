@@ -77,6 +77,9 @@ export function useMeetingWebRTC({
   const [sharing, setSharing] =
     useState(false);
 
+  const [screenShareNeedsResume, setScreenShareNeedsResume] =
+  useState(false);
+
   /*
    * --------------------------------------------------
    * LOCAL VIDEO
@@ -820,6 +823,10 @@ export function useMeetingWebRTC({
       );
 
       setSharing(false);
+      sessionStorage.removeItem(
+         `revslot:meeting:${_bookingId}:screen-sharing`
+      );
+      setScreenShareNeedsResume(false);
     }, [
       localStreamRef,
       setLocalVideo,
@@ -904,6 +911,12 @@ export function useMeetingWebRTC({
         );
 
         setSharing(true);
+        setScreenShareNeedsResume(false);
+
+        sessionStorage.setItem(
+          `revslot:meeting:${_bookingId}:screen-sharing`,
+          "true"
+        );
 
         /*
          * Browser stop-sharing button
@@ -922,6 +935,27 @@ export function useMeetingWebRTC({
       setError,
       setLocalVideo,
     ]);
+
+      /*
+   * --------------------------------------------------
+   * CHECK SCREEN SHARE AFTER REFRESH
+   * --------------------------------------------------
+   */
+  useEffect(() => {
+    if (!joined) {
+      return;
+    }
+
+    const wasSharing =
+      sessionStorage.getItem(
+        `revslot:meeting:${_bookingId}:screen-sharing`
+      ) === "true";
+
+    if (wasSharing) {
+      setScreenShareNeedsResume(true);
+    }
+  }, [joined, _bookingId]);
+
 
   /*
    * --------------------------------------------------
@@ -994,6 +1028,7 @@ export function useMeetingWebRTC({
     muted,
     cameraOff,
     sharing,
+    screenShareNeedsResume,
     getLocalMedia,
     stopLocalMedia,
     toggleMic,
