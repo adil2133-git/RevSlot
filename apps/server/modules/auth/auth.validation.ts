@@ -14,7 +14,6 @@ const usernameSchema = z
 export const RegisterSchema = z.object({
   name: z.string().trim().min(2).max(50),
   email: z.email().trim().toLowerCase(),
-  username: usernameSchema,
   whatsappNumber: z.string().trim().regex(/^\+?[0-9]{10,15}$/, "Invalid WhatsApp number"),
   password: z.string().min(8).max(72),
 });
@@ -50,7 +49,6 @@ export const ResendVerificationSchema = z.object({
 export const GoogleAuthSchema = z.object({
   idToken: z.string().min(1, "ID token is required"),
   whatsappNumber: z.string().trim().regex(/^\+?[0-9]{10,15}$/, "Invalid WhatsApp number").optional(),
-  username: usernameSchema.optional(),
 });
 
 export const UpdateUsernameSchema = z.object({
@@ -59,6 +57,7 @@ export const UpdateUsernameSchema = z.object({
 
 export const UpdateProfileSchema = z.object({
   name: z.string().trim().min(2, "Name must be at least 2 characters").max(50).optional(),
+  username: usernameSchema.optional(),
   bio: z.string().trim().max(300, "Bio must be at most 300 characters").optional(),
   whatsappNumber: z.string().trim().regex(/^\+?[0-9]{10,15}$/, "Invalid WhatsApp number").optional(),
   professionalHeadline: z.string().trim().max(100, "Professional headline must be at most 100 characters").optional(),

@@ -3,8 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useEventTypeStore } from "@/features/eventTypes/store/eventType.store";
+import { useAuthStore } from "@/features/auth/store/authStore";
 import EventTypeCard from "@/features/eventTypes/components/EventTypeCard";
 import EventTypeStats from "@/features/eventTypes/components/EventTypeStats";
+import WhatsappRequiredModal from "@/components/common/WhatsappRequiredModal";
 
 type StatusFilter = "all" | "active" | "inactive";
 
@@ -23,7 +25,9 @@ const SearchIcon = () => (
 
 export default function EventTypesPage() {
   const router = useRouter();
+  const user = useAuthStore((state) => state.user);
   const { eventTypes, isLoading, error, loadEventTypes, toggleActive, togglePublic } = useEventTypeStore();
+  const [whatsappModalOpen, setWhatsappModalOpen] = useState(false);
   // Defensive fallback — guards against a stale/undefined store value
   // (e.g. leftover state from an HMR reload, or an unexpected API shape)
   // so the page never crashes on .filter() even if the store misbehaves.
@@ -44,6 +48,14 @@ export default function EventTypesPage() {
     });
   }, [safeEventTypes, search, statusFilter]);
 
+  const handleCreateClick = () => {
+    if (!user?.whatsappNumber) {
+      setWhatsappModalOpen(true);
+      return;
+    }
+    router.push("/dashboard/event-types/new");
+  };
+
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
@@ -54,13 +66,21 @@ export default function EventTypesPage() {
           </p>
         </div>
         <button
-          onClick={() => router.push("/dashboard/event-types/new")}
+          onClick={handleCreateClick}
           className="flex shrink-0 items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-on-primary shadow-surface transition-opacity hover:opacity-90"
         >
           <PlusIcon />
           Create Event Type
         </button>
       </div>
+
+      <WhatsappRequiredModal
+        isOpen={whatsappModalOpen}
+        onClose={() => setWhatsappModalOpen(false)}
+        onSuccess={() => router.push("/dashboard/event-types/new")}
+        title="WhatsApp Number Required"
+        description="A WhatsApp number is required before creating an event type so bookers have a fallback if you're not on Meet."
+      />
 
       <EventTypeStats eventTypes={safeEventTypes} />
 

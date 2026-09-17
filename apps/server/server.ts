@@ -23,10 +23,12 @@ import { pool } from "./config/db.js"
 dotenv.config();
 
 const app = express();
+
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:3000',
   credentials: true,
 }));
+
 app.use(express.json({ limit: '10kb' }));
 app.use(cookieParser());
 
@@ -51,10 +53,18 @@ app.get('/', (req, res) => {
   res.send('Server is running');
 });
 
+// Health check endpoint for CI/CD and deployment monitoring
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+  });
+});
+
 app.use(notFound);
 app.use(errorMiddleware);
 
 const PORT = process.env.PORT || 5000;
+
 const serverConnect = async () => {
   try {
     await pool.query("SELECT 1");
@@ -63,6 +73,7 @@ const serverConnect = async () => {
     console.log("db connection failed", error)
     process.exit(1)
   }
+
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
   })

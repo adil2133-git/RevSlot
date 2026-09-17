@@ -148,6 +148,13 @@
       "when": 1789066533727,
       "tag": "0033_parallel_reaper",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1789100000000,
+      "tag": "0034_make_whatsapp_nullable",
+      "breakpoints": true
     }
   ]
 }

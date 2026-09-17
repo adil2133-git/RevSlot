@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { useAuthStore } from "../store/authStore";
+import { usernameSchema } from "../validation/authSchema";
 
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024; // 2MB
 const ALLOWED_AVATAR_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -33,6 +34,9 @@ export default function ProfileInfoCard() {
   const updateAvatar = useAuthStore((state) => state.updateAvatar);
 
   const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [generalError, setGeneralError] = useState<string | null>(null);
   const [bio, setBio] = useState("");
   const [whatsappNumber, setWhatsappNumber] = useState("");
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -92,6 +96,9 @@ const handleCropConfirm = async (blob: Blob) => {
     if (!user) return;
 
     setName(user.name ?? "");
+    setUsername(user.username ?? "");
+    setUsernameError(null);
+    setGeneralError(null);
     setBio(user.bio ?? "");
     setWhatsappNumber(user.whatsappNumber ?? "");
 
@@ -125,6 +132,7 @@ const handleCropConfirm = async (blob: Blob) => {
 
     return (
       name.trim() !== (user.name ?? "") ||
+      username.trim().toLowerCase() !== (user.username ?? "").toLowerCase() ||
       bio.trim() !== (user.bio ?? "") ||
       whatsappNumber.trim() !== (user.whatsappNumber ?? "") ||
       professionalHeadline.trim() !==
@@ -151,6 +159,7 @@ const handleCropConfirm = async (blob: Blob) => {
   }, [
     user,
     name,
+    username,
     bio,
     whatsappNumber,
     professionalHeadline,
@@ -170,10 +179,22 @@ const handleCropConfirm = async (blob: Blob) => {
     if (!user || !dirty) return;
 
     setSaved(false);
+    setUsernameError(null);
+    setGeneralError(null);
+
+    const cleanUsername = username.trim().toLowerCase();
+    if (cleanUsername !== (user.username ?? "").toLowerCase()) {
+      const parsed = usernameSchema.safeParse(cleanUsername);
+      if (!parsed.success) {
+        setUsernameError(parsed.error.issues[0]?.message || "Invalid username");
+        return;
+      }
+    }
 
     try {
       await updateProfile({
         name: name.trim(),
+        username: cleanUsername !== (user.username ?? "").toLowerCase() ? cleanUsername : undefined,
         bio: bio.trim() || undefined,
         whatsappNumber: whatsappNumber.trim() || undefined,
 
@@ -206,8 +227,14 @@ const handleCropConfirm = async (blob: Blob) => {
       window.setTimeout(() => {
         setSaved(false);
       }, 2500);
-    } catch {
+    } catch (err: unknown) {
       setSaved(false);
+      const msg = (err as Error)?.message || "Failed to update profile";
+      if (msg.toLowerCase().includes("username")) {
+        setUsernameError(msg);
+      } else {
+        setGeneralError(msg);
+      }
     }
   };
 
@@ -307,6 +334,40 @@ const handleCropConfirm = async (blob: Blob) => {
               placeholder="Your full name"
               maxLength={50}
             />
+          </div>
+
+          <div>
+            <label className={labelClassName}>
+              Username
+            </label>
+
+            <div className="relative">
+              <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-sm font-medium text-slate-400">
+                @
+              </span>
+              <input
+                value={username}
+                onChange={(event) => {
+                  setUsername(event.target.value.toLowerCase().replace(/\s+/g, "-"));
+                  if (usernameError) setUsernameError(null);
+                }}
+                className={`${inputClassName} pl-9 font-medium`}
+                placeholder="your-username"
+                maxLength={30}
+              />
+            </div>
+
+            {usernameError ? (
+              <p className="mt-1.5 text-xs font-medium text-red-600">{usernameError}</p>
+            ) : (
+              <p className="mt-1.5 text-xs text-slate-400">
+                Your public booking link:{" "}
+                <span className="font-medium text-slate-600">
+                  revslot.com/{username.trim().toLowerCase() || "username"}
+                </span>
+                {" "}(lowercase letters, numbers, and hyphens only)
+              </p>
+            )}
           </div>
 
           <div>
@@ -608,6 +669,12 @@ const handleCropConfirm = async (blob: Blob) => {
       </section>
 
       <div className="flex items-center justify-end gap-3">
+        {generalError && (
+          <span className="text-sm font-medium text-red-600">
+            {generalError}
+          </span>
+        )}
+
         {saved && (
           <span className="text-sm font-medium text-emerald-600">
             Changes saved
