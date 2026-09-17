@@ -119,6 +119,22 @@ export const eventTypeService = {
   reviewerId: number,
   data: CreateEventTypeInput
 ) => {
+  // Check whether reviewer has a WhatsApp number set
+  const [reviewer] = await db
+    .select({
+      whatsappNumber: reviewers.whatsappNumber,
+    })
+    .from(reviewers)
+    .where(eq(reviewers.id, reviewerId))
+    .limit(1);
+
+  if (!reviewer?.whatsappNumber || reviewer.whatsappNumber.trim().length === 0) {
+    throw new AppError(
+      "WhatsApp number is required before creating an event type. Please add your WhatsApp number in your profile.",
+      400
+    );
+  }
+
   // 1. Check whether the availability template belongs
   //    to the authenticated reviewer
   const [template] = await db

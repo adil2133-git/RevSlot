@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 // Public URL slug: /:username/:eventSlug — must mirror the server's rules.
-const usernameSchema = z
+export const usernameSchema = z
   .string()
   .trim()
   .toLowerCase()
@@ -13,7 +13,6 @@ export const registerSchema = z
   .object({
     name: z.string().min(2, "Enter your full name"),
     email: z.string().email("Enter a valid email address"),
-    username: usernameSchema,
     whatsappNumber: z
       .string()
       .min(10, "Enter a valid WhatsApp number")
@@ -54,16 +53,3 @@ export const resetPasswordSchema = z
   });
 
 export type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
-
-// Only asked for when the backend tells us this is a brand-new Google
-// user (422 response) — not part of the normal Google sign-in click.
-export const googleWhatsappSchema = z.object({
-  whatsappNumber: z
-    .string()
-    .min(10, "Enter a valid WhatsApp number")
-    .max(15, "Number is too long")
-    .regex(/^\+?[0-9\s-]+$/, "Numbers only"),
-  username: usernameSchema,
-});
-
-export type GoogleWhatsappFormValues = z.infer<typeof googleWhatsappSchema>;
