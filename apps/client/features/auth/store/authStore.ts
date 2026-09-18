@@ -89,6 +89,7 @@ type AuthState = {
    *  this one) — clears local auth state too, same as logout. Caller
    *  should redirect to login after this resolves. */
   changePassword: (payload: ChangePasswordPayload) => Promise<string>;
+  clearError: () => void;
 };
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -97,6 +98,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   isHydrated: false,
   error: null,
   pendingVerificationEmail: null,
+  clearError: () => set({ error: null }),
 
   loginAsReviewer: async (payload) => {
     set({ isLoading: true, error: null });
