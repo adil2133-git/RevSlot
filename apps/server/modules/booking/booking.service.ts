@@ -17,9 +17,8 @@ import { bookingRescheduledTemplate } from "../../emails/templates/bookingResche
 import { bookingRescheduleRequestedTemplate } from "../../emails/templates/bookingRescheduleRequested.js";
 import { slotService } from "../slot/slot.service.js"; 
 import { feedback } from "../feedback/feedback.schema.js";
-import {
-  BOOKING_FIELD_DEFINITIONS,
-} from "./bookingFields.js";
+import { BOOKING_FIELD_DEFINITIONS } from "./bookingFields.js";
+import { meetingService } from "../meeting/meeting.service.js";
 
 export interface GetMyBookingsOptions {
   page: number;
@@ -136,6 +135,29 @@ export const bookingService = {
         );
       }
 
+      const [priceCheckEventType] = await tx
+        .select({ price: eventTypes.price })
+        .from(eventTypes)
+        .where(eq(eventTypes.id, slot.eventTypeId))
+        .limit(1);
+
+      if (priceCheckEventType && priceCheckEventType.price > 0) {
+        const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = data;
+
+        if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
+          throw new AppError("Payment is required for this session", 402);
+        }
+
+        const expectedSignature = crypto
+          .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET!)
+          .update(`${razorpayOrderId}|${razorpayPaymentId}`)
+          .digest("hex");
+
+        if (expectedSignature !== razorpaySignature) {
+          throw new AppError("Payment verification failed", 400);
+        }
+      }
+
       const startTimestamp = dayjs(
         `${slot.slotDate}T${slot.startTime}`
       ).toDate();
@@ -226,6 +248,8 @@ for (const [key, value] of Object.entries(formData)) {
            startTime: startTimestamp,
            endTime: endTimestamp,
            status: "confirmed",
+           razorpayOrderId: data.razorpayOrderId,
+           razorpayPaymentId: data.razorpayPaymentId,
        })
         .returning();
 
@@ -257,7 +281,6 @@ for (const [key, value] of Object.entries(formData)) {
     const [eventType] = await db
       .select({
         name: eventTypes.name,
-        meetingLink: eventTypes.meetingLink,
       })
       .from(eventTypes)
       .where(eq(eventTypes.id, booking.eventTypeId))
@@ -273,7 +296,10 @@ for (const [key, value] of Object.entries(formData)) {
 
     const timezone = "Asia/Kolkata";
 
-    let meetLink: string | null = null;
+    const internalMeetingLink =
+       meetingService.getMeetingLink(booking.id);
+
+    let meetLink: string | null = internalMeetingLink;
 
     try {
       const meetEvent = await calendarService.createMeetEvent({
@@ -288,18 +314,17 @@ for (const [key, value] of Object.entries(formData)) {
           booking.advisorEmail,
           ...(booking.internEmails ?? []),
         ],
+        meetingLink: internalMeetingLink,
       });
 
       if (meetEvent) {
-        meetLink = meetEvent.meetLink;
-
-        await db
-          .update(bookings)
-          .set({
-            meetLink: meetEvent.meetLink,
-            googleEventId: meetEvent.googleEventId,
-          })
-          .where(eq(bookings.id, booking.id));
+      await db
+  .update(bookings)
+  .set({
+    meetLink: internalMeetingLink,
+    googleEventId: meetEvent.googleEventId,
+  })
+  .where(eq(bookings.id, booking.id));
       }
     } catch (err) {
       console.error(
@@ -308,14 +333,12 @@ for (const [key, value] of Object.entries(formData)) {
       );
     }
 
-   if (!meetLink && eventType.meetingLink) {
-      meetLink = eventType.meetingLink;
-
   await db
-    .update(bookings)
-    .set({ meetLink })
-    .where(eq(bookings.id, booking.id));
-}
+  .update(bookings)
+  .set({
+    meetLink: internalMeetingLink,
+  })
+  .where(eq(bookings.id, booking.id));
 
     const formattedDate = dayjs(booking.startTime).format("ddd, MMM D");
 
@@ -477,8 +500,13 @@ for (const [key, value] of Object.entries(formData)) {
     const totalCount = countResult[0]?.count ?? 0;
     const defaultCounts = { all: 0, ongoing: 0, upcoming: 0, reschedule_requested: 0, completed: 0, rescheduled: 0, cancelled: 0, no_show: 0 };
 
+  const bookingsWithMeetingLinks = rows.map((booking) => ({
+  ...booking,
+  meetLink: meetingService.getMeetingLink(booking.id),
+  }));
+
     return {
-      bookings: rows,
+      bookings:  bookingsWithMeetingLinks,
       pagination: {
         page,
         limit,
@@ -1076,7 +1104,7 @@ for (const [key, value] of Object.entries(formData)) {
     }
   ) => {
     const [eventType] = await db
-      .select({ name: eventTypes.name, meetingLink: eventTypes.meetingLink })
+      .select({ name: eventTypes.name, })
       .from(eventTypes)
       .where(eq(eventTypes.id, newBooking.eventTypeId))
       .limit(1);
@@ -1090,7 +1118,10 @@ for (const [key, value] of Object.entries(formData)) {
     if (!eventType || !reviewer) return { meetLink: null };
 
     const timezone = "Asia/Kolkata";
-    let meetLink: string | null = null;
+
+    const internalMeetingLink =
+    meetingService.getMeetingLink(newBooking.id);
+    let meetLink: string | null = internalMeetingLink;
 
     try {
       const meetEvent = await calendarService.createMeetEvent({
@@ -1105,27 +1136,19 @@ for (const [key, value] of Object.entries(formData)) {
           newBooking.advisorEmail,
           ...(newBooking.internEmails ?? []),
         ],
+        meetingLink: internalMeetingLink,
       });
 
       if (meetEvent) {
-        meetLink = meetEvent.meetLink;
+        meetLink = internalMeetingLink;
         await db
           .update(bookings)
-          .set({ meetLink: meetEvent.meetLink, googleEventId: meetEvent.googleEventId })
+          .set({ meetLink: internalMeetingLink, googleEventId: meetEvent.googleEventId })
           .where(eq(bookings.id, newBooking.id));
       }
     } catch (err) {
       console.error(`[Booking] Meet event creation failed for rescheduled booking ${newBooking.id}:`, err);
     }
-
-    if (!meetLink && eventType.meetingLink) {
-  meetLink = eventType.meetingLink;
-
-  await db
-    .update(bookings)
-    .set({ meetLink })
-    .where(eq(bookings.id, newBooking.id));
-}
 
     const oldFormattedDate = dayjs(oldBooking.startTime).format("ddd, MMM D");
     const oldFormattedTime = `${dayjs(oldBooking.startTime).format("h:mm A")} – ${dayjs(oldBooking.endTime).format("h:mm A")}`;

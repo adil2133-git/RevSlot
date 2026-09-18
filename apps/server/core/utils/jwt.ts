@@ -36,10 +36,9 @@ export const verifyAdvisorToken = (token: string): AdvisorTokenPayload => {
     return jwt.verify(token, ACCESS_SECRET) as AdvisorTokenPayload;
 };
 
-
 //for RefreshToken
 export const generateRefreshToken = (payload: TokenPayload): string => {
-    return jwt.sign(payload, REFRESH_SECRET, { expiresIn: "7d" })
+    return jwt.sign(payload, REFRESH_SECRET, { expiresIn: "7d", jwtid: crypto.randomUUID()})
 }
 
 export const verifyRefreshToken = (token: string): TokenPayload => {

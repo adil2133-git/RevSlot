@@ -69,8 +69,12 @@ export default function PublicBookingPage() {
     selectedFieldKeys,
     addField,
     removeField,
-  } = useBookingForm( holdResult);
-
+  } = useBookingForm(holdResult, {
+    price: pageInfo?.eventType.price ?? 0,
+    eventTypeName: pageInfo?.eventType.name ?? "",
+    reviewerName: pageInfo?.reviewer.name ?? "",
+  });
+  
   const currentStep = bookingDone ? 3 : showDetailsForm ? 2 : 1;
   const slotsForSelectedDate = slots.filter((s) => s.date === selectedDate);
 

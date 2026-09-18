@@ -30,12 +30,13 @@ export const bookings = pgTable('bookings', {
   status: bookingStatus('status').default('confirmed'),
   meetLink: text('meet_link'),
   googleEventId: varchar('google_event_id', { length: 255 }),
-
+  razorpayOrderId: varchar('razorpay_order_id', { length: 100 }),
+  razorpayPaymentId: varchar('razorpay_payment_id', { length: 100 }),
   cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
   cancelledReason: varchar('cancelled_reason', { length: 255 }),
 
   // Self-reference: the new booking created by a reschedule points back
-  // to the booking it replaced. Nullable — most bookings are never rescheduled.
+  // to the booking it replaced. Nullable — most bookings are never rescheduled
   rescheduledFromBookingId: integer('rescheduled_from_booking_id').references(
     (): AnyPgColumn => bookings.id,
     { onDelete: 'set null' }

@@ -13,6 +13,7 @@ import { emailService } from "../../services/email.service.js";
 import { advisorOtpTemplate } from "../../emails/templates/advisorOtp.js";
 import { bookingCancelledTemplate } from "../../emails/templates/bookingCancelled.js";
 import { generateAdvisorToken } from "../../core/utils/jwt.js";
+import { meetingService } from "../meeting/meeting.service.js";
 import { AppError } from "../../core/errors/AppError.js";
 
 export const advisorService = {
@@ -75,13 +76,13 @@ export const advisorService = {
 
     const scopeConditions = [...baseConditions];
 
-    if (scope === "upcoming") {
-      scopeConditions.push(gte(bookings.startTime, now));
-      scopeConditions.push(ne(bookings.status, "cancelled"));
-    } else if (scope === "past") {
-      scopeConditions.push(lt(bookings.startTime, now));
-      scopeConditions.push(ne(bookings.status, "cancelled"));
-    } else if (scope === "cancelled") {
+  if (scope === "upcoming") {
+  scopeConditions.push(gte(bookings.endTime, now));
+  scopeConditions.push(ne(bookings.status, "cancelled"));
+} else if (scope === "past") {
+  scopeConditions.push(lt(bookings.endTime, now));
+  scopeConditions.push(ne(bookings.status, "cancelled"));
+} else if (scope === "cancelled") {
       scopeConditions.push(eq(bookings.status, "cancelled"));
     }
 
@@ -127,25 +128,30 @@ export const advisorService = {
       db
         .select({ count: sql<number>`count(*)::int` })
         .from(bookings)
-        .where(and(eq(bookings.advisorEmail, cleanEmail), gte(bookings.startTime, now), ne(bookings.status, "cancelled"))),
+        .where(and(eq(bookings.advisorEmail, cleanEmail), gte(bookings.endTime, now), ne(bookings.status, "cancelled"))),
       db
         .select({ count: sql<number>`count(*)::int` })
         .from(bookings)
-        .where(and(eq(bookings.advisorEmail, cleanEmail), lt(bookings.startTime, now), ne(bookings.status, "cancelled"))),
+        .where(and(eq(bookings.advisorEmail, cleanEmail), lt(bookings.endTime, now), ne(bookings.status, "cancelled"))),
       db
         .select({ count: sql<number>`count(*)::int` })
         .from(bookings)
         .where(and(eq(bookings.advisorEmail, cleanEmail), eq(bookings.status, "cancelled"))),
     ]);
 
-    return {
-      bookings: rows,
-      counts: {
-        upcoming: upcomingCountRes[0]?.count ?? 0,
-        past: pastCountRes[0]?.count ?? 0,
-        cancelled: cancelledCountRes[0]?.count ?? 0,
-      },
-    };
+    const bookingsWithMeetingLinks = rows.map((booking) => ({
+     ...booking,
+     meetLink: meetingService.getMeetingLink(booking.id),
+    }));
+
+  return {
+    bookings: bookingsWithMeetingLinks,
+    counts: {
+    upcoming: upcomingCountRes[0]?.count ?? 0,
+    past: pastCountRes[0]?.count ?? 0,
+    cancelled: cancelledCountRes[0]?.count ?? 0,
+  },
+};
   },
 
   getAdvisorBookingFeedback: async (advisorEmail: string, bookingId: number) => {
