@@ -157,6 +157,10 @@ export function useMeeting({
 
   const participantIdRef = useRef<string | null>(null);
 
+  const setParticipantId = useCallback((id: string | null) => {
+    participantIdRef.current = id;
+  }, []);
+
   const joinedRef =
     useRef(false);
 
@@ -617,6 +621,7 @@ socket.emit("meeting:heartbeat", {
     setParticipants,
     initialMessages,
     participantIdRef,
+    setParticipantId,
     socket,
     socketRef,
     join,

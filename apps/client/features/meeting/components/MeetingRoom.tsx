@@ -174,14 +174,15 @@ export default function MeetingRoom({
           guestSession.name
         );
 
-        meeting.participantIdRef.current =
-          guestSession.participantId;
+        meeting.setParticipantId(
+          guestSession.participantId
+        );
       }
     }
   }, [
     meeting.info,
     meeting.setName,
-    meeting.participantIdRef,
+    meeting.setParticipantId,
     bookingId,
     meetingSource,
     user,
