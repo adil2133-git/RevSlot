@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,12 +17,16 @@ type Step = "request" | "reset" | "done";
 
 export default function ForgotPasswordFlow() {
   const router = useRouter();
-  const { forgotPassword, resetPassword, isLoading, error } = useAuthStore();
+  const { forgotPassword, resetPassword, isLoading, error, clearError } = useAuthStore();
   const [step, setStep] = useState<Step>("request");
   const [email, setEmail] = useState("");
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
+
+  useEffect(() => {
+    clearError();
+  }, [clearError]);
 
   const requestForm = useForm<ForgotPasswordFormValues>({
     resolver: zodResolver(forgotPasswordSchema),
@@ -168,9 +172,14 @@ export default function ForgotPasswordFlow() {
         </div>
 
         {error && (
-          <p className="rounded-lg bg-error-container px-4 py-2.5 text-sm text-error">
-            {error}
-          </p>
+          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 flex items-start gap-2.5">
+            <svg className="w-4 h-4 text-red-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 7.5h.008v.008H12v-.008Z" />
+            </svg>
+            <div className="flex-1 leading-relaxed">
+              <span>{error}</span>
+            </div>
+          </div>
         )}
 
         <button
@@ -213,9 +222,14 @@ export default function ForgotPasswordFlow() {
       </div>
 
       {error && (
-        <p className="rounded-lg bg-error-container px-4 py-2.5 text-sm text-error">
-          {error}
-        </p>
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 flex items-start gap-2.5">
+          <svg className="w-4 h-4 text-red-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 7.5h.008v.008H12v-.008Z" />
+          </svg>
+          <div className="flex-1 leading-relaxed">
+            <span>{error}</span>
+          </div>
+        </div>
       )}
 
       <button

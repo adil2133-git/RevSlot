@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,13 +11,25 @@ import GoogleSignInButton from "./GoogleSignInButton";
 
 export default function RegisterForm() {
   const router = useRouter();
-  const { register: registerReviewer, isLoading, error } = useAuthStore();
+  const { register: registerReviewer, isLoading, error, clearError } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const { register, handleSubmit, formState: { errors },} = useForm<RegisterFormValues>({
+  useEffect(() => {
+    clearError();
+  }, [clearError]);
+
+  const { register, handleSubmit, watch, formState: { errors } } = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
   });
+
+  // Automatically dismiss stale server error as soon as the user starts editing any field
+  useEffect(() => {
+    const subscription = watch(() => {
+      if (error) clearError();
+    });
+    return () => subscription.unsubscribe();
+  }, [watch, error, clearError]);
 
   const onSubmit = async (values: RegisterFormValues) => {
     try {
@@ -46,7 +58,7 @@ export default function RegisterForm() {
         <div className="h-px flex-1 bg-slate-200" />
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-2">
+      <form onSubmit={handleSubmit(onSubmit, () => clearError())} className="space-y-2">
         <div>
           <label htmlFor="name" className="mb-0.5 block text-xs font-semibold text-slate-600">
             Full Name
@@ -161,10 +173,22 @@ export default function RegisterForm() {
           </div>
         </div>
 
-        {error && (
-          <p className="rounded-lg bg-error-container px-3 py-1.5 text-xs text-error">
-            {error}
-          </p>
+        {error && Object.keys(errors).length === 0 && (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 flex items-start gap-2.5">
+            <svg className="w-4 h-4 text-red-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 7.5h.008v.008H12v-.008Z" />
+            </svg>
+            <div className="flex-1 leading-relaxed">
+              <span>{error}</span>
+              {(error.toLowerCase().includes("already exists") || error.toLowerCase().includes("log in")) && (
+                <div className="mt-1">
+                  <Link href="/reviewer/login" className="font-semibold text-primary hover:underline">
+                    Log in to your account &rarr;
+                  </Link>
+                </div>
+              )}
+            </div>
+          </div>
         )}
 
         <button

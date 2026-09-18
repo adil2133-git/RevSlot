@@ -107,8 +107,33 @@ api.interceptors.response.use(
       }
     }
 
-    const message =
-      error.response?.data?.message ?? error.message ?? "Something went wrong";
+    let message = error.response?.data?.message;
+
+    if (!message) {
+      if (!error.response || error.code === "ERR_NETWORK") {
+        message = "Unable to connect to the server. Please check your internet connection and try again.";
+      } else if (error.response?.status === 429) {
+        message = "Too many requests. Please wait a few moments before trying again.";
+      } else if (error.response?.status >= 500) {
+        message = "Our servers are experiencing technical difficulties. Please try again shortly.";
+      } else {
+        message = error.message || "An unexpected error occurred. Please try again.";
+      }
+    } else if (typeof message === "string") {
+      // Guard: if raw database or SQL error text leaked through, sanitize it for the user
+      const lower = message.toLowerCase();
+      const rawDbKeywords = ["violates", "constraint", "syntax error", "p2002", "relation \"", "column \"", "foreign key", "select ", "insert into", "update "];
+      if (rawDbKeywords.some((kw) => lower.includes(kw))) {
+        if (lower.includes("email")) {
+          message = "An account with this email already exists. Please log in instead.";
+        } else if (lower.includes("username")) {
+          message = "This username is already taken. Please choose a different one.";
+        } else {
+          message = "Our servers are experiencing technical difficulties. Please try again shortly.";
+        }
+      }
+    }
+
     return Promise.reject(
       new ApiError(message, error.response?.status, error.response?.data?.details)
     );

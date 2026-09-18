@@ -109,7 +109,6 @@ function GoogleSignInButton() {
                     <span>Continue with Google</span>
                 </div>
             </div>
-            {error && <p className="mt-2 text-center text-sm text-error">{error}</p>}
         </div>
     );
 }

@@ -6,17 +6,18 @@ import { useAuthStore } from "../store/authStore";
 
 export default function VerifyEmailForm() {
   const router = useRouter();
-  const { pendingVerificationEmail, verifyEmail, resendVerification, isLoading, error } = useAuthStore();
+  const { pendingVerificationEmail, verifyEmail, resendVerification, isLoading, error, clearError } = useAuthStore();
   const [otp, setOtp] = useState("");
   const [resendMessage, setResendMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    clearError();
     // No email pending verification (e.g. direct nav or page refresh
     // lost the in-memory store) — send them back to register.
     if (!pendingVerificationEmail) {
       router.replace("/register");
     }
-  }, [pendingVerificationEmail, router]);
+  }, [pendingVerificationEmail, router, clearError]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,9 +70,14 @@ export default function VerifyEmailForm() {
         </div>
 
         {error && (
-          <p className="rounded-lg bg-error-container px-4 py-2 text-sm text-error">
-            {error}
-          </p>
+          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 flex items-start gap-2.5">
+            <svg className="w-4 h-4 text-red-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 7.5h.008v.008H12v-.008Z" />
+            </svg>
+            <div className="flex-1 leading-relaxed">
+              <span>{error}</span>
+            </div>
+          </div>
         )}
 
         {resendMessage && (

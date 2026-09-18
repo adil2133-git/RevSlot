@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -16,16 +16,29 @@ type LoginFormProps = {
 
 export default function LoginForm({ role }: LoginFormProps) {
   const router = useRouter();
-  const { loginAsReviewer, loginAsAdmin, isLoading, error } = useAuthStore();
+  const { loginAsReviewer, loginAsAdmin, isLoading, error, clearError } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    clearError();
+  }, [clearError]);
 
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
   });
+
+  // Automatically dismiss stale server error as soon as the user starts editing any field
+  useEffect(() => {
+    const subscription = watch(() => {
+      if (error) clearError();
+    });
+    return () => subscription.unsubscribe();
+  }, [watch, error, clearError]);
 
   const onSubmit = async (values: LoginFormValues) => {
     try {
@@ -67,7 +80,7 @@ export default function LoginForm({ role }: LoginFormProps) {
         </>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-3.5">
+      <form onSubmit={handleSubmit(onSubmit, () => clearError())} className="space-y-3.5">
         <div>
           <label htmlFor="email" className="mb-1 block text-[13px] font-semibold text-slate-600">
             Email Address
@@ -121,10 +134,15 @@ export default function LoginForm({ role }: LoginFormProps) {
           )}
         </div>
 
-        {error && (
-          <p className="rounded-lg bg-error-container px-4 py-2 text-sm text-error">
-            {error}
-          </p>
+        {error && Object.keys(errors).length === 0 && (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 flex items-start gap-2.5">
+            <svg className="w-4 h-4 text-red-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 7.5h.008v.008H12v-.008Z" />
+            </svg>
+            <div className="flex-1 leading-relaxed">
+              <span>{error}</span>
+            </div>
+          </div>
         )}
 
         <button
