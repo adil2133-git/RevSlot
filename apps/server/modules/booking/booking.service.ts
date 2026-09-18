@@ -299,7 +299,7 @@ for (const [key, value] of Object.entries(formData)) {
     const internalMeetingLink =
        meetingService.getMeetingLink(booking.id);
 
-    let meetLink: string | null = internalMeetingLink;
+    const meetLink: string | null = internalMeetingLink;
 
     try {
       const meetEvent = await calendarService.createMeetEvent({
@@ -1121,7 +1121,7 @@ for (const [key, value] of Object.entries(formData)) {
 
     const internalMeetingLink =
     meetingService.getMeetingLink(newBooking.id);
-    let meetLink: string | null = internalMeetingLink;
+    const meetLink: string | null = internalMeetingLink;
 
     try {
       const meetEvent = await calendarService.createMeetEvent({
@@ -1140,7 +1140,6 @@ for (const [key, value] of Object.entries(formData)) {
       });
 
       if (meetEvent) {
-        meetLink = internalMeetingLink;
         await db
           .update(bookings)
           .set({ meetLink: internalMeetingLink, googleEventId: meetEvent.googleEventId })
