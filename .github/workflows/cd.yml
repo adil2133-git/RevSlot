@@ -1,0 +1,37 @@
+name: CD
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+
+            cd ~/RevSlot
+
+            echo "Pulling latest code..."
+            git fetch origin
+            git reset --hard origin/main
+
+            echo "Rebuilding and starting containers..."
+            docker compose up -d --build
+
+            echo "Waiting for server..."
+            sleep 10
+
+            echo "Checking server health..."
+            curl --fail http://localhost:5000/health
+
+            echo "Deployment successful!"
