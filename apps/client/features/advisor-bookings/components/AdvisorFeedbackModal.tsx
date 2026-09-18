@@ -23,6 +23,12 @@ const CloseIcon = () => (
   </svg>
 );
 
+const BookmarkIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
+    <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" />
+  </svg>
+);
+
 export default function AdvisorFeedbackModal({ bookingId, onClose }: AdvisorFeedbackModalProps) {
   const [data, setData] = useState<AdvisorFeedbackData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -45,6 +51,8 @@ export default function AdvisorFeedbackModal({ bookingId, onClose }: AdvisorFeed
     fetchFeedback();
   }, [bookingId]);
 
+  const pendingTopics = data?.feedback?.pendingQuestions || data?.pendingQuestions || [];
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-xs">
       <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl transition-all">
@@ -57,6 +65,9 @@ export default function AdvisorFeedbackModal({ bookingId, onClose }: AdvisorFeed
             <h2 className="mt-1 text-lg font-bold text-slate-900">
               {data ? data.booking.eventTypeName : `Booking #${bookingId}`}
             </h2>
+            {data?.booking.formName && (
+              <p className="text-xs text-slate-400 mt-0.5">Form: {data.booking.formName}</p>
+            )}
           </div>
           <button
             type="button"
@@ -92,6 +103,10 @@ export default function AdvisorFeedbackModal({ bookingId, onClose }: AdvisorFeed
                   <span className="text-slate-500 block">Stage: {data.booking.weekStage}</span>
                 </div>
               </div>
+              <div className="mt-2.5 pt-2.5 border-t border-slate-200/60 flex items-center justify-between text-slate-500">
+                <span>{dayjs(data.booking.startTime).format("ddd, MMM D, YYYY · h:mm A")}</span>
+                <span>{data.booking.eventTypeName}</span>
+              </div>
             </div>
 
             {/* No-Show Alert */}
@@ -126,6 +141,45 @@ export default function AdvisorFeedbackModal({ bookingId, onClose }: AdvisorFeed
                     </span>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Pending Topics */}
+            {pendingTopics.length > 0 && (
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <div className="flex items-center justify-between mb-2.5">
+                  <div className="flex items-center gap-1.5">
+                    <BookmarkIcon />
+                    <h4 className="text-xs font-semibold text-slate-700">Pending Topics</h4>
+                  </div>
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">
+                    {pendingTopics.filter((q) => q.status === "pending").length} pending
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {pendingTopics.map((pq) => (
+                    <div
+                      key={pq.id}
+                      className="flex items-start justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50 p-3 text-xs"
+                    >
+                      <div className="space-y-0.5 flex-1 min-w-0">
+                        <p className="font-semibold text-slate-800 leading-snug">{pq.questionText}</p>
+                        {pq.description && (
+                          <p className="text-slate-500 leading-relaxed text-[11px] mt-0.5">{pq.description}</p>
+                        )}
+                      </div>
+                      <span
+                        className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                          pq.status === "reviewed"
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                            : "bg-amber-50 text-amber-700 border border-amber-200"
+                        }`}
+                      >
+                        {pq.status === "reviewed" ? "Reviewed" : "Pending"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
