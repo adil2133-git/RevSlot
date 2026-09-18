@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import { OAuth2Client } from "google-auth-library";
 
-import { eq, type InferSelectModel } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "../../config/db.js";
 
 import { reviewers } from "./reviewers.schema.js";
@@ -57,7 +57,7 @@ type AuthUser = {
 const createAuthResponse = async (user: AuthUser, password: string, role: "reviewer" | "admin") => {
   // Check whether account is active
   if (!user.isActive) {
-    throw new AppError("Account is inactive", 403);
+    throw new AppError("Your account has been deactivated. Please contact support.", 403);
   }
 
   // Accounts created via Google have no password set — block normal login for them
@@ -72,7 +72,7 @@ const createAuthResponse = async (user: AuthUser, password: string, role: "revie
   );
 
   if (!isPasswordValid) {
-    throw new AppError("Invalid email or password", 401);
+    throw new AppError("Incorrect email or password. Please try again.", 401);
   }
 
   // Hard-block login until the email is verified via OTP — but only for
@@ -215,7 +215,7 @@ export const authService = {
       .limit(1);
 
     if (existingReviewer.length > 0) {
-      throw new AppError("Email already registered", 409);
+      throw new AppError("An account with this email already exists. Please log in instead.", 409);
     }
 
     const passwordHash = await bcrypt.hash(data.password, 12);
@@ -234,7 +234,7 @@ export const authService = {
       .returning();
 
     if (!newReviewer) {
-      throw new AppError("Failed to create reviewer account", 500);
+      throw new AppError("Unable to create your account right now. Please try again.", 500);
     }
 
     const otpCode = await otpService.generateOtp(newReviewer.email, "email_verification");
@@ -258,7 +258,7 @@ export const authService = {
       .limit(1);
 
     if (!reviewer) {
-      throw new AppError("Invalid email or password", 401);
+      throw new AppError("Incorrect email or password. Please try again.", 401);
     }
 
     return createAuthResponse(
@@ -277,7 +277,7 @@ export const authService = {
       .limit(1);
 
     if (!admin) {
-      throw new AppError("Invalid email or password", 401);
+      throw new AppError("Incorrect email or password. Please try again.", 401);
     }
 
     return createAuthResponse(
@@ -634,7 +634,7 @@ export const authService = {
     const isValid = await otpService.verifyOtp(data.email, "forgot_password", data.otp);
 
     if (!isValid) {
-      throw new AppError("Invalid or expired OTP", 400);
+      throw new AppError("The reset code is invalid or has expired. Please request a new code.", 400);
     }
 
     const passwordHash = await bcrypt.hash(data.newPassword, 12);
@@ -677,7 +677,7 @@ export const authService = {
     const isValid = await otpService.verifyOtp(data.email, "email_verification", data.otp);
 
     if (!isValid) {
-      throw new AppError("Invalid or expired verification code", 400);
+      throw new AppError("The verification code is invalid or has expired. Please request a new code.", 400);
     }
 
     const [reviewer] = await db
@@ -687,7 +687,7 @@ export const authService = {
       .limit(1);
 
     if (!reviewer) {
-      throw new AppError("User not found", 404);
+      throw new AppError("Account not found. Please register again.", 404);
     }
 
     const [updated] = await db
@@ -697,7 +697,7 @@ export const authService = {
       .returning();
 
     if (!updated) {
-      throw new AppError("Failed to verify email", 500);
+      throw new AppError("Unable to verify your email right now. Please try again.", 500);
     }
 
     return await issueSession("reviewer", updated);
@@ -739,7 +739,7 @@ export const authService = {
 
     const googlePayload = ticket.getPayload();
     if (!googlePayload || !googlePayload.email) {
-      throw new AppError("Invalid Google token", 401);
+      throw new AppError("Google sign-in was canceled or could not be completed. Please try again.", 401);
     }
 
     const { email, name, sub: googleId, picture } = googlePayload;
@@ -785,11 +785,11 @@ export const authService = {
     }
 
     if (!reviewer) {
-      throw new AppError("Failed to authenticate with Google", 500);
+      throw new AppError("Unable to complete Google sign-in right now. Please try again.", 500);
     }
 
     if (!reviewer.isActive) {
-      throw new AppError("Account is inactive", 403);
+      throw new AppError("Your account has been deactivated. Please contact support.", 403);
     }
 
     return await issueSession("reviewer", reviewer);
