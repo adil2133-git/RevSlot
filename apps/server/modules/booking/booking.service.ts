@@ -19,8 +19,12 @@ import { slotService } from "../slot/slot.service.js";
 import { feedback } from "../feedback/feedback.schema.js";
 import { BOOKING_FIELD_DEFINITIONS } from "./bookingFields.js";
 import { meetingService } from "../meeting/meeting.service.js";
+import { payments } from "../payment/payments.schema.js";
+import { reviewerWallets, walletTransactions } from "../wallet/wallet.schema.js";
+import { refundService } from "../payment/refund.service.js";
 
 export interface GetMyBookingsOptions {
+
   page: number;
   limit: number;
   status?: ("confirmed" | "completed" | "rescheduled" | "cancelled" | "no_show" | "reschedule_requested")[] | undefined;
@@ -141,6 +145,8 @@ export const bookingService = {
         .where(eq(eventTypes.id, slot.eventTypeId))
         .limit(1);
 
+      let verifiedPayment: typeof payments.$inferSelect | null = null;
+
       if (priceCheckEventType && priceCheckEventType.price > 0) {
         const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = data;
 
@@ -156,12 +162,41 @@ export const bookingService = {
         if (expectedSignature !== razorpaySignature) {
           throw new AppError("Payment verification failed", 400);
         }
+
+        // Replay prevention: check if this payment ID was already used
+        const [existingPayment] = await tx
+          .select({ id: payments.id })
+          .from(payments)
+          .where(eq(payments.razorpayPaymentId, razorpayPaymentId))
+          .limit(1);
+
+        if (existingPayment) {
+          throw new AppError("This payment has already been redeemed", 400);
+        }
+
+        // Match order record in database and verify amount
+        const [paymentRecord] = await tx
+          .select()
+          .from(payments)
+          .where(eq(payments.razorpayOrderId, razorpayOrderId))
+          .limit(1);
+
+        if (!paymentRecord) {
+          throw new AppError("Payment order not found in database", 404);
+        }
+
+        if (paymentRecord.amount !== priceCheckEventType.price * 100) {
+          throw new AppError("Payment amount mismatch", 400);
+        }
+
+        verifiedPayment = paymentRecord;
       }
 
       const startTimestamp = dayjs(
         `${slot.slotDate}T${slot.startTime}`
       ).toDate();
       const endTimestamp = dayjs(`${slot.slotDate}T${slot.endTime}`).toDate();
+
 
   const allowedKeys = new Set<string>([
   "fullName",
@@ -257,6 +292,53 @@ for (const [key, value] of Object.entries(formData)) {
         throw new AppError("Failed to create booking", 500);
       }
 
+      if (verifiedPayment) {
+        await tx
+          .update(payments)
+          .set({
+            bookingId: booking.id,
+            razorpayPaymentId: data.razorpayPaymentId,
+            advisorEmail: formData.advisorEmail || formData.email,
+            status: "captured",
+            updatedAt: new Date(),
+          })
+          .where(eq(payments.id, verifiedPayment.id));
+
+        // Credit reviewer wallet escrow
+        const [wallet] = await tx
+          .select()
+          .from(reviewerWallets)
+          .where(eq(reviewerWallets.reviewerId, slot.reviewerId))
+          .limit(1);
+
+        if (wallet) {
+          await tx
+            .update(reviewerWallets)
+            .set({
+              pendingBalance: wallet.pendingBalance + verifiedPayment.amount,
+              updatedAt: new Date(),
+            })
+            .where(eq(reviewerWallets.id, wallet.id));
+        } else {
+          await tx.insert(reviewerWallets).values({
+            reviewerId: slot.reviewerId,
+            pendingBalance: verifiedPayment.amount,
+            availableBalance: 0,
+            withdrawnBalance: 0,
+          });
+        }
+
+        await tx.insert(walletTransactions).values({
+          reviewerId: slot.reviewerId,
+          bookingId: booking.id,
+          type: "credit_escrow",
+          amount: verifiedPayment.amount,
+          status: "completed",
+          description: `Booking #${booking.id} confirmed: ₹${(verifiedPayment.amount / 100).toFixed(2)} held in escrow`,
+          availableAt: dayjs(endTimestamp).add(48, "hour").toDate(),
+        });
+      }
+
       await tx
         .update(slots)
         .set({ status: "booked", updatedAt: new Date() })
@@ -281,6 +363,7 @@ for (const [key, value] of Object.entries(formData)) {
     const [eventType] = await db
       .select({
         name: eventTypes.name,
+        price: eventTypes.price,
       })
       .from(eventTypes)
       .where(eq(eventTypes.id, booking.eventTypeId))
@@ -290,6 +373,14 @@ for (const [key, value] of Object.entries(formData)) {
       .select({ name: reviewers.name, email: reviewers.email })
       .from(reviewers)
       .where(eq(reviewers.id, booking.reviewerId))
+      .limit(1);
+
+    const [bookingPayment] = await db
+      .select({
+        razorpayPaymentId: payments.razorpayPaymentId,
+      })
+      .from(payments)
+      .where(eq(payments.bookingId, booking.id))
       .limit(1);
 
     if (!eventType || !reviewer) return { meetLink: null };
@@ -380,6 +471,8 @@ for (const [key, value] of Object.entries(formData)) {
           formattedDate,
           formattedTime,
           meetLink,
+          price: eventType.price,
+          paymentId: bookingPayment?.razorpayPaymentId,
         });
 
         return emailService
@@ -469,10 +562,18 @@ for (const [key, value] of Object.entries(formData)) {
           rescheduleToken: bookings.rescheduleToken,
           eventTypeName: eventTypes.name,
           bookingWindowDays: eventTypes.bookingWindowDays,
+          price: eventTypes.price,
+          paymentStatus: payments.status,
+          paymentAmount: payments.amount,
+          refundAmount: payments.refundAmount,
+          cancellationFee: payments.cancellationFee,
+          razorpayPaymentId: payments.razorpayPaymentId,
+          rescheduleCount: bookings.rescheduleCount,
           hasFeedback: sql<boolean>`${feedback.id} is not null`,
         })
         .from(bookings)
         .innerJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
+        .leftJoin(payments, eq(payments.bookingId, bookings.id))
         .leftJoin(feedback, eq(feedback.bookingId, bookings.id))
         .where(and(...conditions))
         .orderBy(orderBy)
@@ -543,10 +644,18 @@ for (const [key, value] of Object.entries(formData)) {
         rescheduleToken: bookings.rescheduleToken,
         eventTypeName: eventTypes.name,
         bookingWindowDays: eventTypes.bookingWindowDays,
+        price: eventTypes.price,
+        paymentStatus: payments.status,
+        paymentAmount: payments.amount,
+        refundAmount: payments.refundAmount,
+        cancellationFee: payments.cancellationFee,
+        razorpayPaymentId: payments.razorpayPaymentId,
+        rescheduleCount: bookings.rescheduleCount,
         hasFeedback: sql<boolean>`${feedback.id} is not null`,
       })
       .from(bookings)
       .innerJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
+      .leftJoin(payments, eq(payments.bookingId, bookings.id))
       .leftJoin(feedback, eq(feedback.bookingId, bookings.id))
       .where(and(eq(bookings.id, bookingId), eq(bookings.reviewerId, reviewerId)))
       .limit(1);
@@ -615,6 +724,20 @@ for (const [key, value] of Object.entries(formData)) {
         })),
       ];
 
+      // Process automatic 100% refund for reviewer cancellation
+      const refundResult = await refundService.processBookingRefund({
+        bookingId,
+        initiatedBy: "reviewer",
+        reason: data.reason,
+      }).catch((err) => {
+        console.error(`[Booking] Automated refund failed on reviewer cancel for booking ${bookingId}:`, err);
+        return null;
+      });
+
+      const refundStatusText = refundResult?.refundAmount && refundResult.refundAmount > 0
+        ? `Full 100% refund of ₹${(refundResult.refundAmount / 100).toFixed(2)} initiated via Razorpay (credited within 5–7 business days).`
+        : null;
+
       await Promise.all(
         recipients.map(({ email, name, role }) => {
           const { subject, html } = bookingCancelledTemplate({
@@ -626,6 +749,7 @@ for (const [key, value] of Object.entries(formData)) {
             formattedDate,
             formattedTime,
             reason: data.reason,
+            refundStatusText,
           });
           return emailService.sendEmail({ to: email, subject, html }).catch((err) => {
             console.error(`[Booking] Failed to send cancellation email to ${email}:`, err);
@@ -682,6 +806,12 @@ for (const [key, value] of Object.entries(formData)) {
         .update(slots)
         .set({ status: "booked", holdToken: null, holdExpiresAt: null, updatedAt: new Date() })
         .where(eq(slots.id, hold.slotId));
+
+      // Update escrow maturity time to 48 hours after new end time
+      await tx
+        .update(walletTransactions)
+        .set({ availableAt: dayjs(newEndTime).add(48, "hour").toDate() })
+        .where(and(eq(walletTransactions.bookingId, bookingId), eq(walletTransactions.type, "credit_escrow")));
 
       return updated;
     });
@@ -803,15 +933,37 @@ for (const [key, value] of Object.entries(formData)) {
       .limit(1);
 
     const [eventType] = await db
-      .select({ id: eventTypes.id, name: eventTypes.name, durationMinutes: eventTypes.durationMinutes, slug: eventTypes.slug })
+      .select({
+        id: eventTypes.id,
+        name: eventTypes.name,
+        durationMinutes: eventTypes.durationMinutes,
+        slug: eventTypes.slug,
+        price: eventTypes.price,
+      })
       .from(eventTypes)
       .where(eq(eventTypes.id, booking.eventTypeId))
       .limit(1);
 
+    const [payment] = await db
+      .select({
+        amount: payments.amount,
+        status: payments.status,
+        razorpayPaymentId: payments.razorpayPaymentId,
+      })
+      .from(payments)
+      .where(eq(payments.bookingId, booking.id))
+      .limit(1);
+
     return {
-      booking,
+      booking: {
+        ...booking,
+        price: eventType?.price ?? 0,
+        paymentStatus: payment?.status ?? null,
+        paymentAmount: payment?.amount ?? null,
+      },
       reviewer,
       eventType,
+      payment: payment || null,
     };
   },
 
@@ -985,6 +1137,20 @@ for (const [key, value] of Object.entries(formData)) {
         });
       }
 
+      // Automatically issue full 100% refund since client declined reviewer's reschedule request
+      const refundResult = await refundService.processBookingRefund({
+        bookingId: booking.id,
+        initiatedBy: "reschedule_decline",
+        reason,
+      }).catch((err) => {
+        console.error(`[Booking] Automated refund failed on reschedule decline for booking ${booking.id}:`, err);
+        return null;
+      });
+
+      const refundStatusText = refundResult?.refundAmount && refundResult.refundAmount > 0
+        ? `Full 100% refund of ₹${(refundResult.refundAmount / 100).toFixed(2)} initiated via Razorpay (credited within 5–7 business days).`
+        : null;
+
       if (eventType && reviewer) {
         const formattedDate = dayjs(booking.startTime).format("ddd, MMM D, YYYY");
         const formattedTime = `${dayjs(booking.startTime).format("h:mm A")} – ${dayjs(booking.endTime).format("h:mm A")}`;
@@ -1006,6 +1172,7 @@ for (const [key, value] of Object.entries(formData)) {
               formattedDate,
               formattedTime,
               reason,
+              refundStatusText,
             });
             return emailService.sendEmail({ to: email, subject, html }).catch((err) => {
               console.error(`[Booking] Failed to send cancellation email to ${email}:`, err);
