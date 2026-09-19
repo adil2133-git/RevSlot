@@ -20,11 +20,18 @@ export interface AdvisorBookingItem {
   rescheduleReason?: string | null;
   rescheduleToken?: string | null;
   rescheduleRequestedBy?: string | null;
+  rescheduleCount?: number | null;
   eventTypeName: string;
   bookingWindowDays?: number;
   reviewerName: string;
   timezone: string;
   hasFeedback?: boolean;
+  price?: number | null;
+  paymentStatus?: "created" | "captured" | "failed" | "refunded" | "partially_refunded" | null;
+  paymentAmount?: number | null;
+  refundAmount?: number | null;
+  cancellationFee?: number | null;
+  razorpayPaymentId?: string | null;
 }
 
 export interface AdvisorBookingsResponse {

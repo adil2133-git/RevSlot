@@ -103,9 +103,16 @@ export type MyBooking = {
   rescheduleReason?: string | null;
   rescheduleToken?: string | null;
   rescheduleRequestedBy?: string | null;
+  rescheduleCount?: number | null;
   eventTypeName: string;
   bookingWindowDays: number;
   hasFeedback: boolean;
+  price?: number | null;
+  paymentStatus?: "created" | "captured" | "failed" | "refunded" | "partially_refunded" | null;
+  paymentAmount?: number | null;
+  refundAmount?: number | null;
+  cancellationFee?: number | null;
+  razorpayPaymentId?: string | null;
 };
 
 export type MyBookingsPagination = {
@@ -181,7 +188,13 @@ export type RescheduleRequestDetail = {
     name: string;
     durationMinutes: number;
     slug: string;
+    price?: number;
   };
+  payment?: {
+    amount: number;
+    status: string;
+    razorpayPaymentId: string | null;
+  } | null;
 };
 
 export type MarkOutcomePayload = {

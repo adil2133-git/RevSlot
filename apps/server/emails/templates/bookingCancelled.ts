@@ -7,6 +7,7 @@ interface CancelledEmailParams {
   formattedDate: string;
   formattedTime: string;
   reason: string;
+  refundStatusText?: string | null | undefined;
 }
 
 function getRoleIntro(params: CancelledEmailParams): string {
@@ -36,6 +37,7 @@ export function bookingCancelledTemplate(params: CancelledEmailParams) {
     '<p style="margin: 0 0 4px 0; font-size: 14px; color: #111827; font-weight: 600;">' + formattedDate + '</p>' +
     '<p style="margin: 0 0 10px 0; font-size: 13px; color: #6b7280;">' + formattedTime + '</p>' +
     '<p style="margin: 0; font-size: 13px; color: #ba1a1a;">Reason: ' + reason + '</p>' +
+    (params.refundStatusText ? '<div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e5e7eb;"><p style="margin: 0; font-size: 13px; font-weight: 600; color: #111827;">Refund Status:</p><p style="margin: 2px 0 0 0; font-size: 12px; color: #4b5563;">' + params.refundStatusText + '</p></div>' : '') +
     '</div>' +
     '<p style="color: #9ca3af; font-size: 12px; line-height: 1.6; margin-top: 24px;">Sent by RevSlot on behalf of ' + params.reviewerName + '.</p>' +
     '</div>';

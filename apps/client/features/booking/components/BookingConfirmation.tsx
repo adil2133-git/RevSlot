@@ -42,6 +42,18 @@ export default function BookingConfirmation({
           A confirmation email has been sent to {advisorEmail}.
         </p>
 
+        {pageInfo.eventType.price > 0 && (
+          <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/60 p-3.5 text-left text-xs">
+            <div className="flex justify-between font-medium text-emerald-900">
+              <span>Payment Status</span>
+              <span className="font-semibold text-emerald-700">✓ Paid (₹{pageInfo.eventType.price})</span>
+            </div>
+            <p className="mt-1 text-slate-500">
+              Payment confirmed via Razorpay. Receipt sent to your email.
+            </p>
+          </div>
+        )}
+
         {meetLink && (
           <div className="mt-4">
             <a

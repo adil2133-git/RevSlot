@@ -12,6 +12,8 @@ interface BookingEmailParams {
   formattedTime: string;
 
   meetLink: string | null;
+  price?: number | null | undefined;
+  paymentId?: string | null | undefined;
 }
 
 const roleIntro: Record<
@@ -94,6 +96,15 @@ export const bookingConfirmationTemplate = (
         <p style="margin: 0; font-size: 13px; color: #6b7280;">
           Intern: ${internName}
         </p>
+
+        ${params.price != null ? `
+          <div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e5e7eb;">
+            <p style="margin: 0; font-size: 13px; font-weight: 600; color: #111827;">
+              Payment: ${params.price > 0 ? `<span style="color: #047857;">Paid ₹${params.price}</span>` : '<span style="color: #4b5563;">Free Session</span>'}
+            </p>
+            ${params.paymentId ? `<p style="margin: 3px 0 0 0; font-size: 11px; font-family: monospace; color: #9ca3af;">Receipt: ${params.paymentId}</p>` : ''}
+          </div>
+        ` : ''}
 
       </div>
 
