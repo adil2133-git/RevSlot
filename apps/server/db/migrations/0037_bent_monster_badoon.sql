@@ -1,0 +1,22 @@
+CREATE TYPE "public"."dispute_reason" AS ENUM('reviewer_no_show', 'technical_issue', 'inadequate_review', 'other');--> statement-breakpoint
+CREATE TYPE "public"."dispute_status" AS ENUM('under_review', 'resolved_refunded', 'resolved_dismissed');--> statement-breakpoint
+ALTER TYPE "public"."wallet_tx_status" ADD VALUE 'disputed';--> statement-breakpoint
+CREATE TABLE "booking_disputes" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"booking_id" integer NOT NULL,
+	"advisor_email" varchar(255) NOT NULL,
+	"reason" "dispute_reason" NOT NULL,
+	"description" text NOT NULL,
+	"status" "dispute_status" DEFAULT 'under_review' NOT NULL,
+	"meeting_joined_by_reviewer" boolean DEFAULT false,
+	"meeting_joined_by_client" boolean DEFAULT false,
+	"admin_notes" text,
+	"resolved_at" timestamp with time zone,
+	"resolved_by" integer,
+	"created_at" timestamp with time zone DEFAULT now()
+);
+--> statement-breakpoint
+ALTER TABLE "payout_requests" ADD COLUMN "admin_notes" text;--> statement-breakpoint
+ALTER TABLE "payout_requests" ADD COLUMN "processed_by" integer;--> statement-breakpoint
+ALTER TABLE "booking_disputes" ADD CONSTRAINT "booking_disputes_booking_id_bookings_id_fk" FOREIGN KEY ("booking_id") REFERENCES "public"."bookings"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "booking_disputes" ADD CONSTRAINT "booking_disputes_resolved_by_admins_id_fk" FOREIGN KEY ("resolved_by") REFERENCES "public"."admins"("id") ON DELETE set null ON UPDATE no action;
