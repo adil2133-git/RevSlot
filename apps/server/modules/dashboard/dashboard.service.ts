@@ -42,7 +42,7 @@ export const dashboardService = {
     endOfToday.setHours(23, 59, 59, 999);
 
     // 2. Compute Metric 1: Upcoming Reviews count
-    let timeframeStart = startOfToday;
+    const timeframeStart = startOfToday;
     let timeframeEnd: Date | null = null;
 
     if (query.timeframe === 'week') {
@@ -283,8 +283,8 @@ const [nextReview] = await db
       .limit(10);
 
     const activityFeed = recentBookings.map((b) => {
-      let type: 'new_booking' | 'rescheduled' | 'cancellation' = 'new_booking';
-      let title = '';
+      let type: 'new_booking' | 'rescheduled' | 'cancellation';
+      let title: string;
       let timestamp = b.createdAt;
 
       if (b.status === 'cancelled') {

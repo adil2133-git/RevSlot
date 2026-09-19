@@ -20,14 +20,14 @@ function getRoleIntro(params: CancelledEmailParams): string {
 }
 
 export function bookingCancelledTemplate(params: CancelledEmailParams) {
-  var recipientName = params.recipientName;
-  var formattedDate = params.formattedDate;
-  var formattedTime = params.formattedTime;
-  var reason = params.reason;
+  const recipientName = params.recipientName;
+  const formattedDate = params.formattedDate;
+  const formattedTime = params.formattedTime;
+  const reason = params.reason;
 
-  var subject = "Booking cancelled: " + params.eventTypeName;
+  const subject = "Booking cancelled: " + params.eventTypeName;
 
-  var html =
+  const html =
     '<div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px;">' +
     '<h2 style="color: #111827; margin-bottom: 8px;">Booking cancelled</h2>' +
     '<p style="color: #374151; font-size: 15px; line-height: 1.6;">Hi ' + recipientName + ',</p>' +

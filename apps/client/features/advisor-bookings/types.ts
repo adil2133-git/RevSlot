@@ -36,6 +36,16 @@ export interface AdvisorBookingsResponse {
   };
 }
 
+export interface AdvisorPendingQuestion {
+  id: number;
+  questionId: number;
+  questionText: string;
+  description?: string | null;
+  status: "pending" | "reviewed";
+  assignedAt?: string | null;
+  completedAt?: string | null;
+}
+
 export interface AdvisorFeedbackData {
   booking: {
     id: number;
@@ -46,6 +56,7 @@ export interface AdvisorFeedbackData {
     eventTypeName: string;
     startTime: string;
     endTime: string;
+    formName?: string | null;
   };
   feedback: {
     id: number;
@@ -56,5 +67,7 @@ export interface AdvisorFeedbackData {
     understandingLevel?: string | null;
     customFieldValues?: Record<string, { label: string; fieldType: string; value: string }> | null;
     createdAt?: string | null;
+    pendingQuestions?: AdvisorPendingQuestion[];
   };
+  pendingQuestions?: AdvisorPendingQuestion[];
 }
