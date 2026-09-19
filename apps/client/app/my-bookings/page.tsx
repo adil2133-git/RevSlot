@@ -10,7 +10,7 @@ export default function MyBookingsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = getStoredAdvisorToken();
+    const token = getStoredAdvisorToken();                                        
     const email = getStoredAdvisorEmail();
 
     if (token && email) {
