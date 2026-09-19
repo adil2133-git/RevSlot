@@ -31,3 +31,31 @@ export const pendingQuestionStatus = pgEnum('pending_question_status', [
 export const notificationType = pgEnum('notification_type', [
   'booking_created', 'booking_cancelled', 'booking_rescheduled', 'booking_completed', 'feedback_submitted',
 ]);
+
+export const paymentStatus = pgEnum('payment_status', [
+  'created', 'captured', 'failed', 'refunded', 'partially_refunded',
+]);
+
+export const walletTxType = pgEnum('wallet_tx_type', [
+  'credit_escrow', 'escrow_cleared', 'escrow_cancelled', 'withdrawal', 'cancellation_compensation',
+]);
+
+export const walletTxStatus = pgEnum('wallet_tx_status', [
+  'pending', 'completed', 'failed', 'disputed',
+]);
+
+export const payoutMethod = pgEnum('payout_method', [
+  'bank_account', 'upi',
+]);
+
+export const payoutRequestStatus = pgEnum('payout_request_status', [
+  'requested', 'processing', 'completed', 'rejected',
+]);
+
+export const disputeReason = pgEnum('dispute_reason', [
+  'reviewer_no_show', 'technical_issue', 'inadequate_review', 'other',
+]);
+
+export const disputeStatus = pgEnum('dispute_status', [
+  'under_review', 'resolved_refunded', 'resolved_dismissed',
+]);

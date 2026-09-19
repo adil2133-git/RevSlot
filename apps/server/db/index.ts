@@ -15,3 +15,6 @@ export * from '../modules/auth/refreshTokens.schema.js'
 export * from '../modules/auditLog/auditLog.schema.js'
 export * from '../modules/feedback/feedback.schema.js';
 export * from '../modules/notification/notification.schema.js';
+export * from '../modules/payment/payments.schema.js';
+export * from '../modules/wallet/wallet.schema.js';
+export * from '../modules/dispute/disputes.schema.js';

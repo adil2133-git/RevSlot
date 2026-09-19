@@ -40,6 +40,14 @@ type MeetingRoom = {
 };
 
 const rooms = new Map<number, MeetingRoom>();
+const meetingAttendance = new Map<
+  number,
+  {
+    reviewerJoined: boolean;
+    clientJoined: boolean;
+    attendees: { id: string; name: string; joinedAt: Date }[];
+  }
+>();
 
 const getRoom = (bookingId: number): MeetingRoom => {
   let room = rooms.get(bookingId);
@@ -153,6 +161,19 @@ export const meetingService = {
       lastSeen: Date.now(),
     });
 
+    let attendance = meetingAttendance.get(bookingId);
+    if (!attendance) {
+      attendance = { reviewerJoined: false, clientJoined: false, attendees: [] };
+      meetingAttendance.set(bookingId, attendance);
+    }
+    const isReviewer = participant.name.toLowerCase().includes(booking.reviewerName.toLowerCase());
+    if (isReviewer) {
+      attendance.reviewerJoined = true;
+    } else {
+      attendance.clientJoined = true;
+    }
+    attendance.attendees.push({ id: participant.id, name: participant.name, joinedAt: new Date() });
+
     return {
       booking,
       participants: [...room.participants.values()],
@@ -263,4 +284,7 @@ export const meetingService = {
     return item;
   },
 
+  getAttendance: (bookingId: number) => {
+    return meetingAttendance.get(bookingId) || { reviewerJoined: false, clientJoined: false, attendees: [] };
+  },
 };

@@ -190,9 +190,19 @@ export default function RescheduleRequestPage({ params }: PageProps) {
                 ✕
               </div>
               <h2 className="text-2xl font-bold text-slate-900 mb-2">Booking Cancelled</h2>
-              <p className="text-sm text-slate-600 mb-6">
+              <p className="text-sm text-slate-600 mb-4">
                 You have declined the reschedule request for <strong>{eventType.name}</strong>. The booking has been cancelled and notification emails sent.
               </p>
+              {booking.price && booking.price > 0 ? (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-left mb-6 text-xs text-emerald-950 space-y-1">
+                  <p className="font-bold text-emerald-800 flex items-center gap-1.5">
+                    <span>💰</span> 100% Full Refund Initiated
+                  </p>
+                  <p className="text-emerald-700 leading-relaxed">
+                    A full refund of ₹{booking.price} has been automatically processed to your original payment method via Razorpay. Credited within 5–7 business days.
+                  </p>
+                </div>
+              ) : null}
             </>
           )}
 
@@ -220,11 +230,22 @@ export default function RescheduleRequestPage({ params }: PageProps) {
 
         {/* Card Body */}
         <div className="bg-white rounded-2xl border border-slate-200 p-6 md:p-8 shadow-xs space-y-6">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Reschedule Request from Reviewer</h1>
-            <p className="text-sm text-slate-500 mt-1">
-              Reviewer <strong>{reviewer.name}</strong> has asked to reschedule your review session for <strong>{booking.internName}</strong> ({booking.batch}).
-            </p>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Reschedule Request from Reviewer</h1>
+              <p className="text-sm text-slate-500 mt-1">
+                Reviewer <strong>{reviewer.name}</strong> has asked to reschedule your review session for <strong>{booking.internName}</strong> ({booking.batch}).
+              </p>
+            </div>
+            {booking.price && booking.price > 0 ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 border border-emerald-200 shrink-0">
+                Paid ₹{booking.price}
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 shrink-0">
+                Free Session
+              </span>
+            )}
           </div>
 
           {/* Reason Note from Reviewer */}
@@ -374,6 +395,18 @@ export default function RescheduleRequestPage({ params }: PageProps) {
               <p className="text-xs text-slate-500">
                 Are you sure you want to decline this reschedule request? Declining will cancel the booking.
               </p>
+
+              {booking.price && booking.price > 0 ? (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 p-3 text-xs text-emerald-950 space-y-1">
+                  <p className="font-bold flex items-center gap-1.5 text-emerald-800">
+                    <span>💰</span> 100% Full Refund Guaranteed
+                  </p>
+                  <p className="text-emerald-800 leading-relaxed">
+                    Since the reviewer requested this reschedule, declining will cancel the session and immediately initiate a <strong>100% full refund of ₹{booking.price}</strong> back to your original payment method via Razorpay.
+                  </p>
+                </div>
+              ) : null}
+
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">
                   Optional Reason for Declining

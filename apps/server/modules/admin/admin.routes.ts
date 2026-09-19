@@ -38,6 +38,9 @@ router.patch(
 
 router.get("/bookings", validateQuery(ListBookingsQuerySchema), catchAsync(adminController.listBookings));
 
+router.get("/payouts", catchAsync(adminController.listPayouts));
+router.patch("/payouts/:id/process", catchAsync(adminController.processPayout));
+
 router.get("/audit-log", validateQuery(ListAuditLogQuerySchema), catchAsync(auditLogController.listAuditLogs));
 
 export default router;

@@ -31,6 +31,7 @@ type BookingFormProps = {
   submitting: boolean;
   submitError: string | null;
   secondsLeft: number;
+  price?: number;
   onSubmit: (e?: React.BaseSyntheticEvent) => void;
   onBack: () => void;
 };
@@ -45,6 +46,7 @@ export default function BookingForm({
   submitting,
   submitError,
   secondsLeft,
+  price = 0,
   onSubmit,
   onBack,
 }: BookingFormProps) {
@@ -173,6 +175,30 @@ const hasMoreSuggestedFields = suggestedFields.some(
           })}
         </div>
 
+        {/* Order Summary & Pricing Breakdown */}
+        {price > 0 && (
+          <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Order Summary</h4>
+            <div className="mt-3 space-y-2 text-sm">
+              <div className="flex justify-between text-slate-600">
+                <span>Session Fee</span>
+                <span className="font-medium text-slate-900">₹{price}</span>
+              </div>
+              <div className="flex justify-between text-slate-600">
+                <span>Platform Fee</span>
+                <span className="font-medium text-emerald-600">FREE</span>
+              </div>
+              <div className="border-t border-slate-200 pt-2 flex justify-between font-semibold text-slate-900">
+                <span>Total Payable</span>
+                <span>₹{price}</span>
+              </div>
+            </div>
+            <p className="mt-3 text-xs leading-relaxed text-slate-500">
+              ℹ️ <strong>Cancellation Policy:</strong> 100% full refund if cancelled &gt; 8 hours before session. Partial refund applies between 8 to 3 hours. Non-cancellable within 3 hours.
+            </p>
+          </div>
+        )}
+
         {submitError && (
           <p className="mt-4 text-sm text-red-600">
             {submitError}
@@ -183,15 +209,15 @@ const hasMoreSuggestedFields = suggestedFields.some(
           <button
             type="submit"
             disabled={submitting}
-            className="rounded-xl bg-blue-900 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
+            className="rounded-xl bg-blue-900 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50 transition hover:bg-blue-800"
           >
-            {submitting ? "Confirming..." : "Confirm booking"}
+            {submitting ? "Processing..." : price > 0 ? `Pay ₹${price} & Confirm booking` : "Confirm booking"}
           </button>
 
           <button
             type="button"
             onClick={onBack}
-            className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700"
+            className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
           >
             Back
           </button>
