@@ -51,6 +51,7 @@ export const eventTypeService = {
         description: eventTypes.description,
         timezone: availabilityTemplates.timezone,
         bookingWindowDays: eventTypes.bookingWindowDays,
+        price: eventTypes.price,
       })
       .from(eventTypes)
       .innerJoin(

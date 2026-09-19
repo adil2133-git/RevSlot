@@ -25,6 +25,7 @@ export type BookingPageInfo = {
     description: string | null;
     timezone: string;
     bookingWindowDays: number;
+    price: number;
   };
 };
 

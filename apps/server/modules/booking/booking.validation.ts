@@ -6,6 +6,9 @@ export const CreateBookingSchema = z.object({
   formData: z
     .record(z.string(), z.string())
     .default({}),
+  razorpayOrderId: z.string().optional(),
+  razorpayPaymentId: z.string().optional(),
+  razorpaySignature: z.string().optional(),
 });
 
 export type CreateBookingInput = z.infer<typeof CreateBookingSchema>;

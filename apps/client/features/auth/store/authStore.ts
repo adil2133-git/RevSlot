@@ -12,6 +12,7 @@ import type {
   UpdateProfilePayload,
   ChangePasswordPayload,
 } from "../types";
+
 import {
   loginReviewer,
   loginAdmin,
@@ -88,6 +89,7 @@ type AuthState = {
    *  this one) — clears local auth state too, same as logout. Caller
    *  should redirect to login after this resolves. */
   changePassword: (payload: ChangePasswordPayload) => Promise<string>;
+  clearError: () => void;
 };
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -96,6 +98,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   isHydrated: false,
   error: null,
   pendingVerificationEmail: null,
+  clearError: () => set({ error: null }),
 
   loginAsReviewer: async (payload) => {
     set({ isLoading: true, error: null });
@@ -168,14 +171,6 @@ export const useAuthStore = create<AuthState>((set) => ({
       const user = await getMe();
       set({ user, isHydrated: true });
     } catch (err) {
-      // No valid refresh cookie, or getMe failed after a refresh that
-      // did succeed — either way, no session. Make sure axios doesn't
-      // keep a half-set token around from a partial failure.
-      if (err instanceof ApiError && err.status === 429) {
-        set({ isHydrated: true });
-        return;
-      }
-
       setAccessToken(null);
       set({ user: null, isHydrated: true });
     }

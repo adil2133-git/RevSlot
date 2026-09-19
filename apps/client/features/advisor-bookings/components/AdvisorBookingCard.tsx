@@ -52,10 +52,17 @@ export default function AdvisorBookingCard({
   const formattedDate = dayjs(booking.startTime).format("ddd, MMM D");
   const formattedTime = `${dayjs(booking.startTime).format("h:mm A")} – ${dayjs(booking.endTime).format("h:mm A")} (${booking.timezone || "IST"})`;
 
+  const now = dayjs();
+  const endTime = dayjs(booking.endTime);
+
+  const isJoinAvailable =
+  (booking.status === "confirmed" || booking.status === "rescheduled") &&
+  now.isBefore(endTime); 
+
   const getStatusBadge = () => {
     switch (booking.status) {
       case "confirmed":
-        return <span className="rounded-full bg-[#e6eef5] px-3 py-1 text-xs font-medium text-[#003366]">Upcoming</span>;
+        return <span className="rounded-full bg-secondary px-3 py-1 text-xs font-medium text-[#003366]">Upcoming</span>;
       case "completed":
         return <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">Completed</span>;
       case "cancelled":
@@ -133,18 +140,22 @@ export default function AdvisorBookingCard({
               >
                 <span>Respond to Reschedule Request</span>
               </a>
-            ) : booking.meetLink && booking.status !== "cancelled" ? (
+          ) : isJoinAvailable && booking.meetLink ? (
               <a
-                href={booking.meetLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-xs font-semibold text-on-primary shadow-sm transition hover:bg-primary/90"
+               href={`${booking.meetLink}${
+                    booking.meetLink.includes("?")
+                    ? "&"
+                    : "?"
+              }source=advisor`}
+               target="_blank"
+               rel="noopener noreferrer"
+               className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-xs font-semibold text-on-primary shadow-sm transition hover:bg-primary/90"
               >
-                <VideoIcon />
-                <span>Join Google Meet</span>
-              </a>
-            ) : (
-              <button
+             <VideoIcon />
+             <span>Join Meet</span>
+             </a>
+          ) : (
+             <button
                 type="button"
                 disabled
                 className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-slate-100 px-4 py-2.5 text-xs font-semibold text-slate-400 cursor-not-allowed"

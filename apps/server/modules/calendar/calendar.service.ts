@@ -127,6 +127,7 @@ export const calendarService = {
     endTime: Date;
     timezone: string;
     attendeeEmails: string[];
+    meetingLink: string;
   }): Promise<{ meetLink: string; googleEventId: string } | null> => {
     const [reviewer] = await db
       .select({
@@ -161,9 +162,12 @@ export const calendarService = {
           requestBody: {
             summary: params.summary,
 
-            ...(params.description
-              ? { description: params.description }
-              : {}),
+            description: [
+                 params.description,
+               `Join RevSlot meeting: ${params.meetingLink}`,
+              ]
+            .filter(Boolean)
+            .join("\n\n"),
 
             start: {
               dateTime: params.startTime.toISOString(),

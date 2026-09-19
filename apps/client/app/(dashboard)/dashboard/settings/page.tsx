@@ -17,42 +17,10 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "account", label: "Account" },
 ];
 
-function initials(name: string) {
-  return name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
-}
-
 export default function SettingsPage() {
   const router = useRouter();
-  const { user, updateProfile, changePassword } = useAuthStore();
+  const { user, changePassword } = useAuthStore();
   const [activeTab, setActiveTab] = useState<Tab>("profile");
-
-  // ---- Profile tab ----
-  const [name, setName] = useState(user?.name ?? "");
-  const [bio, setBio] = useState(user?.bio ?? "");
-  const [whatsappNumber, setWhatsappNumber] = useState(user?.whatsappNumber ?? "");
-  const [profileSaving, setProfileSaving] = useState(false);
-  const [profileError, setProfileError] = useState<string | null>(null);
-  const [profileSaved, setProfileSaved] = useState(false);
-
-  const profileDirty =
-    name !== (user?.name ?? "") ||
-    bio !== (user?.bio ?? "") ||
-    whatsappNumber !== (user?.whatsappNumber ?? "");
-
-  const handleProfileSave = async () => {
-    setProfileSaving(true);
-    setProfileError(null);
-    setProfileSaved(false);
-    try {
-      await updateProfile({ name, bio, whatsappNumber });
-      setProfileSaved(true);
-      setTimeout(() => setProfileSaved(false), 2500);
-    } catch (err) {
-      setProfileError(err instanceof ApiError ? err.message : "Something went wrong.");
-    } finally {
-      setProfileSaving(false);
-    }
-  };
 
   // ---- Account tab (email/username + password) ----
   const [currentPassword, setCurrentPassword] = useState("");
@@ -60,6 +28,9 @@ export default function SettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const passwordMismatch = confirmPassword.length > 0 && newPassword !== confirmPassword;
   const canSubmitPassword =
@@ -192,71 +163,147 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* Password — Google-only accounts (no passwordHash) never see this */}
-          {user.hasPassword && (
-            <div className="rounded-xl border border-slate-100 bg-surface-card p-6 shadow-surface">
-              <h2 className="mb-1 text-base font-semibold text-on-surface">Password</h2>
-              <p className="mb-4 text-sm text-slate-400">
-                Changing your password logs you out of every device — you&apos;ll need to log back in.
-              </p>
+           {/* Password & Security */}
+{user.hasPassword && (
+  <div className="rounded-xl border border-slate-100 bg-surface-card p-6 shadow-surface">
+    <div className="mb-6">
+      <h2 className="text-base font-semibold text-on-surface">
+        Password & Security
+      </h2>
 
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="currentPassword" className="mb-2 block text-sm font-semibold text-on-surface">
-                    Current password
-                  </label>
-                  <input
-                    id="currentPassword"
-                    type="password"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 p-2.5 text-sm text-on-surface focus:border-primary focus:outline-none"
-                  />
-                </div>
+      <p className="mt-1 text-sm text-slate-400">
+        Update your password to keep your account secure. You&apos;ll be
+        signed out of all devices after changing it.
+      </p>
+    </div>
 
-                <div>
-                  <label htmlFor="newPassword" className="mb-2 block text-sm font-semibold text-on-surface">
-                    New password
-                  </label>
-                  <input
-                    id="newPassword"
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 p-2.5 text-sm text-on-surface focus:border-primary focus:outline-none"
-                  />
-                </div>
+    <div className="max-w-xl space-y-5">
+      {/* Current Password */}
+      <div>
+        <label
+          htmlFor="currentPassword"
+          className="mb-2 block text-sm font-semibold text-on-surface"
+        >
+          Current password
+        </label>
 
-                <div>
-                  <label htmlFor="confirmPassword" className="mb-2 block text-sm font-semibold text-on-surface">
-                    Confirm new password
-                  </label>
-                  <input
-                    id="confirmPassword"
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 p-2.5 text-sm text-on-surface focus:border-primary focus:outline-none"
-                  />
-                  {passwordMismatch && (
-                    <p className="mt-1 text-xs text-error">Passwords don&apos;t match.</p>
-                  )}
-                </div>
+        <div className="relative">
+          <input
+            id="currentPassword"
+            type={showCurrentPassword ? "text" : "password"}
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            placeholder="Enter your current password"
+            className="w-full rounded-lg border border-slate-300 p-2.5 pr-16 text-sm text-on-surface focus:border-primary focus:outline-none"
+          />
 
-                {passwordError && <p className="text-sm text-error">{passwordError}</p>}
+          <button
+            type="button"
+            onClick={() =>
+              setShowCurrentPassword((prev) => !prev)
+            }
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-400 hover:text-on-surface"
+          >
+            {showCurrentPassword ? "Hide" : "Show"}
+          </button>
+        </div>
+      </div>
 
-                <button
-                  onClick={handlePasswordChange}
-                  disabled={!canSubmitPassword}
-                  className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {passwordSaving ? "Changing…" : "Change password"}
-                </button>
-              </div>
-            </div>
-          )}
+      {/* New Password */}
+      <div>
+        <label
+          htmlFor="newPassword"
+          className="mb-2 block text-sm font-semibold text-on-surface"
+        >
+          New password
+        </label>
+
+        <div className="relative">
+          <input
+            id="newPassword"
+            type={showNewPassword ? "text" : "password"}
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            placeholder="Enter your new password"
+            className="w-full rounded-lg border border-slate-300 p-2.5 pr-16 text-sm text-on-surface focus:border-primary focus:outline-none"
+          />
+
+          <button
+            type="button"
+            onClick={() =>
+              setShowNewPassword((prev) => !prev)
+            }
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-400 hover:text-on-surface"
+          >
+            {showNewPassword ? "Hide" : "Show"}
+          </button>
+        </div>
+
+        <p className="mt-1.5 text-xs text-slate-400">
+          Use at least 8 characters.
+        </p>
+      </div>
+
+      {/* Confirm Password */}
+      <div>
+        <label
+          htmlFor="confirmPassword"
+          className="mb-2 block text-sm font-semibold text-on-surface"
+        >
+          Confirm new password
+        </label>
+
+        <div className="relative">
+          <input
+            id="confirmPassword"
+            type={showConfirmPassword ? "text" : "password"}
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            placeholder="Re-enter your new password"
+            className="w-full rounded-lg border border-slate-300 p-2.5 pr-16 text-sm text-on-surface focus:border-primary focus:outline-none"
+          />
+
+          <button
+            type="button"
+            onClick={() =>
+              setShowConfirmPassword((prev) => !prev)
+            }
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-400 hover:text-on-surface"
+          >
+            {showConfirmPassword ? "Hide" : "Show"}
+          </button>
+        </div>
+
+        {passwordMismatch && (
+          <p className="mt-1.5 text-xs text-error">
+            Passwords don&apos;t match.
+          </p>
+        )}
+      </div>
+
+      {/* Error */}
+      {passwordError && (
+        <div className="rounded-lg bg-red-50 px-3 py-2.5 text-sm text-error">
+          {passwordError}
         </div>
       )}
+
+      {/* Submit */}
+      <div className="pt-1">
+        <button
+          type="button"
+          onClick={handlePasswordChange}
+          disabled={!canSubmitPassword}
+          className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {passwordSaving ? "Changing…" : "Change password"}
+        </button>
+      </div>
     </div>
-  );
+  </div>
+)}
+</div>
+)}
+</div>
+);
 }

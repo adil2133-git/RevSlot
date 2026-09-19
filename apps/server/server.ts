@@ -1,4 +1,7 @@
 import express from 'express';
+import { createServer } from "node:http";
+import { Server } from "socket.io";
+import helmet from "helmet"
 import cors from 'cors';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
@@ -6,7 +9,6 @@ import cookieParser from 'cookie-parser';
 import authRoutes from "./modules/auth/auth.routes.js";
 import advisorRoutes from "./modules/advisor/advisor.routes.js";
 import availabilityRoutes from "./modules/availability/availability.routes.js";
-
 import questionBankRoutes from "./modules/questionBank/questionBank.routes.js";
 import slotRoutes from "./modules/slot/slot.routes.js";
 import bookingRoutes from "./modules/booking/booking.routes.js"
@@ -17,13 +19,18 @@ import calendarRoutes from "./modules/calendar/calendar.routes.js";
 import dashboardRoutes from "./modules/dashboard/dashboard.routes.js";
 import feedbackFormRoutes, { bookingFeedbackRouter, internHistoryRouter, feedbackListRouter } from "./modules/feedback/feedback.routes.js";
 import notificationRoutes from "./modules/notification/notification.routes.js";
+import paymentRoutes from "./modules/payment/payment.routes.js"
+import meetingRoutes from "./modules/meeting/meeting.routes.js"
+import { registerMeetingSocket } from "./modules/meeting/meeting.socket.js"
+
 import { notFound, errorMiddleware } from './core/middlewares/error.middleware.js';
 import { pool } from "./config/db.js"
 
 dotenv.config();
 
 const app = express();
-
+const httpServer = createServer(app);
+app.use(helmet())
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:3000',
   credentials: true,
@@ -48,6 +55,8 @@ app.use("/api/vacation-blocks", vacationRoutes);
 app.use("/api/calendar", calendarRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/payments", paymentRoutes );
+app.use("/api/meetings", meetingRoutes)
 
 app.get('/', (req, res) => {
   res.send('Server is running');
@@ -63,6 +72,15 @@ app.get('/health', (req, res) => {
 app.use(notFound);
 app.use(errorMiddleware);
 
+const io = new Server(httpServer, {
+  cors: {
+    origin: process.env.CLIENT_URL || "http://localhost:3000",
+    credentials: true,
+  },
+});
+
+registerMeetingSocket(io);
+
 const PORT = process.env.PORT || 5000;
 
 const serverConnect = async () => {
@@ -73,8 +91,7 @@ const serverConnect = async () => {
     console.log("db connection failed", error)
     process.exit(1)
   }
-
-  app.listen(PORT, () => {
+  httpServer.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
   })
 };

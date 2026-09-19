@@ -2,12 +2,16 @@ import { Router } from "express";
 import { advisorController } from "./advisor.controller.js";
 import { requireAdvisor } from "../../core/middlewares/auth.middleware.js";
 import { catchAsync } from "../../core/utils/catchAsync.js";
+import {
+  otpSendLimiter,
+  otpVerifyLimiter,
+} from "../../core/middlewares/rateLimit.middleware.js";
 
 const router = Router();
 
 // OTP Auth Endpoints
-router.post("/auth/send-otp", catchAsync(advisorController.sendOtp));
-router.post("/auth/verify-otp", catchAsync(advisorController.verifyOtp));
+router.post("/auth/send-otp", otpSendLimiter, catchAsync(advisorController.sendOtp));
+router.post("/auth/verify-otp", otpVerifyLimiter, catchAsync(advisorController.verifyOtp));
 
 // Protected Advisor Bookings & Feedback Endpoints
 router.get("/bookings", requireAdvisor, catchAsync(advisorController.getAdvisorBookings));
