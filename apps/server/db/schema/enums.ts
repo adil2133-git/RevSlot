@@ -29,7 +29,19 @@ export const pendingQuestionStatus = pgEnum('pending_question_status', [
 ]);
 
 export const notificationType = pgEnum('notification_type', [
-  'booking_created', 'booking_cancelled', 'booking_rescheduled', 'booking_completed', 'feedback_submitted',
+  'booking_created',
+  'booking_cancelled',
+  'booking_rescheduled',
+  'booking_completed',
+  'feedback_submitted',
+  'session_reminder',
+  'dispute_filed',
+  'dispute_resolved',
+  'payout_processed',
+  'payout_rejected',
+  'admin_new_dispute',
+  'admin_new_payout',
+  'admin_new_reviewer',
 ]);
 
 export const paymentStatus = pgEnum('payment_status', [

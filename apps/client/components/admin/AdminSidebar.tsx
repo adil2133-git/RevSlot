@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAuthStore } from "@/features/auth/store/authStore";
 import { InstallPwaButton } from "@/components/common/InstallPwaButton";
+import NotificationBell from "@/features/notifications/components/NotificationBell";
 
 // Matches the Stitch "Dashboard Overview" design sidebar. Feedback
 // History, Audit Log, and Analytics are in the design but have no
@@ -83,7 +84,7 @@ export default function AdminSidebar() {
 
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-slate-100 bg-white">
-      <div className="flex h-16 flex-col justify-center px-6">
+      <div className="flex h-16 items-center justify-between px-6">
         <Link href="/admin/dashboard" className="flex items-center gap-2 text-lg font-bold tracking-tight text-[#003366]">
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#003366] text-xs font-bold text-white">
             R
@@ -93,6 +94,7 @@ export default function AdminSidebar() {
             <div className="text-[10px] font-semibold tracking-wider text-slate-400 uppercase">SUPER ADMIN</div>
           </div>
         </Link>
+        <NotificationBell role="admin" />
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">

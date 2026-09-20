@@ -1,6 +1,7 @@
 import { eq, and, sql, desc, inArray } from "drizzle-orm";
 import { db } from "../../config/db.js";
 import { reviewerWallets, walletTransactions, reviewerPayoutProfiles, payoutRequests } from "./wallet.schema.js";
+import { notificationService } from "../notification/notification.service.js";
 import { AppError } from "../../core/errors/AppError.js";
 
 export const walletService = {
@@ -138,7 +139,7 @@ export const walletService = {
       throw new AppError("Please add your payout details (Bank or UPI) before requesting a payout", 400);
     }
 
-    return await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => {
       const [wallet] = await tx
         .select()
         .from(reviewerWallets)
@@ -178,6 +179,23 @@ export const walletService = {
 
       return payout;
     });
+
+    // 1. Notify reviewer (live socket)
+    notificationService.createNotification({
+      reviewerId,
+      type: "payout_processed",
+      title: "Payout requested",
+      message: `Your withdrawal request for ₹${(amountPaise / 100).toFixed(2)} has been submitted for admin processing.`,
+    }).catch((err) => console.error("[Wallet] Reviewer payout notification error:", err));
+
+    // 2. Notify admins (live socket)
+    notificationService.createAdminNotification({
+      type: "admin_new_payout",
+      title: "New payout request",
+      message: `A reviewer requested a payout of ₹${(amountPaise / 100).toFixed(2)}.`,
+    }).catch((err) => console.error("[Wallet] Admin payout notification error:", err));
+
+    return result;
   },
 
   // Releases matured escrow funds to available balance 48 hours after session end
