@@ -56,4 +56,27 @@ export const adminController = {
     const admin = await adminService.updateProfile(req.user!.userId, input);
     res.status(200).json({ success: true, data: { admin } });
   },
+
+  listPayouts: async (req: Request, res: Response) => {
+    const { adminPayoutsService } = await import("./admin.payouts.service.js");
+    const status = req.query.status as any;
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 20;
+
+    const result = await adminPayoutsService.listPayoutRequests({ status, page, limit });
+    res.status(200).json({ success: true, data: result });
+  },
+
+  processPayout: async (req: Request, res: Response) => {
+    const { adminPayoutsService } = await import("./admin.payouts.service.js");
+    const payoutId = Number(req.params.id);
+    const { action, transactionReference, adminNotes } = req.body;
+
+    const updated = await adminPayoutsService.processPayout(
+      payoutId,
+      req.user!.userId,
+      { action, transactionReference, adminNotes }
+    );
+    res.status(200).json({ success: true, data: updated });
+  },
 };

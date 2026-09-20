@@ -1,15 +1,19 @@
 import { pgTable, serial, integer, varchar, text, boolean, timestamp, index } from 'drizzle-orm/pg-core';
 import { notificationType } from '../../db/schema/enums.js';
 import { reviewers } from '../auth/reviewers.schema.js';
+import { admins } from '../admin/admins.schema.js';
 import { bookings } from '../booking/bookings.schema.js';
+
 export const notifications = pgTable(
   'notifications',
   {
     id: serial('id').primaryKey(),
 
     reviewerId: integer('reviewer_id')
-      .notNull()
       .references(() => reviewers.id, { onDelete: 'cascade' }),
+
+    adminId: integer('admin_id')
+      .references(() => admins.id, { onDelete: 'cascade' }),
 
     type: notificationType('type').notNull(),
     title: varchar('title', { length: 150 }).notNull(),
@@ -25,5 +29,7 @@ export const notifications = pgTable(
   (table) => [
     index('idx_notifications_reviewer_created').on(table.reviewerId, table.createdAt),
     index('idx_notifications_reviewer_unread').on(table.reviewerId, table.isRead),
+    index('idx_notifications_admin_created').on(table.adminId, table.createdAt),
+    index('idx_notifications_admin_unread').on(table.adminId, table.isRead),
   ]
 );

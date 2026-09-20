@@ -156,6 +156,7 @@ export default function PublicBookingPage() {
                   submitting={submitting}
                   submitError={submitError}
                   secondsLeft={secondsLeft}
+                  price={pageInfo.eventType.price}
                   onSubmit={onSubmit}
                   onBack={() => setShowDetailsForm(false)}
                 />

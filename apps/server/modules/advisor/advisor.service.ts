@@ -15,7 +15,13 @@ import { advisorOtpTemplate } from "../../emails/templates/advisorOtp.js";
 import { bookingCancelledTemplate } from "../../emails/templates/bookingCancelled.js";
 import { generateAdvisorToken } from "../../core/utils/jwt.js";
 import { meetingService } from "../meeting/meeting.service.js";
+import { refundService } from "../payment/refund.service.js";
+import { bookingService } from "../booking/booking.service.js";
+import { walletTransactions } from "../wallet/wallet.schema.js";
+import { payments } from "../payment/payments.schema.js";
+import { notificationService } from "../notification/notification.service.js";
 import { AppError } from "../../core/errors/AppError.js";
+
 
 export const advisorService = {
   sendOtp: async (email: string) => {
@@ -112,8 +118,15 @@ export const advisorService = {
         rescheduleReason: bookings.rescheduleReason,
         rescheduleToken: bookings.rescheduleToken,
         rescheduleRequestedBy: bookings.rescheduleRequestedBy,
+        rescheduleCount: bookings.rescheduleCount,
         eventTypeName: eventTypes.name,
         bookingWindowDays: eventTypes.bookingWindowDays,
+        price: eventTypes.price,
+        paymentStatus: payments.status,
+        paymentAmount: payments.amount,
+        refundAmount: payments.refundAmount,
+        cancellationFee: payments.cancellationFee,
+        razorpayPaymentId: payments.razorpayPaymentId,
         reviewerName: reviewers.name,
         timezone: sql<string>`'IST'`,
         hasFeedback: sql<boolean>`${feedback.id} is not null`,
@@ -121,6 +134,7 @@ export const advisorService = {
       .from(bookings)
       .innerJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
       .innerJoin(reviewers, eq(bookings.reviewerId, reviewers.id))
+      .leftJoin(payments, eq(payments.bookingId, bookings.id))
       .leftJoin(feedback, eq(feedback.bookingId, bookings.id))
       .where(and(...scopeConditions))
       .orderBy(orderBy);
@@ -314,6 +328,27 @@ export const advisorService = {
       });
     }
 
+    // Process automated refund based on 8h/3h policy tiers
+    const refundResult = await refundService.processBookingRefund({
+      bookingId,
+      initiatedBy: "advisor",
+      reason: reasonText,
+    }).catch((err) => {
+      console.error(`[AdvisorBooking] Automated refund failed on advisor cancel for booking ${bookingId}:`, err);
+      return null;
+    });
+
+    let refundStatusText: string | null = null;
+    if (refundResult) {
+      if (refundResult.refundAmount > 0 && refundResult.cancellationFee > 0) {
+        refundStatusText = `Partial refund of ₹${(refundResult.refundAmount / 100).toFixed(2)} initiated via Razorpay (₹${(refundResult.cancellationFee / 100).toFixed(2)} cancellation fee retained). Credited within 5–7 business days.`;
+      } else if (refundResult.refundAmount > 0) {
+        refundStatusText = `Full 100% refund of ₹${(refundResult.refundAmount / 100).toFixed(2)} initiated via Razorpay. Credited within 5–7 business days.`;
+      } else if (refundResult.cancellationFee > 0) {
+        refundStatusText = `Non-refundable cancellation (session was previously rescheduled). Fee transferred to reviewer as compensation.`;
+      }
+    }
+
     if (eventType && reviewer) {
       const formattedDate = dayjs(booking.startTime).format("ddd, MMM D");
       const formattedTime = `${dayjs(booking.startTime).format("h:mm A")} – ${dayjs(booking.endTime).format("h:mm A")}`;
@@ -339,12 +374,21 @@ export const advisorService = {
             formattedDate,
             formattedTime,
             reason: reasonText,
+            refundStatusText,
           });
           return emailService.sendEmail({ to: email, subject, html }).catch((err) => {
             console.error(`[AdvisorBooking] Failed to send cancellation email to ${email}:`, err);
           });
         })
       );
+
+      await notificationService.createNotification({
+        reviewerId: booking.reviewerId,
+        type: "booking_cancelled",
+        title: "Booking cancelled by advisor",
+        message: `${booking.advisorName} cancelled their session for ${dayjs(booking.startTime).format("ddd, MMM D")}`,
+        bookingId: booking.id,
+      });
     }
 
     return updated;
@@ -369,6 +413,10 @@ export const advisorService = {
 
     if (booking.status !== "confirmed" && booking.status !== "rescheduled") {
       throw new AppError("Only confirmed or rescheduled bookings can be rescheduled", 400);
+    }
+
+    if (booking.rescheduleCount >= 1) {
+      throw new AppError("This booking has already been rescheduled once and cannot be rescheduled again", 400);
     }
 
     const hoursUntilStart = dayjs(booking.startTime).diff(dayjs(), "hour", true);
@@ -409,6 +457,7 @@ export const advisorService = {
           startTime: newStartTime,
           endTime: newEndTime,
           status: "rescheduled",
+          rescheduleCount: booking.rescheduleCount + 1,
           meetLink: null,
           googleEventId: null,
         })
@@ -424,6 +473,12 @@ export const advisorService = {
         .set({ status: "booked", holdToken: null, holdExpiresAt: null, updatedAt: new Date() })
         .where(eq(slots.id, hold.slotId));
 
+      // Update escrow maturity time to 48 hours after new end time
+      await tx
+        .update(walletTransactions)
+        .set({ availableAt: dayjs(newEndTime).add(48, "hour").toDate() })
+        .where(and(eq(walletTransactions.bookingId, bookingId), eq(walletTransactions.type, "credit_escrow")));
+
       return updated;
     });
 
@@ -432,6 +487,31 @@ export const advisorService = {
         console.error(`[AdvisorBooking] Failed to cancel old Calendar event for booking ${bookingId}:`, err);
       });
     }
+
+    // Finalize reschedule: regenerate Google Meet / internal link and send confirmation emails
+    await bookingService.finalizeReschedule(
+      { startTime: booking.startTime, endTime: booking.endTime },
+      {
+        id: updatedBooking.id,
+        eventTypeId: updatedBooking.eventTypeId,
+        reviewerId: updatedBooking.reviewerId,
+        internName: updatedBooking.internName,
+        advisorName: updatedBooking.advisorName,
+        advisorEmail: updatedBooking.advisorEmail,
+        internEmails: updatedBooking.internEmails,
+        weekStage: updatedBooking.weekStage,
+        startTime: updatedBooking.startTime,
+        endTime: updatedBooking.endTime,
+      }
+    );
+
+    await notificationService.createNotification({
+      reviewerId: updatedBooking.reviewerId,
+      type: "booking_rescheduled",
+      title: "Booking rescheduled by advisor",
+      message: `${updatedBooking.advisorName} rescheduled their session to ${dayjs(updatedBooking.startTime).format("ddd, MMM D, h:mm A")}`,
+      bookingId: updatedBooking.id,
+    });
 
     return updatedBooking;
   },

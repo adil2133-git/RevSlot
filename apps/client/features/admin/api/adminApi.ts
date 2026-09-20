@@ -98,3 +98,41 @@ export async function listAuditLog(params: ListAuditLogParams = {}) {
   );
   return data.data;
 }
+
+export async function listPayouts(params: { status?: string; page?: number; limit?: number } = {}) {
+  const { data } = await api.get<{ success: boolean; data: import("../types").ListPayoutsResponse }>(
+    "/admin/payouts",
+    { params }
+  );
+  return data.data;
+}
+
+export async function processPayout(
+  payoutId: number,
+  payload: { action: "approve" | "reject"; transactionReference?: string; adminNotes?: string }
+) {
+  const { data } = await api.patch<{ success: boolean; data: any }>(
+    `/admin/payouts/${payoutId}/process`,
+    payload
+  );
+  return data.data;
+}
+
+export async function listDisputes(params: { status?: string; page?: number; limit?: number } = {}) {
+  const { data } = await api.get<{ status: string; data: import("../types").ListDisputesResponse }>(
+    "/disputes/admin",
+    { params }
+  );
+  return data.data;
+}
+
+export async function resolveDispute(
+  disputeId: number,
+  payload: { action: "refund_client" | "dismiss"; adminNotes?: string }
+) {
+  const { data } = await api.patch<{ status: string; data: any }>(
+    `/disputes/admin/${disputeId}/resolve`,
+    payload
+  );
+  return data.data;
+}

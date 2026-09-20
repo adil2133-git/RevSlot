@@ -196,3 +196,71 @@ export type ListFeedbackResponse = {
   feedback: AdminFeedbackHistoryItem[];
   pagination: Pagination;
 };
+
+export type AdminPayoutItem = {
+  id: number;
+  reviewerId: number;
+  amount: number; // in paise
+  status: "requested" | "completed" | "rejected";
+  transactionReference: string | null;
+  notes: string | null;
+  adminNotes: string | null;
+  requestedAt: string;
+  processedAt: string | null;
+  processedBy: number | null;
+  reviewerName: string;
+  reviewerEmail: string;
+  reviewerAvatar: string | null;
+  payoutMethod: "bank_account" | "upi" | null;
+  accountHolderName: string | null;
+  accountNumber: string | null;
+  ifscCode: string | null;
+  upiId: string | null;
+};
+
+export type AdminPayoutStats = {
+  pendingCount: number;
+  pendingAmount: number; // in paise
+  completedAmount: number; // in paise
+};
+
+export type ListPayoutsResponse = {
+  items: AdminPayoutItem[];
+  total: number;
+  page: number;
+  limit: number;
+  stats: AdminPayoutStats;
+};
+
+export type AdminDisputeItem = {
+  id: number;
+  bookingId: number;
+  advisorEmail: string;
+  reason: "reviewer_no_show" | "technical_issue" | "inadequate_review" | "other";
+  description: string;
+  status: "under_review" | "resolved_refunded" | "resolved_dismissed";
+  meetingJoinedByReviewer: boolean;
+  meetingJoinedByClient: boolean;
+  adminNotes: string | null;
+  resolvedAt: string | null;
+  resolvedBy: number | null;
+  createdAt: string;
+  internName: string;
+  advisorName: string;
+  startTime: string;
+  endTime: string;
+  reviewerId: number;
+  reviewerName: string;
+  reviewerEmail: string;
+  eventTypeName: string;
+  paymentAmount: number | null;
+  paymentStatus: string | null;
+  razorpayPaymentId: string | null;
+};
+
+export type ListDisputesResponse = {
+  items: AdminDisputeItem[];
+  total: number;
+  page: number;
+  limit: number;
+};
