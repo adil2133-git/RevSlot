@@ -1,5 +1,10 @@
-CREATE TYPE "public"."understanding_level" AS ENUM('excellent', 'good', 'average', 'needs_improvement');--> statement-breakpoint
-CREATE TABLE "feedback_form_questions" (
+DO $$ BEGIN
+    CREATE TYPE "public"."understanding_level" AS ENUM('excellent', 'good', 'average', 'needs_improvement');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS "feedback_form_questions" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"form_id" integer NOT NULL,
 	"question_id" integer NOT NULL,
