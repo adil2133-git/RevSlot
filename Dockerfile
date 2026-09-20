@@ -12,7 +12,7 @@ RUN pnpm install --frozen-lockfile
 
 COPY apps/server ./apps/server
 
-RUN NODE_OPTIONS="--max-old-space-size=1536" pnpm --filter server build
+RUN NODE_OPTIONS="--max-old-space-size=2560" pnpm --filter server build
 
 EXPOSE 5000
 
