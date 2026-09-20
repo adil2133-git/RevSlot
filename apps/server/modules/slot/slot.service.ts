@@ -113,6 +113,8 @@ function timeRangesOverlap(aStart: string, aEnd: string, bStart: string, bEnd: s
   return aStart < bEnd && bStart < aEnd;
 };
 
+export const MINIMUM_BOOKING_NOTICE_HOURS = 3;
+
 // Walks dateFrom..dateTo and, for each day, resolves which time blocks
 // apply (override wins over the weekly template; "unavailable" override
 // means zero blocks that day), then splits each block into duration+buffer
@@ -120,7 +122,11 @@ function timeRangesOverlap(aStart: string, aEnd: string, bStart: string, bEnd: s
 function computeCandidates(
   dateFrom: string,
   dateTo: string,
-  eventType: { durationMinutes: number; bufferBeforeMinutes: number; bufferAfterMinutes: number },
+  eventType: {
+    durationMinutes: number;
+    bufferBeforeMinutes: number;
+    bufferAfterMinutes: number;
+  },
   timeBlocks: { dayOfWeek: number; startTime: string; endTime: string }[],
   overridesByDate: Map<string, { isUnavailable: boolean; blocks: TimeBlockLike[] }>,
   vacations: { startDate: string; endDate: string }[]
@@ -129,7 +135,7 @@ function computeCandidates(
   let current = dayjs(dateFrom);
   const end = dayjs(dateTo);
   const now = dayjs();
-  const todayStr = now.format("YYYY-MM-DD");     
+  const minBookingNoticeCutoff = now.add(MINIMUM_BOOKING_NOTICE_HOURS, "hour");
 
   while (current.isSame(end) || current.isBefore(end)) {
     const dateStr = current.format("YYYY-MM-DD");
@@ -156,11 +162,9 @@ function computeCandidates(
         );
 
         for (const slot of generated) {
-            if (dateStr === todayStr) {
-            const slotStart = dayjs(`${dateStr}T${slot.start}`);
-            if (!slotStart.isAfter(now)) {
-              continue;
-            }
+          const slotStart = dayjs(`${dateStr}T${slot.start}`);
+          if (slotStart.isBefore(minBookingNoticeCutoff)) {
+            continue;
           }
           candidates.push({ slotDate: dateStr, startTime: slot.start, endTime: slot.end });
         }
@@ -238,6 +242,11 @@ export const slotService = {
 
     if (data.date > effectiveDateTo) {
       throw new AppError("This slot is not part of the reviewer's current availability", 400);
+    }
+
+    const slotStartTime = dayjs(`${data.date}T${data.startTime}`);
+    if (slotStartTime.isBefore(dayjs().add(MINIMUM_BOOKING_NOTICE_HOURS, "hour"))) {
+      throw new AppError(`Bookings must be scheduled at least ${MINIMUM_BOOKING_NOTICE_HOURS} hours in advance`, 400);
     }
  
     const candidates = computeCandidates(data.date, data.date, eventType, timeBlocks, overridesByDate, vacations);
