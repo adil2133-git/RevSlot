@@ -72,7 +72,7 @@ CREATE TABLE "wallet_transactions" (
 );
 --> statement-breakpoint
 ALTER TABLE "reviewers" ALTER COLUMN "whatsapp_number" DROP NOT NULL;--> statement-breakpoint
-ALTER TABLE "bookings" ADD COLUMN "reschedule_count" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "reschedule_count" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
 ALTER TABLE "payments" ADD CONSTRAINT "payments_booking_id_bookings_id_fk" FOREIGN KEY ("booking_id") REFERENCES "public"."bookings"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "payments" ADD CONSTRAINT "payments_reviewer_id_reviewers_id_fk" FOREIGN KEY ("reviewer_id") REFERENCES "public"."reviewers"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "payout_requests" ADD CONSTRAINT "payout_requests_reviewer_id_reviewers_id_fk" FOREIGN KEY ("reviewer_id") REFERENCES "public"."reviewers"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
