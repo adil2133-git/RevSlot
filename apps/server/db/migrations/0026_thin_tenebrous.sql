@@ -7,12 +7,15 @@ CREATE TABLE "feedback_form_questions" (
 	CONSTRAINT "unique_form_question" UNIQUE("form_id","question_id")
 );
 --> statement-breakpoint
-ALTER TABLE "feedback_form_fields" DROP CONSTRAINT "feedback_form_fields_form_id_feedback_forms_id_fk";
+ALTER TABLE "feedback_form_fields" DROP CONSTRAINT IF EXISTS "feedback_form_fields_form_id_feedback_forms_id_fk";
 --> statement-breakpoint
-ALTER TABLE "feedback" ADD COLUMN "understanding_level" "understanding_level";--> statement-breakpoint
-ALTER TABLE "feedback_forms" ADD COLUMN "task_mark_enabled" boolean DEFAULT false NOT NULL;--> statement-breakpoint
-ALTER TABLE "feedback_forms" ADD COLUMN "is_active" boolean DEFAULT true NOT NULL;--> statement-breakpoint
+ALTER TABLE "feedback" ADD COLUMN IF NOT EXISTS "understanding_level" "understanding_level";--> statement-breakpoint
+ALTER TABLE "feedback_forms" ADD COLUMN IF NOT EXISTS "task_mark_enabled" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "feedback_forms" ADD COLUMN IF NOT EXISTS "is_active" boolean DEFAULT true NOT NULL;--> statement-breakpoint
+ALTER TABLE "feedback_form_questions" DROP CONSTRAINT IF EXISTS "feedback_form_questions_form_id_feedback_forms_id_fk";--> statement-breakpoint
 ALTER TABLE "feedback_form_questions" ADD CONSTRAINT "feedback_form_questions_form_id_feedback_forms_id_fk" FOREIGN KEY ("form_id") REFERENCES "public"."feedback_forms"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "feedback_form_questions" DROP CONSTRAINT IF EXISTS "feedback_form_questions_question_id_questions_id_fk";--> statement-breakpoint
 ALTER TABLE "feedback_form_questions" ADD CONSTRAINT "feedback_form_questions_question_id_questions_id_fk" FOREIGN KEY ("question_id") REFERENCES "public"."questions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX "idx_feedback_form_questions_form" ON "feedback_form_questions" USING btree ("form_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_feedback_form_questions_form" ON "feedback_form_questions" USING btree ("form_id");--> statement-breakpoint
+ALTER TABLE "feedback_form_fields" DROP CONSTRAINT IF EXISTS "feedback_form_fields_form_id_feedback_forms_id_fk";--> statement-breakpoint
 ALTER TABLE "feedback_form_fields" ADD CONSTRAINT "feedback_form_fields_form_id_feedback_forms_id_fk" FOREIGN KEY ("form_id") REFERENCES "public"."feedback_forms"("id") ON DELETE cascade ON UPDATE no action;
