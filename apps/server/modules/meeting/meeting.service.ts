@@ -127,6 +127,12 @@ export const meetingService = {
       throw new AppError("This meeting is not active", 409);
     }
 
+    const JOIN_WINDOW_MS = 15 * 60 * 1000;
+    const earliestJoinTime = new Date(booking.startTime).getTime() - JOIN_WINDOW_MS;
+    if (Date.now() < earliestJoinTime) {
+      throw new AppError("The meeting room opens 15 minutes before the scheduled start time", 403);
+    }
+
     if (Date.now() >= new Date(booking.endTime).getTime()) {
       throw new AppError("The meeting has ended", 403);
     }

@@ -26,10 +26,17 @@ export default function BookingDetailsModal({ bookingId, onClose }: BookingDetai
       .finally(() => setLoading(false));
   }, [bookingId]);
 
- const canJoinMeet =
-  !!detail?.meetLink &&
-  (detail.status === "confirmed" || detail.status === "rescheduled") &&
-  dayjs().isBefore(dayjs(detail.endTime));
+  const now = dayjs();
+  const isActive = !!detail && (detail.status === "confirmed" || detail.status === "rescheduled");
+  const canJoinMeet =
+    isActive &&
+    !!detail?.meetLink &&
+    now.isAfter(dayjs(detail.startTime).subtract(15, "minute")) &&
+    now.isBefore(dayjs(detail.endTime));
+  const isBeforeJoinWindow =
+    isActive &&
+    !!detail?.meetLink &&
+    now.isBefore(dayjs(detail.startTime).subtract(15, "minute"));
 
   return (
     <Modal onClose={onClose} widthClassName="max-w-lg max-h-[90vh]">
@@ -114,15 +121,21 @@ export default function BookingDetailsModal({ bookingId, onClose }: BookingDetai
             )}
 
           {canJoinMeet && (
-              <a
-                href={detail.meetLink!}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 font-semibold text-on-primary transition hover:opacity-90"
-               >
+            <a
+              href={detail.meetLink!}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 font-semibold text-on-primary transition hover:opacity-90"
+            >
               Join Meet
-            <ExternalLinkIcon />
+              <ExternalLinkIcon />
             </a>
+          )}
+
+          {isBeforeJoinWindow && (
+            <div className="flex items-center justify-center gap-2 rounded-lg bg-slate-100 px-5 py-2.5 text-xs font-semibold text-slate-500">
+              <span>Meeting link activates 15 minutes before start</span>
+            </div>
           )}
 
             {detail.status === "cancelled" && detail.cancelledReason && (

@@ -57,7 +57,7 @@ export const NextReviewCard: React.FC<NextReviewCardProps> = ({
 
   const canJoinMeet =
     !!nextReview.meetLink &&
-    now >= startTime.subtract(10, "minute").valueOf() &&
+    now >= startTime.subtract(15, "minute").valueOf() &&
     now < endTime.valueOf();
 
   return (

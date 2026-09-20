@@ -118,7 +118,7 @@ export const TodaysSchedule: React.FC<TodaysScheduleProps> = ({
             const canMarkNoShow = isActive && now >= graceEnd;
             const isJoinAvailable =
                  isActive &&
-                 now >= startTs - 10 * 60 * 1000 &&
+                 now >= startTs - 15 * 60 * 1000 &&
                  now < endTs &&
                  !!item.meetLink;
 
