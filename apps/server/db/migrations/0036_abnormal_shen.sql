@@ -1,9 +1,9 @@
-CREATE TYPE "public"."payment_status" AS ENUM('created', 'captured', 'failed', 'refunded', 'partially_refunded');--> statement-breakpoint
-CREATE TYPE "public"."payout_method" AS ENUM('bank_account', 'upi');--> statement-breakpoint
-CREATE TYPE "public"."payout_request_status" AS ENUM('requested', 'processing', 'completed', 'rejected');--> statement-breakpoint
-CREATE TYPE "public"."wallet_tx_status" AS ENUM('pending', 'completed', 'failed');--> statement-breakpoint
-CREATE TYPE "public"."wallet_tx_type" AS ENUM('credit_escrow', 'escrow_cleared', 'escrow_cancelled', 'withdrawal', 'cancellation_compensation');--> statement-breakpoint
-CREATE TABLE "payments" (
+DO $$ BEGIN CREATE TYPE "public"."payment_status" AS ENUM('created', 'captured', 'failed', 'refunded', 'partially_refunded'); EXCEPTION WHEN duplicate_object THEN null; END $$;--> statement-breakpoint
+DO $$ BEGIN CREATE TYPE "public"."payout_method" AS ENUM('bank_account', 'upi'); EXCEPTION WHEN duplicate_object THEN null; END $$;--> statement-breakpoint
+DO $$ BEGIN CREATE TYPE "public"."payout_request_status" AS ENUM('requested', 'processing', 'completed', 'rejected'); EXCEPTION WHEN duplicate_object THEN null; END $$;--> statement-breakpoint
+DO $$ BEGIN CREATE TYPE "public"."wallet_tx_status" AS ENUM('pending', 'completed', 'failed'); EXCEPTION WHEN duplicate_object THEN null; END $$;--> statement-breakpoint
+DO $$ BEGIN CREATE TYPE "public"."wallet_tx_type" AS ENUM('credit_escrow', 'escrow_cleared', 'escrow_cancelled', 'withdrawal', 'cancellation_compensation'); EXCEPTION WHEN duplicate_object THEN null; END $$;--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS "payments" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"booking_id" integer,
 	"hold_token" varchar(100) NOT NULL,
@@ -24,7 +24,7 @@ CREATE TABLE "payments" (
 	CONSTRAINT "payments_razorpay_payment_id_unique" UNIQUE("razorpay_payment_id")
 );
 --> statement-breakpoint
-CREATE TABLE "payout_requests" (
+CREATE TABLE IF NOT EXISTS "payout_requests" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"reviewer_id" integer NOT NULL,
 	"amount" integer NOT NULL,
@@ -35,7 +35,7 @@ CREATE TABLE "payout_requests" (
 	"processed_at" timestamp with time zone
 );
 --> statement-breakpoint
-CREATE TABLE "reviewer_payout_profiles" (
+CREATE TABLE IF NOT EXISTS "reviewer_payout_profiles" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"reviewer_id" integer NOT NULL,
 	"payout_method" "payout_method" DEFAULT 'bank_account' NOT NULL,
@@ -49,7 +49,7 @@ CREATE TABLE "reviewer_payout_profiles" (
 	CONSTRAINT "reviewer_payout_profiles_reviewer_id_unique" UNIQUE("reviewer_id")
 );
 --> statement-breakpoint
-CREATE TABLE "reviewer_wallets" (
+CREATE TABLE IF NOT EXISTS "reviewer_wallets" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"reviewer_id" integer NOT NULL,
 	"pending_balance" integer DEFAULT 0 NOT NULL,
@@ -59,7 +59,7 @@ CREATE TABLE "reviewer_wallets" (
 	CONSTRAINT "reviewer_wallets_reviewer_id_unique" UNIQUE("reviewer_id")
 );
 --> statement-breakpoint
-CREATE TABLE "wallet_transactions" (
+CREATE TABLE IF NOT EXISTS "wallet_transactions" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"reviewer_id" integer NOT NULL,
 	"booking_id" integer,
@@ -73,10 +73,17 @@ CREATE TABLE "wallet_transactions" (
 --> statement-breakpoint
 ALTER TABLE "reviewers" ALTER COLUMN "whatsapp_number" DROP NOT NULL;--> statement-breakpoint
 ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "reschedule_count" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "payments" DROP CONSTRAINT IF EXISTS "payments_booking_id_bookings_id_fk";--> statement-breakpoint
 ALTER TABLE "payments" ADD CONSTRAINT "payments_booking_id_bookings_id_fk" FOREIGN KEY ("booking_id") REFERENCES "public"."bookings"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "payments" DROP CONSTRAINT IF EXISTS "payments_reviewer_id_reviewers_id_fk";--> statement-breakpoint
 ALTER TABLE "payments" ADD CONSTRAINT "payments_reviewer_id_reviewers_id_fk" FOREIGN KEY ("reviewer_id") REFERENCES "public"."reviewers"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "payout_requests" DROP CONSTRAINT IF EXISTS "payout_requests_reviewer_id_reviewers_id_fk";--> statement-breakpoint
 ALTER TABLE "payout_requests" ADD CONSTRAINT "payout_requests_reviewer_id_reviewers_id_fk" FOREIGN KEY ("reviewer_id") REFERENCES "public"."reviewers"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "reviewer_payout_profiles" DROP CONSTRAINT IF EXISTS "reviewer_payout_profiles_reviewer_id_reviewers_id_fk";--> statement-breakpoint
 ALTER TABLE "reviewer_payout_profiles" ADD CONSTRAINT "reviewer_payout_profiles_reviewer_id_reviewers_id_fk" FOREIGN KEY ("reviewer_id") REFERENCES "public"."reviewers"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "reviewer_wallets" DROP CONSTRAINT IF EXISTS "reviewer_wallets_reviewer_id_reviewers_id_fk";--> statement-breakpoint
 ALTER TABLE "reviewer_wallets" ADD CONSTRAINT "reviewer_wallets_reviewer_id_reviewers_id_fk" FOREIGN KEY ("reviewer_id") REFERENCES "public"."reviewers"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "wallet_transactions" DROP CONSTRAINT IF EXISTS "wallet_transactions_reviewer_id_reviewers_id_fk";--> statement-breakpoint
 ALTER TABLE "wallet_transactions" ADD CONSTRAINT "wallet_transactions_reviewer_id_reviewers_id_fk" FOREIGN KEY ("reviewer_id") REFERENCES "public"."reviewers"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "wallet_transactions" DROP CONSTRAINT IF EXISTS "wallet_transactions_booking_id_bookings_id_fk";--> statement-breakpoint
 ALTER TABLE "wallet_transactions" ADD CONSTRAINT "wallet_transactions_booking_id_bookings_id_fk" FOREIGN KEY ("booking_id") REFERENCES "public"."bookings"("id") ON DELETE set null ON UPDATE no action;
