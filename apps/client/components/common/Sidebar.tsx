@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAuthStore } from "@/features/auth/store/authStore";
 import NotificationBell from "@/features/notifications/components/NotificationBell";
+import { InstallPwaButton } from "@/components/common/InstallPwaButton";
 
 const NAV_ITEMS = [
   {
@@ -83,6 +84,17 @@ const NAV_ITEMS = [
   },
 
     {
+    href: "/dashboard/wallet",
+    label: "Earnings & Wallet",
+    icon: (
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" />
+        <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" />
+        <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" />
+      </svg>
+    ),
+  },
+  {
     href: "/dashboard/settings",
     label: "Settings",
     icon: (
@@ -146,6 +158,11 @@ export default function Sidebar() {
           );
         })}
       </nav>
+
+      {/* PWA Install Button (renders only if browser supports install & not yet installed) */}
+      <div className="px-3 pb-1">
+        <InstallPwaButton className="flex w-full items-center justify-center gap-2 rounded-lg bg-secondary/80 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-secondary cursor-pointer" />
+      </div>
 
       {/* Account section — anchored to bottom, cal.com style */}
       <div className="relative border-t border-slate-100 p-3">

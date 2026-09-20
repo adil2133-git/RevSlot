@@ -49,6 +49,7 @@ export const bookings = pgTable('bookings', {
   rescheduleReason: text('reschedule_reason'),
   rescheduleToken: varchar('reschedule_token', { length: 255 }),
   rescheduleTokenExpiresAt: timestamp('reschedule_token_expires_at', { withTimezone: true }),
+  rescheduleCount: integer('reschedule_count').notNull().default(0),
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });

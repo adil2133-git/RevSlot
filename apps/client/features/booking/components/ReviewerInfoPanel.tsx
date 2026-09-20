@@ -63,11 +63,22 @@ export default function ReviewerInfoPanel({
 
       {/* Session */}
       <div className="mt-6 rounded-xl bg-slate-50 p-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-          Session
-        </p>
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+            Session
+          </p>
+          <span
+            className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold ${
+              pageInfo.eventType.price > 0
+                ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
+                : "border border-blue-200 bg-blue-50 text-blue-700"
+            }`}
+          >
+            {pageInfo.eventType.price > 0 ? `₹${pageInfo.eventType.price}` : "Free"}
+          </span>
+        </div>
 
-        <h1 className="mt-1 text-lg font-semibold leading-snug text-on-surface">
+        <h1 className="mt-2 text-lg font-semibold leading-snug text-on-surface">
           {pageInfo.eventType.name}
         </h1>
 
@@ -247,6 +258,30 @@ export default function ReviewerInfoPanel({
           </svg>
 
           {pageInfo.eventType.timezone}
+        </div>
+
+        <div className="flex items-center gap-2.5 text-sm text-slate-700 font-medium">
+          <svg
+            className="h-4 w-4 shrink-0 text-emerald-600"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={1.5}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6H2.25m0 0v12m0-12h18m-18 0a3 3 0 00-3 3v9a3 3 0 003 3m18-12a3 3 0 013 3v9a3 3 0 01-3 3m-18 0h18"
+            />
+          </svg>
+
+          {pageInfo.eventType.price > 0 ? (
+            <span>
+              Price: <strong className="text-slate-900">₹{pageInfo.eventType.price}</strong>
+            </span>
+          ) : (
+            <span className="text-emerald-700">Free session</span>
+          )}
         </div>
       </div>
     </aside>

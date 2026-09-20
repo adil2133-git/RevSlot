@@ -19,24 +19,32 @@ import calendarRoutes from "./modules/calendar/calendar.routes.js";
 import dashboardRoutes from "./modules/dashboard/dashboard.routes.js";
 import feedbackFormRoutes, { bookingFeedbackRouter, internHistoryRouter, feedbackListRouter } from "./modules/feedback/feedback.routes.js";
 import notificationRoutes from "./modules/notification/notification.routes.js";
-import paymentRoutes from "./modules/payment/payment.routes.js"
-import meetingRoutes from "./modules/meeting/meeting.routes.js"
-import { registerMeetingSocket } from "./modules/meeting/meeting.socket.js"
+import paymentRoutes from "./modules/payment/payment.routes.js";
+import walletRoutes from "./modules/wallet/wallet.routes.js";
+import { walletService } from "./modules/wallet/wallet.service.js";
+import meetingRoutes from "./modules/meeting/meeting.routes.js";
+import { registerMeetingSocket } from "./modules/meeting/meeting.socket.js";
+import disputeRoutes from "./modules/dispute/dispute.routes.js";
 
 import { notFound, errorMiddleware } from './core/middlewares/error.middleware.js';
-import { pool } from "./config/db.js"
+import { pool } from "./config/db.js";
 
 dotenv.config();
 
 const app = express();
 const httpServer = createServer(app);
-app.use(helmet())
+app.use(helmet());
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:3000',
   credentials: true,
 }));
 
-app.use(express.json({ limit: '10kb' }));
+app.use(express.json({
+  limit: '50kb',
+  verify: (req: any, _res, buf) => {
+    req.rawBody = buf;
+  },
+}));
 app.use(cookieParser());
 
 app.use("/api/auth", authRoutes);
@@ -56,7 +64,9 @@ app.use("/api/calendar", calendarRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/payments", paymentRoutes );
-app.use("/api/meetings", meetingRoutes)
+app.use("/api/wallet", walletRoutes);
+app.use("/api/meetings", meetingRoutes);
+app.use("/api/disputes", disputeRoutes);
 
 app.get('/', (req, res) => {
   res.send('Server is running');
@@ -93,7 +103,17 @@ const serverConnect = async () => {
   }
   httpServer.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
-  })
+
+    // Initial check and periodic background escrow release (every 30 mins)
+    walletService.matureEscrowTransactions().catch((err) => {
+      console.error("[EscrowJob] Initial run error:", err);
+    });
+    setInterval(() => {
+      walletService.matureEscrowTransactions().catch((err) => {
+        console.error("[EscrowJob] Periodic run error:", err);
+      });
+    }, 30 * 60 * 1000);
+  });
 };
 
 serverConnect();
