@@ -16,7 +16,7 @@ CREATE TABLE "booking_disputes" (
 	"created_at" timestamp with time zone DEFAULT now()
 );
 --> statement-breakpoint
-ALTER TABLE "payout_requests" ADD COLUMN "admin_notes" text;--> statement-breakpoint
-ALTER TABLE "payout_requests" ADD COLUMN "processed_by" integer;--> statement-breakpoint
+ALTER TABLE "payout_requests" ADD COLUMN IF NOT EXISTS "admin_notes" text;--> statement-breakpoint
+ALTER TABLE "payout_requests" ADD COLUMN IF NOT EXISTS "processed_by" integer;--> statement-breakpoint
 ALTER TABLE "booking_disputes" ADD CONSTRAINT "booking_disputes_booking_id_bookings_id_fk" FOREIGN KEY ("booking_id") REFERENCES "public"."bookings"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "booking_disputes" ADD CONSTRAINT "booking_disputes_resolved_by_admins_id_fk" FOREIGN KEY ("resolved_by") REFERENCES "public"."admins"("id") ON DELETE set null ON UPDATE no action;
