@@ -85,7 +85,8 @@ export default function BookingCard({
 
   const isUpcoming = isActiveBooking && now < startTime;
   const msUntilStart = startTime - now;
-  const isJoinAvailable = isActiveBooking && now < endTime;
+  const isJoinAvailable = isActiveBooking && now >= startTime - 15 * 60 * 1000 && now < endTime;
+  const isBeforeJoinWindow = isActiveBooking && now < startTime - 15 * 60 * 1000;
   const isUrgent = isUpcoming && msUntilStart <= 10 * 60 * 1000; // last 10 minutes
 
   const statusBorderColor = isOutcomeRequired
@@ -258,6 +259,17 @@ export default function BookingCard({
   >
     Join Meet
   </a>
+)}
+
+{isBeforeJoinWindow && (
+  <button
+    type="button"
+    disabled
+    title="Meeting link will activate 15 minutes before the session starts"
+    className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-400 cursor-not-allowed"
+  >
+    Join Meet (Opens 15m before)
+  </button>
 )}
 </div>
             
