@@ -28,9 +28,6 @@ jobs:
             echo "Rebuilding and starting containers..."
             docker compose up -d --build
 
-            echo "Running database migrations..."
-            docker compose exec -T server pnpm --filter server db:migrate
-
             echo "Waiting for server..."
             sleep 10
 
