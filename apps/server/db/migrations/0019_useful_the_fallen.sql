@@ -1,2 +1,3 @@
 ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "rescheduled_from_booking_id" integer;--> statement-breakpoint
+ALTER TABLE "bookings" DROP CONSTRAINT IF EXISTS "bookings_rescheduled_from_booking_id_bookings_id_fk";--> statement-breakpoint
 ALTER TABLE "bookings" ADD CONSTRAINT "bookings_rescheduled_from_booking_id_bookings_id_fk" FOREIGN KEY ("rescheduled_from_booking_id") REFERENCES "public"."bookings"("id") ON DELETE set null ON UPDATE no action;
