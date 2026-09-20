@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAuthStore } from "@/features/auth/store/authStore";
 import NotificationBell from "@/features/notifications/components/NotificationBell";
+import { InstallPwaButton } from "@/components/common/InstallPwaButton";
 
 const NAV_ITEMS = [
   {
@@ -146,6 +147,11 @@ export default function Sidebar() {
           );
         })}
       </nav>
+
+      {/* PWA Install Button (renders only if browser supports install & not yet installed) */}
+      <div className="px-3 pb-1">
+        <InstallPwaButton className="flex w-full items-center justify-center gap-2 rounded-lg bg-secondary/80 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-secondary cursor-pointer" />
+      </div>
 
       {/* Account section — anchored to bottom, cal.com style */}
       <div className="relative border-t border-slate-100 p-3">
