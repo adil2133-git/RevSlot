@@ -1,5 +1,10 @@
-CREATE TYPE "public"."pending_question_status" AS ENUM('pending', 'reviewed');--> statement-breakpoint
-CREATE TABLE "feedback_pending_questions" (
+DO $$ BEGIN
+    CREATE TYPE "public"."pending_question_status" AS ENUM('pending', 'reviewed');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS "feedback_pending_questions" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"feedback_id" integer NOT NULL,
 	"question_id" integer NOT NULL,
@@ -9,6 +14,8 @@ CREATE TABLE "feedback_pending_questions" (
 	CONSTRAINT "unique_feedback_question" UNIQUE("feedback_id","question_id")
 );
 --> statement-breakpoint
+ALTER TABLE "feedback_pending_questions" DROP CONSTRAINT IF EXISTS "feedback_pending_questions_feedback_id_feedback_id_fk";--> statement-breakpoint
 ALTER TABLE "feedback_pending_questions" ADD CONSTRAINT "feedback_pending_questions_feedback_id_feedback_id_fk" FOREIGN KEY ("feedback_id") REFERENCES "public"."feedback"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "feedback_pending_questions" DROP CONSTRAINT IF EXISTS "feedback_pending_questions_question_id_questions_id_fk";--> statement-breakpoint
 ALTER TABLE "feedback_pending_questions" ADD CONSTRAINT "feedback_pending_questions_question_id_questions_id_fk" FOREIGN KEY ("question_id") REFERENCES "public"."questions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX "idx_feedback_pending_questions_feedback" ON "feedback_pending_questions" USING btree ("feedback_id");
+CREATE INDEX IF NOT EXISTS "idx_feedback_pending_questions_feedback" ON "feedback_pending_questions" USING btree ("feedback_id");
