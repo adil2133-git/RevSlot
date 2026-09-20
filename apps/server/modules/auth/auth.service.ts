@@ -115,6 +115,7 @@ const createAuthResponse = async (user: AuthUser, password: string, role: "revie
       role,
       avatarUrl: user.avatarUrl,
       bio: user.bio,
+      whatsappNumber: ("whatsappNumber" in user ? user.whatsappNumber : null) ?? null,
     },
   };
 };
@@ -124,7 +125,15 @@ const createAuthResponse = async (user: AuthUser, password: string, role: "revie
 // proven a different way.
 const issueSession = async (
   role: "reviewer" | "admin",
-  userRow: { id: number; name: string; username?: string | null; email: string; avatarUrl: string | null; bio: string | null },
+  userRow: {
+    id: number;
+    name: string;
+    username?: string | null;
+    email: string;
+    avatarUrl: string | null;
+    bio: string | null;
+    whatsappNumber?: string | null;
+  },
 ) => {
   const payload = { userId: userRow.id, role };
   const { accessToken, refreshToken } = await refreshTokenService.issueTokenPair(payload);
@@ -139,6 +148,7 @@ const issueSession = async (
       role,
       avatarUrl: userRow.avatarUrl,
       bio: userRow.bio,
+      whatsappNumber: userRow.whatsappNumber ?? null,
     },
   };
 };
