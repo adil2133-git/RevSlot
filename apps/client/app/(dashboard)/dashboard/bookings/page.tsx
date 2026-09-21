@@ -221,7 +221,7 @@ function BookingsContent() {
           }}
           placeholder="Search by intern name, batch, stage, advisor..."
           className="w-full rounded-xl border border-slate-200 bg-surface-card pl-10 pr-4 py-2.5 text-xs font-medium text-on-surface placeholder:text-slate-400 shadow-2xs focus:border-primary focus:outline-none"
-        />
+        />  
       </div>
 
       {/* Clean Filter Tabs Bar */}

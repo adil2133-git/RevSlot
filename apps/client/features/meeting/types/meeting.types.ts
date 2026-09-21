@@ -21,6 +21,11 @@ export type MeetingSignal = {
   createdAt: number;
 };
 
+export type ScreenShareState = {
+  participantId: string;
+  streamId: string;
+};
+
 export type MeetingInfo = {
   bookingId: number;
   eventTypeName: string;

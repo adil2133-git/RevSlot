@@ -14,6 +14,7 @@ type MeetingControlsProps = {
   muted: boolean;
   cameraOff: boolean;
   sharing: boolean;
+  shareDisabled?: boolean;
   chatOpen: boolean;
   onToggleMic: () => void;
   onToggleCamera: () => void;
@@ -26,6 +27,7 @@ export default function MeetingControls({
   muted,
   cameraOff,
   sharing,
+  shareDisabled,
   chatOpen,
   onToggleMic,
   onToggleCamera,
@@ -61,8 +63,15 @@ export default function MeetingControls({
 
       <ControlButton
         active={sharing}
+        disabled={shareDisabled}
         onClick={onShareScreen}
-        label={sharing ? "Stop sharing" : "Share screen"}
+        label={
+          shareDisabled
+            ? "Someone else is presenting"
+            : sharing
+              ? "Stop sharing"
+              : "Share screen"
+        }
       >
         <MonitorUp />
       </ControlButton>
@@ -91,11 +100,13 @@ export default function MeetingControls({
 
 function ControlButton({
   active,
+  disabled,
   onClick,
   label,
   children,
 }: {
   active: boolean;
+  disabled?: boolean;
   onClick: () => void;
   label: string;
   children: ReactNode;
@@ -104,11 +115,14 @@ function ControlButton({
     <button
       type="button"
       title={label}
+      disabled={disabled}
       onClick={onClick}
       className={`inline-flex h-11 w-11 items-center justify-center rounded-full ${
-        active
-          ? "bg-slate-800 hover:bg-slate-700"
-          : "bg-red-600 hover:bg-red-500"
+        disabled
+          ? "cursor-not-allowed bg-slate-800 opacity-40"
+          : active
+            ? "bg-slate-800 hover:bg-slate-700"
+            : "bg-red-600 hover:bg-red-500"
       }`}
     >
       {children}
