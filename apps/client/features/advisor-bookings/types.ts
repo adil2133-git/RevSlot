@@ -32,6 +32,17 @@ export interface AdvisorBookingItem {
   refundAmount?: number | null;
   cancellationFee?: number | null;
   razorpayPaymentId?: string | null;
+  dispute?: BookingDisputeInfo | null;
+}
+
+export interface BookingDisputeInfo {
+  id: number;
+  reason: "reviewer_no_show" | "technical_issue" | "inadequate_review" | "other";
+  description: string;
+  status: "under_review" | "resolved_refunded" | "resolved_dismissed";
+  adminNotes?: string | null;
+  createdAt: string;
+  resolvedAt?: string | null;
 }
 
 export interface AdvisorBookingsResponse {

@@ -609,12 +609,23 @@ export default function WalletPage() {
                               ? "bg-blue-50 text-primary border border-blue-200/60"
                               : tx.status === "pending"
                               ? "bg-amber-50 text-amber-800 border border-amber-200"
+                              : tx.status === "disputed"
+                              ? "bg-rose-50 text-rose-700 border border-rose-200"
                               : "bg-slate-100 text-slate-700"
                           }`}
                         >
                           {tx.status === "completed" && <Check className="h-3 w-3 text-primary" />}
                           {tx.status === "pending" && <Clock className="h-3 w-3 text-amber-600" />}
-                          <span>{tx.status === "completed" ? "Cleared" : tx.status === "pending" ? "Pending Clearance" : tx.status}</span>
+                          {tx.status === "disputed" && <AlertCircle className="h-3 w-3 text-rose-600" />}
+                          <span>
+                            {tx.status === "completed"
+                              ? "Cleared"
+                              : tx.status === "pending"
+                              ? "Pending Clearance"
+                              : tx.status === "disputed"
+                              ? "Disputed (On Hold)"
+                              : tx.status}
+                          </span>
                         </span>
                       </td>
 

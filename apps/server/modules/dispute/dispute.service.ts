@@ -180,19 +180,55 @@ export const disputeService = {
     return dispute;
   },
 
-  getDisputeForBooking: async (bookingId: number, advisorEmail: string) => {
-    const [dispute] = await db
-      .select()
-      .from(bookingDisputes)
-      .where(
-        and(
-          eq(bookingDisputes.bookingId, bookingId),
-          eq(bookingDisputes.advisorEmail, advisorEmail)
+  getDisputeForBooking: async (
+    bookingId: number,
+    filter: { advisorEmail?: string | undefined; reviewerId?: number | undefined }
+  ) => {
+    if (filter.advisorEmail) {
+      const [dispute] = await db
+        .select()
+        .from(bookingDisputes)
+        .where(
+          and(
+            eq(bookingDisputes.bookingId, bookingId),
+            eq(bookingDisputes.advisorEmail, filter.advisorEmail.trim().toLowerCase())
+          )
         )
-      )
-      .limit(1);
+        .limit(1);
 
-    return dispute || null;
+      return dispute || null;
+    }
+
+    if (filter.reviewerId) {
+      const [dispute] = await db
+        .select({
+          id: bookingDisputes.id,
+          bookingId: bookingDisputes.bookingId,
+          advisorEmail: bookingDisputes.advisorEmail,
+          reason: bookingDisputes.reason,
+          description: bookingDisputes.description,
+          status: bookingDisputes.status,
+          meetingJoinedByReviewer: bookingDisputes.meetingJoinedByReviewer,
+          meetingJoinedByClient: bookingDisputes.meetingJoinedByClient,
+          adminNotes: bookingDisputes.adminNotes,
+          resolvedAt: bookingDisputes.resolvedAt,
+          resolvedBy: bookingDisputes.resolvedBy,
+          createdAt: bookingDisputes.createdAt,
+        })
+        .from(bookingDisputes)
+        .innerJoin(bookings, eq(bookings.id, bookingDisputes.bookingId))
+        .where(
+          and(
+            eq(bookingDisputes.bookingId, bookingId),
+            eq(bookings.reviewerId, filter.reviewerId)
+          )
+        )
+        .limit(1);
+
+      return dispute || null;
+    }
+
+    return null;
   },
 
   listAdminDisputes: async (params: {
