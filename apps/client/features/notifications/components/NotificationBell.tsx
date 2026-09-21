@@ -34,7 +34,13 @@ function BellIcon({ className }: { className?: string }) {
   );
 }
 
-export default function NotificationBell({ role = "reviewer" }: { role?: "reviewer" | "admin" }) {
+export default function NotificationBell({
+  role = "reviewer",
+  align = "right",
+}: {
+  role?: "reviewer" | "admin";
+  align?: "left" | "right";
+}) {
   const router = useRouter();
   const {
     notifications,
@@ -60,7 +66,7 @@ export default function NotificationBell({ role = "reviewer" }: { role?: "review
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-dismiss live toast alert after 5 seconds
+  // Show live toast for 5 seconds when received
   useEffect(() => {
     if (!latestToast) return;
     const timer = setTimeout(() => {
@@ -152,8 +158,9 @@ export default function NotificationBell({ role = "reviewer" }: { role?: "review
       {/* Bell Dropdown in Navigation / Sidebar */}
       <div ref={panelRef} className="relative">
         <button
+          type="button"
           onClick={handleBellClick}
-          className="relative flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+          className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200/80 bg-white text-slate-600 hover:bg-slate-50 shadow-2xs transition-colors cursor-pointer"
           aria-label="Notifications"
         >
           <BellIcon />
@@ -165,7 +172,11 @@ export default function NotificationBell({ role = "reviewer" }: { role?: "review
         </button>
 
         {open && (
-          <div className="absolute left-0 top-full z-30 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-slate-100 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900">
+          <div
+            className={`absolute ${
+              align === "right" ? "right-0" : "left-0"
+            } top-full z-50 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-2xl border border-slate-200/90 bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-100 dark:border-slate-800 dark:bg-slate-900`}
+          >
             <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
               <h4 className="text-sm font-bold text-slate-900 dark:text-white">
                 Notifications

@@ -10,10 +10,11 @@ import { walletTransactions, reviewerWallets } from "../wallet/wallet.schema.js"
 import { meetingService } from "../meeting/meeting.service.js";
 import { refundService } from "../payment/refund.service.js";
 import { emailService } from "../../services/email.service.js";
-import { disputeReportedTemplate } from "../../emails/templates/disputeReported.js";
-import { disputeResolvedTemplate } from "../../emails/templates/disputeResolved.js";
+import { disputeReportedTemplate, disputeReportedTemplateData } from "../../emails/templates/disputeReported.js";
+import { disputeResolvedTemplate, disputeResolvedTemplateData } from "../../emails/templates/disputeResolved.js";
 import { notificationService } from "../notification/notification.service.js";
 import { admins } from "../admin/admins.schema.js";
+import { auditLogService } from "../auditLog/auditLog.service.js";
 import { AppError } from "../../core/errors/AppError.js";
 
 export interface ReportDisputeInput {
@@ -133,7 +134,18 @@ export const disputeService = {
       advisorName: booking.advisorName,
       advisorEmail: booking.advisorEmail,
     });
-    emailService.sendEmail({ to: booking.advisorEmail, subject: advisorMail.subject, html: advisorMail.html }).catch((err) => {
+    const advisorMailData = disputeReportedTemplateData({
+      recipientName: booking.advisorName,
+      recipientRole: "advisor",
+      bookingId,
+      eventTypeName: booking.eventTypeName,
+      reason: data.reason,
+      description: data.description,
+      reviewerName: booking.reviewerName,
+      advisorName: booking.advisorName,
+      advisorEmail: booking.advisorEmail,
+    });
+    emailService.sendTemplateEmail({ to: booking.advisorEmail, templateId: advisorMailData.templateId, subject: advisorMailData.subject, variables: advisorMailData.variables, fallbackHtml: advisorMail.html }).catch((err) => {
       console.error("[Dispute] Failed to send advisor dispute email:", err);
     });
 
@@ -149,7 +161,18 @@ export const disputeService = {
       advisorName: booking.advisorName,
       advisorEmail: booking.advisorEmail,
     });
-    emailService.sendEmail({ to: booking.reviewerEmail, subject: reviewerMail.subject, html: reviewerMail.html }).catch((err) => {
+    const reviewerMailData = disputeReportedTemplateData({
+      recipientName: booking.reviewerName,
+      recipientRole: "reviewer",
+      bookingId,
+      eventTypeName: booking.eventTypeName,
+      reason: data.reason,
+      description: data.description,
+      reviewerName: booking.reviewerName,
+      advisorName: booking.advisorName,
+      advisorEmail: booking.advisorEmail,
+    });
+    emailService.sendTemplateEmail({ to: booking.reviewerEmail, templateId: reviewerMailData.templateId, subject: reviewerMailData.subject, variables: reviewerMailData.variables, fallbackHtml: reviewerMail.html }).catch((err) => {
       console.error("[Dispute] Failed to send reviewer dispute email:", err);
     });
 
@@ -170,7 +193,18 @@ export const disputeService = {
             advisorName: booking.advisorName,
             advisorEmail: booking.advisorEmail,
           });
-          emailService.sendEmail({ to: adm.email, subject: adminMail.subject, html: adminMail.html }).catch((err) => {
+          const adminMailData = disputeReportedTemplateData({
+            recipientName: adm.name,
+            recipientRole: "admin",
+            bookingId,
+            eventTypeName: booking.eventTypeName,
+            reason: data.reason,
+            description: data.description,
+            reviewerName: booking.reviewerName,
+            advisorName: booking.advisorName,
+            advisorEmail: booking.advisorEmail,
+          });
+          emailService.sendTemplateEmail({ to: adm.email, templateId: adminMailData.templateId, subject: adminMailData.subject, variables: adminMailData.variables, fallbackHtml: adminMail.html }).catch((err) => {
             console.error(`[Dispute] Failed to send admin email to ${adm.email}:`, err);
           });
         }
@@ -201,7 +235,7 @@ export const disputeService = {
     limit?: number;
   }) => {
     const page = params.page || 1;
-    const limit = params.limit || 20;
+    const limit = params.limit || 5;
     const offset = (page - 1) * limit;
 
     const baseQuery = db
@@ -369,7 +403,15 @@ export const disputeService = {
         outcome,
         adminNotes: data.adminNotes,
       });
-      emailService.sendEmail({ to: bookingData.advisorEmail, subject: advMail.subject, html: advMail.html }).catch((err) => {
+      const advMailData = disputeResolvedTemplateData({
+        recipientName: bookingData.advisorName,
+        recipientRole: "advisor",
+        bookingId: dispute.bookingId,
+        eventTypeName: bookingData.eventTypeName,
+        outcome,
+        adminNotes: data.adminNotes,
+      });
+      emailService.sendTemplateEmail({ to: bookingData.advisorEmail, templateId: advMailData.templateId, subject: advMailData.subject, variables: advMailData.variables, fallbackHtml: advMail.html }).catch((err) => {
         console.error("[Dispute] Failed to send advisor resolution email:", err);
       });
 
@@ -382,9 +424,38 @@ export const disputeService = {
         outcome,
         adminNotes: data.adminNotes,
       });
-      emailService.sendEmail({ to: bookingData.reviewerEmail, subject: revMail.subject, html: revMail.html }).catch((err) => {
+      const revMailData = disputeResolvedTemplateData({
+        recipientName: bookingData.reviewerName,
+        recipientRole: "reviewer",
+        bookingId: dispute.bookingId,
+        eventTypeName: bookingData.eventTypeName,
+        outcome,
+        adminNotes: data.adminNotes,
+      });
+      emailService.sendTemplateEmail({ to: bookingData.reviewerEmail, templateId: revMailData.templateId, subject: revMailData.subject, variables: revMailData.variables, fallbackHtml: revMail.html }).catch((err) => {
         console.error("[Dispute] Failed to send reviewer resolution email:", err);
       });
+    }
+
+    // Record Audit Log for Dispute Resolution
+    try {
+      const [actorAdmin] = await db.select({ name: admins.name }).from(admins).where(eq(admins.id, adminId));
+      await auditLogService.recordAuditLog({
+        actorId: adminId,
+        actorRole: "admin",
+        actorName: actorAdmin?.name ?? "Admin",
+        action: data.action === "refund_client" ? "dispute.resolved_refunded" : "dispute.dismissed",
+        targetType: "dispute",
+        targetId: disputeId,
+        metadata: {
+          bookingId: dispute.bookingId,
+          action: data.action,
+          adminNotes: data.adminNotes,
+          advisorEmail: dispute.advisorEmail,
+        },
+      });
+    } catch (auditErr) {
+      console.error("[Dispute] Failed to record audit log:", auditErr);
     }
 
     return updatedResult;

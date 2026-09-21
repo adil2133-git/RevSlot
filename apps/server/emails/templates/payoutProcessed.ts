@@ -6,26 +6,14 @@ interface PayoutProcessedParams {
   adminNotes?: string | null | undefined;
 }
 
-export const payoutProcessedTemplate = (params: PayoutProcessedParams) => {
-  const {
-    reviewerName,
-    amountPaise,
-    status,
-    transactionReference,
-    adminNotes,
-  } = params;
+export const PAYOUT_PROCESSED_TEMPLATE_ID = "revslot-payout-processed";
 
-  const amountRupees = (amountPaise / 100).toFixed(2);
+function buildStatusContent(params: PayoutProcessedParams, amountRupees: string): string {
+  const { status, transactionReference, adminNotes } = params;
   const isApproved = status === "completed";
 
-  const subject = isApproved
-    ? `Payout Processed: ₹${amountRupees} has been transferred`
-    : `Payout Request Rejected: ₹${amountRupees}`;
-
-  const bannerColor = isApproved ? "#003366" : "#b91c1c";
-
-  const statusContent = isApproved
-    ? `
+  if (isApproved) {
+    return `
       <div style="margin: 20px 0; padding: 18px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;">
         <p style="margin: 0 0 6px 0; font-size: 13px; font-weight: 700; color: #15803d;">Transfer Completed</p>
         <p style="margin: 0; font-size: 14px; color: #166534;">
@@ -41,24 +29,61 @@ export const payoutProcessedTemplate = (params: PayoutProcessedParams) => {
             : ""
         }
       </div>
-    `
-    : `
-      <div style="margin: 20px 0; padding: 18px; background: #fef2f2; border: 1px solid #fee2e2; border-radius: 8px;">
-        <p style="margin: 0 0 6px 0; font-size: 13px; font-weight: 700; color: #b91c1c;">Payout Request Rejected</p>
-        <p style="margin: 0; font-size: 14px; color: #991b1b;">
-          Your payout request for <strong>₹${amountRupees}</strong> was not processed. The amount has been returned to your Available Balance.
-        </p>
-        ${
-          adminNotes
-            ? `
-            <p style="margin: 10px 0 0 0; font-size: 12px; color: #7f1d1d;">
-              <strong>Reason:</strong> ${adminNotes}
-            </p>
-          `
-            : ""
-        }
-      </div>
     `;
+  }
+
+  return `
+    <div style="margin: 20px 0; padding: 18px; background: #fef2f2; border: 1px solid #fee2e2; border-radius: 8px;">
+      <p style="margin: 0 0 6px 0; font-size: 13px; font-weight: 700; color: #b91c1c;">Payout Request Rejected</p>
+      <p style="margin: 0; font-size: 14px; color: #991b1b;">
+        Your payout request for <strong>₹${amountRupees}</strong> was not processed. The amount has been returned to your Available Balance.
+      </p>
+      ${
+        adminNotes
+          ? `
+          <p style="margin: 10px 0 0 0; font-size: 12px; color: #7f1d1d;">
+            <strong>Reason:</strong> ${adminNotes}
+          </p>
+        `
+          : ""
+      }
+    </div>
+  `;
+}
+
+// Variables + subject for emailService.sendTemplateEmail(). The
+// approved/rejected branching (banner color, status block) happens in
+// code — Resend Templates don't support conditionals.
+export const payoutProcessedTemplateData = (params: PayoutProcessedParams) => {
+  const amountRupees = (params.amountPaise / 100).toFixed(2);
+  const isApproved = params.status === "completed";
+
+  return {
+    templateId: PAYOUT_PROCESSED_TEMPLATE_ID,
+    subject: isApproved
+      ? `Payout Processed: ₹${amountRupees} has been transferred`
+      : `Payout Request Rejected: ₹${amountRupees}`,
+    variables: {
+      REVIEWER_NAME: params.reviewerName,
+      AMOUNT_RUPEES: amountRupees,
+      BANNER_COLOR: isApproved ? "#003366" : "#b91c1c",
+      STATUS_CONTENT: buildStatusContent(params, amountRupees),
+    },
+  };
+};
+
+export const payoutProcessedTemplate = (params: PayoutProcessedParams) => {
+  const { reviewerName, amountPaise, status } = params;
+
+  const amountRupees = (amountPaise / 100).toFixed(2);
+  const isApproved = status === "completed";
+
+  const subject = isApproved
+    ? `Payout Processed: ₹${amountRupees} has been transferred`
+    : `Payout Request Rejected: ₹${amountRupees}`;
+
+  const bannerColor = isApproved ? "#003366" : "#b91c1c";
+  const statusContent = buildStatusContent(params, amountRupees);
 
   const html = `
     <!DOCTYPE html>

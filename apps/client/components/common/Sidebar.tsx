@@ -5,7 +5,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuthStore } from "@/features/auth/store/authStore";
-import NotificationBell from "@/features/notifications/components/NotificationBell";
 import {
   LayoutGrid,
   Calendar,
@@ -20,7 +19,6 @@ import {
   ChevronsUpDown,
   ChevronUp,
   LogOut,
-  Download,
 } from "lucide-react";
 
 interface NavItem {
@@ -66,7 +64,6 @@ const NAV_ITEMS: NavItem[] = [
     href: "/dashboard/vacation",
     label: "Vacation Mode",
     icon: Palmtree,
-    hasDot: true,
   },
   {
     href: "/dashboard/wallet",
@@ -141,7 +138,7 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
           <Link
             href="/dashboard"
             className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-white shadow-xs hover:scale-105 transition-transform"
-            title="RevSlot Reviewer Suite"
+            title="RevSlot Reviewer"
           >
             <ShieldCheck className="h-6 w-6" />
           </Link>
@@ -177,15 +174,8 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
           </nav>
         </div>
 
-        {/* Bottom Stack: Install Icon + User Avatar */}
-        <div className="flex flex-col items-center gap-3">
-          <button
-            title="Install App"
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 hover:text-primary transition-colors cursor-pointer"
-          >
-            <Download className="h-4 w-4" />
-          </button>
-
+        {/* Bottom Stack: User Avatar */}
+        <div className="flex flex-col items-center">
           <button
             onClick={() => setPopoverOpen(!popoverOpen)}
             className="relative flex h-10 w-10 items-center justify-center rounded-full bg-primary text-white text-xs font-bold hover:ring-2 hover:ring-primary/20 transition-all cursor-pointer"
@@ -226,7 +216,7 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
                 RevSlot
               </span>
               <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400 block mt-0.5">
-                Reviewer Suite
+                Reviewer
               </span>
             </div>
           </Link>
@@ -280,19 +270,8 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
         </nav>
       </div>
 
-      {/* Bottom Section: Install App Card + User Account Popover */}
-      <div className="p-3 border-t border-slate-100 space-y-2 bg-white relative">
-        {/* Install App Pill Button */}
-        <button
-          className="flex w-full items-center justify-between rounded-xl bg-slate-100/70 hover:bg-slate-200/70 px-3.5 py-2 text-xs font-semibold text-slate-700 transition-colors cursor-pointer"
-        >
-          <div className="flex items-center gap-2">
-            <Download className="h-3.5 w-3.5 text-slate-500" />
-            <span>Install App</span>
-          </div>
-          <span className="text-[10px] font-medium text-slate-400">v2.4</span>
-        </button>
-
+      {/* Bottom Section: User Account Popover */}
+      <div className="p-3 border-t border-slate-100 bg-white relative">
         {/* VARIANT B: ELEVATED USER POPOVER (8px above the user tile) */}
         {popoverOpen && (
           <div
@@ -321,15 +300,10 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
               <Link
                 href="/dashboard/settings"
                 onClick={() => setPopoverOpen(false)}
-                className="flex items-center justify-between rounded-xl px-2.5 py-2 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+                className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 hover:bg-slate-50 hover:text-slate-900 transition-colors"
               >
-                <div className="flex items-center gap-2.5">
-                  <Settings className="h-4 w-4 text-slate-400" />
-                  <span>Settings</span>
-                </div>
-                <span className="rounded bg-blue-50 border border-blue-200/60 px-1.5 py-0.2 text-[10px] font-bold text-primary">
-                  Suite
-                </span>
+                <Settings className="h-4 w-4 text-slate-400" />
+                <span>Settings</span>
               </Link>
             </div>
 

@@ -5,7 +5,7 @@ import { questions } from "../questionBank/questions.schema.js";
 import { questionBanks } from "../questionBank/questionBanks.schema.js";
 import { reviewers } from "../auth/reviewers.schema.js";
 import { emailService } from "../../services/email.service.js";
-import { feedbackSubmittedTemplate } from "../../emails/templates/feedbackSubmitted.js";
+import { feedbackSubmittedTemplate, feedbackSubmittedTemplateData } from "../../emails/templates/feedbackSubmitted.js";
 import { notificationService } from "../notification/notification.service.js";
 import { AppError } from "../../core/errors/AppError.js";
 import type {
@@ -374,7 +374,19 @@ export async function submitFeedback(bookingId: number, reviewerId: number, inpu
 
   await Promise.all(
     recipients.map(({ email, name, role }) => {
-      const { subject, html } = feedbackSubmittedTemplate({
+      const { html: fallbackHtml } = feedbackSubmittedTemplate({
+        recipientName: name,
+        recipientRole: role,
+        eventTypeName: eventType?.name || "Review Session",
+        reviewerName: reviewer?.name || "Reviewer",
+        internName: booking.internName,
+        reviewMark: input.isNoShow ? null : input.reviewMark !== undefined ? String(input.reviewMark) : null,
+        understandingLevel: input.isNoShow ? null : input.understandingLevel || null,
+        taskMark: input.isNoShow || effectiveTaskMark === undefined ? null : String(effectiveTaskMark),
+        comments: input.comments || null,
+        isNoShow: input.isNoShow,
+      });
+      const { templateId, subject, variables } = feedbackSubmittedTemplateData({
         recipientName: name,
         recipientRole: role,
         eventTypeName: eventType?.name || "Review Session",
@@ -387,7 +399,7 @@ export async function submitFeedback(bookingId: number, reviewerId: number, inpu
         isNoShow: input.isNoShow,
       });
 
-      return emailService.sendEmail({ to: email, subject, html }).catch((err) => {
+      return emailService.sendTemplateEmail({ to: email, templateId, subject, variables, fallbackHtml }).catch((err) => {
         console.error(`[Feedback] Failed to send evaluation email to ${email}:`, err);
       });
     })

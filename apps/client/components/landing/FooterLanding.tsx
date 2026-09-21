@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { Shield } from "lucide-react";
+import Image from "next/image";
 
 export default function FooterLanding() {
   return (
@@ -10,9 +10,13 @@ export default function FooterLanding() {
       <div className="container-page flex flex-col md:flex-row items-center justify-between gap-6 text-xs text-slate-500">
         {/* Brand */}
         <div className="flex items-center gap-2">
-          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-primary text-white">
-            <Shield className="h-3.5 w-3.5" />
-          </div>
+          <Image
+            src="/icons/icon-192x192.png"
+            alt="RevSlot Logo"
+            width={24}
+            height={24}
+            className="h-6 w-6 rounded-lg object-contain"
+          />
           <span className="font-bold text-slate-800 text-sm">RevSlot</span>
         </div>
 

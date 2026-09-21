@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useAuthStore } from "@/features/auth/store/authStore";
-import { Shield, User, Menu, X, ArrowUpRight } from "lucide-react";
+import { User, Menu, X, ArrowUpRight } from "lucide-react";
 
 export default function NavbarLanding() {
   const user = useAuthStore((state) => state.user);
@@ -29,9 +30,14 @@ export default function NavbarLanding() {
       <div className="container-page flex h-16 items-center justify-between">
         {/* Brand Logo */}
         <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-white shadow-xs group-hover:scale-105 transition-transform">
-            <Shield className="h-5 w-5 fill-white/20" />
-          </div>
+          <Image
+            src="/icons/icon-192x192.png"
+            alt="RevSlot Logo"
+            width={36}
+            height={36}
+            className="h-9 w-9 rounded-xl shadow-xs group-hover:scale-105 transition-transform object-contain"
+            priority
+          />
           <span className="text-xl font-bold tracking-tight text-primary">
             RevSlot
           </span>
