@@ -2,8 +2,10 @@ import { eq, desc, sql } from "drizzle-orm";
 import { db } from "../../config/db.js";
 import { payoutRequests, reviewerWallets, walletTransactions, reviewerPayoutProfiles } from "../wallet/wallet.schema.js";
 import { reviewers } from "../auth/reviewers.schema.js";
+import { admins } from "./admins.schema.js";
+import { auditLogService } from "../auditLog/auditLog.service.js";
 import { emailService } from "../../services/email.service.js";
-import { payoutProcessedTemplate } from "../../emails/templates/payoutProcessed.js";
+import { payoutProcessedTemplate, payoutProcessedTemplateData } from "../../emails/templates/payoutProcessed.js";
 import { notificationService } from "../notification/notification.service.js";
 import { AppError } from "../../core/errors/AppError.js";
 
@@ -14,7 +16,7 @@ export const adminPayoutsService = {
     limit?: number;
   }) => {
     const page = params.page || 1;
-    const limit = params.limit || 20;
+    const limit = params.limit || 5;
     const offset = (page - 1) * limit;
 
     const baseQuery = db
@@ -33,6 +35,7 @@ export const adminPayoutsService = {
         reviewerName: reviewers.name,
         reviewerEmail: reviewers.email,
         reviewerAvatar: reviewers.avatarUrl,
+        reviewerDepartment: reviewers.professionalHeadline,
         // Payout Profile details
         payoutMethod: reviewerPayoutProfiles.payoutMethod,
         accountHolderName: reviewerPayoutProfiles.accountHolderName,
@@ -210,16 +213,47 @@ export const adminPayoutsService = {
       }).catch((err) => console.error("[Payout] Notification error:", err));
 
       // 2. Email alert
-      const { subject, html } = payoutProcessedTemplate({
+      const { html: fallbackHtml } = payoutProcessedTemplate({
         reviewerName: reviewer.name,
         amountPaise: payout.amount,
         status: isApproved ? "completed" : "rejected",
         transactionReference: data.transactionReference,
         adminNotes: data.adminNotes,
       });
-      emailService.sendEmail({ to: reviewer.email, subject, html }).catch((err) => {
+      const { templateId, subject, variables } = payoutProcessedTemplateData({
+        reviewerName: reviewer.name,
+        amountPaise: payout.amount,
+        status: isApproved ? "completed" : "rejected",
+        transactionReference: data.transactionReference,
+        adminNotes: data.adminNotes,
+      });
+      emailService.sendTemplateEmail({ to: reviewer.email, templateId, subject, variables, fallbackHtml }).catch((err) => {
         console.error("[Payout] Email error:", err);
       });
+    }
+
+    // Record Audit Log for Payout Action
+    try {
+      const [actorAdmin] = await db.select({ name: admins.name }).from(admins).where(eq(admins.id, adminId));
+      await auditLogService.recordAuditLog({
+        actorId: adminId,
+        actorRole: "admin",
+        actorName: actorAdmin?.name ?? "Admin",
+        action: data.action === "approve" ? "payout.approved" : "payout.rejected",
+        targetType: "payout",
+        targetId: payoutId,
+        metadata: {
+          reviewerId: payout.reviewerId,
+          reviewerName: reviewer?.name,
+          amountPaise: payout.amount,
+          amountRupees: (payout.amount / 100).toFixed(2),
+          action: data.action,
+          transactionReference: data.transactionReference,
+          adminNotes: data.adminNotes,
+        },
+      });
+    } catch (auditErr) {
+      console.error("[Payout] Failed to record audit log:", auditErr);
     }
 
     return result;

@@ -5,9 +5,11 @@ import { db } from "../../config/db.js";
 import { payments } from "./payments.schema.js";
 import { bookings } from "../booking/bookings.schema.js";
 import { slots } from "../slot/slots.schema.js";
+import { eventTypes } from "../eventType/eventTypes.schema.js";
+import { availabilityTemplates } from "../availability/schema/availabilityTemplates.schema.js";
 import { reviewerWallets, walletTransactions } from "../wallet/wallet.schema.js";
 import { bookingService } from "../booking/booking.service.js";
-import dayjs from "dayjs";
+import dayjs from "../../config/dayjs.js";
 
 export const webhookController = {
   handleRazorpayWebhook: async (req: Request, res: Response) => {
@@ -67,8 +69,27 @@ export const webhookController = {
               .limit(1);
 
             if (heldSlot && heldSlot.status === "held") {
-              const startTimestamp = dayjs(`${heldSlot.slotDate}T${heldSlot.startTime}`).toDate();
-              const endTimestamp = dayjs(`${heldSlot.slotDate}T${heldSlot.endTime}`).toDate();
+              // If the hold is still active, user is actively completing checkout in their browser.
+              // Defer auto-recovery to let the browser submit the real user form details.
+              const isHoldExpired = dayjs().isAfter(heldSlot.holdExpiresAt);
+              if (!isHoldExpired) {
+                console.log(`[Razorpay Webhook] Slot hold is still active for ${paymentRecord.holdToken}. Deferring auto-recovery to browser verification.`);
+                return;
+              }
+
+              const [templateRow] = await db
+                .select({ timezone: availabilityTemplates.timezone })
+                .from(eventTypes)
+                .innerJoin(
+                  availabilityTemplates,
+                  eq(eventTypes.availabilityTemplateId, availabilityTemplates.id)
+                )
+                .where(eq(eventTypes.id, heldSlot.eventTypeId))
+                .limit(1);
+
+              const timezone = templateRow?.timezone || "Asia/Kolkata";
+              const startTimestamp = dayjs.tz(`${heldSlot.slotDate} ${heldSlot.startTime}`, timezone).toDate();
+              const endTimestamp = dayjs.tz(`${heldSlot.slotDate} ${heldSlot.endTime}`, timezone).toDate();
 
               const recoveredBooking = await db.transaction(async (tx) => {
                 const [newBooking] = await tx

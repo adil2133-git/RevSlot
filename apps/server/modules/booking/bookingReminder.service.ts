@@ -5,7 +5,7 @@ import { bookings } from "./bookings.schema.js";
 import { eventTypes } from "../eventType/eventTypes.schema.js";
 import { reviewers } from "../auth/reviewers.schema.js";
 import { emailService } from "../../services/email.service.js";
-import { sessionReminderTemplate } from "../../emails/templates/sessionReminder.js";
+import { sessionReminderTemplate, sessionReminderTemplateData } from "../../emails/templates/sessionReminder.js";
 import { notificationService } from "../notification/notification.service.js";
 
 export const bookingReminderService = {
@@ -81,7 +81,19 @@ export const bookingReminderService = {
 
           await Promise.all(
             recipients.map(({ email, name, role }) => {
-              const { subject, html } = sessionReminderTemplate({
+              const { html: fallbackHtml } = sessionReminderTemplate({
+                recipientName: name,
+                recipientRole: role,
+                eventTypeName: booking.eventTypeName,
+                reviewerName: booking.reviewerName,
+                internName: booking.internName,
+                advisorName: booking.advisorName,
+                formattedDate,
+                formattedTime,
+                meetLink: booking.meetLink,
+                startsInText,
+              });
+              const { templateId, subject, variables } = sessionReminderTemplateData({
                 recipientName: name,
                 recipientRole: role,
                 eventTypeName: booking.eventTypeName,
@@ -94,7 +106,7 @@ export const bookingReminderService = {
                 startsInText,
               });
 
-              return emailService.sendEmail({ to: email, subject, html }).catch((err) => {
+              return emailService.sendTemplateEmail({ to: email, templateId, subject, variables, fallbackHtml }).catch((err) => {
                 console.error(`[Reminder] Failed to send email to ${email}:`, err);
               });
             })

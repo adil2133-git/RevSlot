@@ -12,16 +12,11 @@ import {
   MessageSquare,
   FileText,
   BarChart2,
-  Download,
   Settings,
   LogOut,
   ChevronsUpDown,
-  Shield,
-  ShieldCheck,
 } from "lucide-react";
 import { useAuthStore } from "@/features/auth/store/authStore";
-import { InstallPwaButton } from "@/components/common/InstallPwaButton";
-import NotificationBell from "@/features/notifications/components/NotificationBell";
 
 const NAV_ITEMS = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutGrid },
@@ -47,8 +42,8 @@ export default function AdminSidebar() {
         setPopoverOpen(false);
       }
     };
-    window.addEventListener("mousedown", handleClickOutside);
-    return () => window.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const handleLogout = async () => {
@@ -61,7 +56,8 @@ export default function AdminSidebar() {
 
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-slate-100 bg-white">
-      <div className="flex h-16 items-center justify-between px-6">
+      {/* 1. Brand Logo */}
+      <div className="flex h-16 items-center px-6">
         <Link href="/admin/dashboard" className="flex items-center gap-2 text-lg font-bold tracking-tight text-[#003366]">
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#003366] text-xs font-bold text-white">
             R
@@ -75,10 +71,9 @@ export default function AdminSidebar() {
             </div>
           </div>
         </Link>
-        <NotificationBell role="admin" />
       </div>
 
-      {/* 2. Navigation */}
+      {/* 2. Navigation Items */}
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
         {NAV_ITEMS.map((item) => {
           const active = pathname === item.href || (item.href !== "/admin/dashboard" && pathname.startsWith(item.href));
@@ -105,38 +100,7 @@ export default function AdminSidebar() {
         })}
       </nav>
 
-      {/* 3. Bottom Session Box */}
-      <div className="px-3 pb-2">
-        <div className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              Session
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200/60">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              <span>Active</span>
-            </span>
-          </div>
-          <p className="mt-1 text-xs font-bold text-slate-900">
-            2024-2025 Tier 1
-          </p>
-        </div>
-      </div>
-
-      {/* 4. Install App Row */}
-      <div className="px-3 pb-2">
-        <div className="flex items-center justify-between rounded-xl border border-slate-200/80 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 transition-colors">
-          <div className="flex items-center gap-2">
-            <Download className="h-3.5 w-3.5 text-slate-400" />
-            <span>Install App</span>
-          </div>
-          <span className="rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-primary">
-            v2.4
-          </span>
-        </div>
-      </div>
-
-      {/* 5. User Card & Popover */}
+      {/* 3. User Card & Popover */}
       <div ref={popoverRef} className="relative border-t border-slate-100 p-3">
         {popoverOpen && (
           <div className="absolute bottom-full left-3 right-3 mb-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl z-50 animate-in fade-in-0 zoom-in-95">

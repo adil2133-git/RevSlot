@@ -7,7 +7,7 @@ export const ListAuditLogQuerySchema = z.object({
   fromDate: z.string().date().optional(),
   toDate: z.string().date().optional(),
   page: z.coerce.number().int().min(1).optional().default(1),
-  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(5),
 });
 
 export type ListAuditLogQuery = z.infer<typeof ListAuditLogQuerySchema>;

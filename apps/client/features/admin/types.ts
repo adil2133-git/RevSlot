@@ -104,9 +104,17 @@ export type ListAuditLogParams = {
   limit?: number;
 };
 
+export type AuditLogStats = {
+  totalEvents: number;
+  todayEvents: number;
+  securityEvents: number;
+  financialEvents: number;
+};
+
 export type ListAuditLogResponse = {
   logs: AuditLogEntry[];
   pagination: Pagination;
+  stats?: AuditLogStats;
 };
 
 export type KPIMetric = {
@@ -211,6 +219,7 @@ export type AdminPayoutItem = {
   reviewerName: string;
   reviewerEmail: string;
   reviewerAvatar: string | null;
+  reviewerDepartment?: string | null;
   payoutMethod: "bank_account" | "upi" | null;
   accountHolderName: string | null;
   accountNumber: string | null;
