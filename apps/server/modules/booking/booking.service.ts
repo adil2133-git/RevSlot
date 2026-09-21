@@ -11,10 +11,10 @@ import { eventTypes } from "../eventType/eventTypes.schema.js";
 import { reviewers } from "../auth/reviewers.schema.js";
 import { calendarService } from "../calendar/calendar.service.js";
 import { emailService } from "../../services/email.service.js";
-import { bookingConfirmationTemplate } from "../../emails/templates/bookingConfirmation.js";
-import { bookingCancelledTemplate } from "../../emails/templates/bookingCancelled.js";
-import { bookingRescheduledTemplate } from "../../emails/templates/bookingRescheduled.js";
-import { bookingRescheduleRequestedTemplate } from "../../emails/templates/bookingRescheduleRequested.js";
+import { bookingConfirmationTemplate, bookingConfirmationTemplateData } from "../../emails/templates/bookingConfirmation.js";
+import { bookingCancelledTemplate, bookingCancelledTemplateData } from "../../emails/templates/bookingCancelled.js";
+import { bookingRescheduledTemplate, bookingRescheduledTemplateData } from "../../emails/templates/bookingRescheduled.js";
+import { bookingRescheduleRequestedTemplate, bookingRescheduleRequestedTemplateData } from "../../emails/templates/bookingRescheduleRequested.js";
 import { slotService } from "../slot/slot.service.js"; 
 import { feedback } from "../feedback/feedback.schema.js";
 import { BOOKING_FIELD_DEFINITIONS } from "./bookingFields.js";
@@ -22,6 +22,7 @@ import { meetingService } from "../meeting/meeting.service.js";
 import { payments } from "../payment/payments.schema.js";
 import { reviewerWallets, walletTransactions } from "../wallet/wallet.schema.js";
 import { refundService } from "../payment/refund.service.js";
+import { bookingDisputes } from "../dispute/disputes.schema.js";
 
 export interface GetMyBookingsOptions {
 
@@ -461,7 +462,20 @@ for (const [key, value] of Object.entries(formData)) {
 
     await Promise.all(
       recipients.map(({ email, name, role }) => {
-        const { subject, html } = bookingConfirmationTemplate({
+        const { html: fallbackHtml } = bookingConfirmationTemplate({
+          recipientName: name,
+          recipientRole: role,
+          eventTypeName: eventType.name,
+          reviewerName: reviewer.name,
+          internName: booking.internName,
+          advisorName: booking.advisorName,
+          formattedDate,
+          formattedTime,
+          meetLink,
+          price: eventType.price,
+          paymentId: bookingPayment?.razorpayPaymentId,
+        });
+        const { templateId, subject, variables } = bookingConfirmationTemplateData({
           recipientName: name,
           recipientRole: role,
           eventTypeName: eventType.name,
@@ -476,10 +490,12 @@ for (const [key, value] of Object.entries(formData)) {
         });
 
         return emailService
-          .sendEmail({
+          .sendTemplateEmail({
             to: email,
+            templateId,
             subject,
-            html,
+            variables,
+            fallbackHtml,
           })
           .catch((err) => {
             console.error(
@@ -570,11 +586,19 @@ for (const [key, value] of Object.entries(formData)) {
           razorpayPaymentId: payments.razorpayPaymentId,
           rescheduleCount: bookings.rescheduleCount,
           hasFeedback: sql<boolean>`${feedback.id} is not null`,
+          disputeId: bookingDisputes.id,
+          disputeReason: bookingDisputes.reason,
+          disputeDescription: bookingDisputes.description,
+          disputeStatus: bookingDisputes.status,
+          disputeAdminNotes: bookingDisputes.adminNotes,
+          disputeCreatedAt: bookingDisputes.createdAt,
+          disputeResolvedAt: bookingDisputes.resolvedAt,
         })
         .from(bookings)
         .innerJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
         .leftJoin(payments, eq(payments.bookingId, bookings.id))
         .leftJoin(feedback, eq(feedback.bookingId, bookings.id))
+        .leftJoin(bookingDisputes, eq(bookingDisputes.bookingId, bookings.id))
         .where(and(...conditions))
         .orderBy(orderBy)
         .limit(limit)
@@ -601,10 +625,34 @@ for (const [key, value] of Object.entries(formData)) {
     const totalCount = countResult[0]?.count ?? 0;
     const defaultCounts = { all: 0, ongoing: 0, upcoming: 0, reschedule_requested: 0, completed: 0, rescheduled: 0, cancelled: 0, no_show: 0 };
 
-  const bookingsWithMeetingLinks = rows.map((booking) => ({
-  ...booking,
-  meetLink: meetingService.getMeetingLink(booking.id),
-  }));
+    const bookingsWithMeetingLinks = rows.map((r) => {
+      const {
+        disputeId,
+        disputeReason,
+        disputeDescription,
+        disputeStatus,
+        disputeAdminNotes,
+        disputeCreatedAt,
+        disputeResolvedAt,
+        ...booking
+      } = r;
+
+      return {
+        ...booking,
+        meetLink: meetingService.getMeetingLink(booking.id),
+        dispute: disputeId
+          ? {
+              id: disputeId,
+              reason: disputeReason,
+              description: disputeDescription,
+              status: disputeStatus,
+              adminNotes: disputeAdminNotes,
+              createdAt: disputeCreatedAt ? disputeCreatedAt.toISOString() : null,
+              resolvedAt: disputeResolvedAt ? disputeResolvedAt.toISOString() : null,
+            }
+          : null,
+      };
+    });
 
     return {
       bookings:  bookingsWithMeetingLinks,
@@ -740,7 +788,7 @@ for (const [key, value] of Object.entries(formData)) {
 
       await Promise.all(
         recipients.map(({ email, name, role }) => {
-          const { subject, html } = bookingCancelledTemplate({
+          const { html: fallbackHtml } = bookingCancelledTemplate({
             recipientName: name,
             recipientRole: role,
             eventTypeName: eventType.name,
@@ -751,7 +799,18 @@ for (const [key, value] of Object.entries(formData)) {
             reason: data.reason,
             refundStatusText,
           });
-          return emailService.sendEmail({ to: email, subject, html }).catch((err) => {
+          const { templateId, subject, variables } = bookingCancelledTemplateData({
+            recipientName: name,
+            recipientRole: role,
+            eventTypeName: eventType.name,
+            reviewerName: reviewer.name,
+            advisorName: booking.advisorName,
+            formattedDate,
+            formattedTime,
+            reason: data.reason,
+            refundStatusText,
+          });
+          return emailService.sendTemplateEmail({ to: email, templateId, subject, variables, fallbackHtml }).catch((err) => {
             console.error(`[Booking] Failed to send cancellation email to ${email}:`, err);
           });
         })
@@ -888,7 +947,7 @@ for (const [key, value] of Object.entries(formData)) {
 
       await Promise.all(
         recipients.map(({ email, name }) => {
-          const { subject, html } = bookingRescheduleRequestedTemplate({
+          const { html: fallbackHtml } = bookingRescheduleRequestedTemplate({
             recipientName: name,
             eventTypeName: eventType.name,
             reviewerName: reviewer.name,
@@ -901,7 +960,20 @@ for (const [key, value] of Object.entries(formData)) {
             reason: data.reason,
             actionUrl,
           });
-          return emailService.sendEmail({ to: email, subject, html }).catch((err) => {
+          const { templateId, subject, variables } = bookingRescheduleRequestedTemplateData({
+            recipientName: name,
+            eventTypeName: eventType.name,
+            reviewerName: reviewer.name,
+            advisorName: booking.advisorName,
+            internName: booking.internName,
+            currentFormattedDate,
+            currentFormattedTime,
+            proposedFormattedDate,
+            proposedFormattedTime,
+            reason: data.reason,
+            actionUrl,
+          });
+          return emailService.sendTemplateEmail({ to: email, templateId, subject, variables, fallbackHtml }).catch((err) => {
             console.error(`[Booking] Failed to send reschedule request email to ${email}:`, err);
           });
         })
@@ -1163,7 +1235,7 @@ for (const [key, value] of Object.entries(formData)) {
 
         await Promise.all(
           recipients.map(({ email, name, role }) => {
-            const { subject, html } = bookingCancelledTemplate({
+            const { html: fallbackHtml } = bookingCancelledTemplate({
               recipientName: name,
               recipientRole: role,
               eventTypeName: eventType.name,
@@ -1174,7 +1246,18 @@ for (const [key, value] of Object.entries(formData)) {
               reason,
               refundStatusText,
             });
-            return emailService.sendEmail({ to: email, subject, html }).catch((err) => {
+            const { templateId, subject, variables } = bookingCancelledTemplateData({
+              recipientName: name,
+              recipientRole: role,
+              eventTypeName: eventType.name,
+              reviewerName: reviewer.name,
+              advisorName: booking.advisorName,
+              formattedDate,
+              formattedTime,
+              reason,
+              refundStatusText,
+            });
+            return emailService.sendTemplateEmail({ to: email, templateId, subject, variables, fallbackHtml }).catch((err) => {
               console.error(`[Booking] Failed to send cancellation email to ${email}:`, err);
             });
           })
@@ -1333,7 +1416,7 @@ for (const [key, value] of Object.entries(formData)) {
 
     await Promise.all(
       recipients.map(({ email, name, role }) => {
-        const { subject, html } = bookingRescheduledTemplate({
+        const { html: fallbackHtml } = bookingRescheduledTemplate({
           recipientName: name,
           recipientRole: role,
           eventTypeName: eventType.name,
@@ -1345,7 +1428,19 @@ for (const [key, value] of Object.entries(formData)) {
           newFormattedTime,
           meetLink,
         });
-        return emailService.sendEmail({ to: email, subject, html }).catch((err) => {
+        const { templateId, subject, variables } = bookingRescheduledTemplateData({
+          recipientName: name,
+          recipientRole: role,
+          eventTypeName: eventType.name,
+          reviewerName: reviewer.name,
+          advisorName: newBooking.advisorName,
+          oldFormattedDate,
+          oldFormattedTime,
+          newFormattedDate,
+          newFormattedTime,
+          meetLink,
+        });
+        return emailService.sendTemplateEmail({ to: email, templateId, subject, variables, fallbackHtml }).catch((err) => {
           console.error(`[Booking] Failed to send reschedule email to ${email}:`, err);
         });
       })

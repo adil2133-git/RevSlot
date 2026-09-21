@@ -22,6 +22,10 @@ const HeartbeatSchema = z.object({
   participantId: z.string().min(1).max(100),
 });
 
+const ScreenStartSchema = z.object({
+  streamId: z.string().min(1).max(200),
+});
+
 type MeetingSocketData = {
   bookingId: number;
   token: string;
@@ -58,6 +62,12 @@ export type ClientToServerEvents = {
     },
     ack?: (response: { ok: boolean; error?: string }) => void
   ) => void;
+  "webrtc:ready": () => void;
+  "screen:start": (
+    payload: { streamId: string },
+    ack: (response: { ok: boolean; error?: string }) => void
+  ) => void;
+  "screen:stop": () => void;
   "chat:send": (
     payload: { message: string },
     ack?: (response: { ok: boolean; error?: string }) => void
@@ -74,6 +84,8 @@ export type ServerToClientEvents = {
   "webrtc:signal": (
     signal: MeetingSignal
   ) => void;
+  "participant:ready": (payload: { participantId: string }) => void;
+  "screen:state": (state: ScreenShareState | null) => void;
   "chat:message": (
     message: MeetingMessage
   ) => void;
@@ -86,6 +98,11 @@ type MeetingParticipant = {
   id: string;
   name: string;
   lastSeen: number;
+};
+
+type ScreenShareState = {
+  participantId: string;
+  streamId: string;
 };
 
 type MeetingMessage = {
@@ -117,6 +134,28 @@ const socketParticipants = new Map<
   number,
   Map<string, string>
 >();
+
+/*
+ * One active screen presenter per meeting.
+ * Kept in memory, like socketParticipants above.
+ */
+const activeScreenShares = new Map<
+  number,
+  ScreenShareState & { socketId: string }
+>();
+
+const toPublicScreenState = (
+  bookingId: number
+): ScreenShareState | null => {
+  const share = activeScreenShares.get(bookingId);
+
+  return share
+    ? {
+        participantId: share.participantId,
+        streamId: share.streamId,
+      }
+    : null;
+};
 
 const getParticipantSockets = (bookingId: number) => {
   let map = socketParticipants.get(bookingId);
@@ -330,6 +369,90 @@ export const registerMeetingSocket = (
       }
     });
 
+    meetingSocket.on("webrtc:ready", () => {
+      meetingSocket
+        .to(roomName(bookingId))
+        .emit("participant:ready", { participantId });
+
+      // Late joiners need to know if someone is already presenting.
+      meetingSocket.emit(
+        "screen:state",
+        toPublicScreenState(bookingId)
+      );
+    });
+
+    /*
+     * Screen share ownership.
+     * The server only decides WHO may present (one at a time).
+     * The screen video itself still travels over WebRTC.
+     */
+    const clearScreenShareIfOwner = () => {
+      const share = activeScreenShares.get(bookingId);
+
+      if (share?.socketId !== meetingSocket.id) {
+        return;
+      }
+
+      activeScreenShares.delete(bookingId);
+
+      io.to(roomName(bookingId)).emit("screen:state", null);
+    };
+
+    meetingSocket.on("screen:start", (payload, ack) => {
+      try {
+        const input = ScreenStartSchema.parse(payload);
+
+        const joined =
+          socketParticipants
+            .get(bookingId)
+            ?.get(participantId) === meetingSocket.id;
+
+        if (!joined) {
+          ack?.({
+            ok: false,
+            error: "Join the meeting before sharing your screen.",
+          });
+          return;
+        }
+
+        const current = activeScreenShares.get(bookingId);
+
+        if (
+          current &&
+          current.participantId !== participantId
+        ) {
+          ack?.({
+            ok: false,
+            error:
+              "Someone else is already presenting. Wait until they stop sharing.",
+          });
+          return;
+        }
+
+        activeScreenShares.set(bookingId, {
+          participantId,
+          streamId: input.streamId,
+          socketId: meetingSocket.id,
+        });
+
+        io.to(roomName(bookingId)).emit(
+          "screen:state",
+          toPublicScreenState(bookingId)
+        );
+
+        ack?.({ ok: true });
+      } catch {
+        ack?.({
+          ok: false,
+          error: "Unable to start screen sharing.",
+        });
+      }
+    });
+
+    meetingSocket.on("screen:stop", () => {
+      clearScreenShareIfOwner();
+    });
+
     meetingSocket.on("chat:send", async (payload, ack) => {
       try {
         const input = ChatMessageSchema.parse({
@@ -376,6 +499,8 @@ export const registerMeetingSocket = (
           participantId
         );
 
+        clearScreenShareIfOwner();
+
         removeSocketMapping(
           bookingId,
           participantId,
@@ -394,6 +519,9 @@ export const registerMeetingSocket = (
     });
 
     meetingSocket.on("disconnect", async () => {
+      // A presenter who drops (refresh / closed tab) stops presenting.
+      clearScreenShareIfOwner();
+
       const map = socketParticipants.get(bookingId);
       const ownsParticipant =
         map?.get(participantId) === meetingSocket.id;

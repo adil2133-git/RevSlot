@@ -55,9 +55,10 @@ export const NextReviewCard: React.FC<NextReviewCardProps> = ({
   const isInProgress =
     now >= startTime.valueOf() && now < endTime.valueOf();
 
+  // Meeting join window: set to 1 day (24h) for testing; revert to 15, "minute" for 15 minutes
   const canJoinMeet =
     !!nextReview.meetLink &&
-    now >= startTime.subtract(10, "minute").valueOf() &&
+    now >= startTime.subtract(1, "day").valueOf() &&
     now < endTime.valueOf();
 
   return (

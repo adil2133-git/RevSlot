@@ -28,13 +28,21 @@ export const disputeController = {
 
   getBookingDispute: async (req: Request, res: Response) => {
     const bookingId = Number(req.params.bookingId);
-    const advisorEmail = String(req.query.advisorEmail || "");
+    const advisorEmail = req.query.advisorEmail ? String(req.query.advisorEmail) : undefined;
+    const reviewerId = (req as any).user?.role === "reviewer" ? (req as any).user?.userId : undefined;
 
-    if (!bookingId || !advisorEmail) {
-      throw new AppError("Booking ID and advisor email are required", 400);
+    if (!bookingId || isNaN(bookingId)) {
+      throw new AppError("A valid booking ID is required", 400);
+    }
+    if (!advisorEmail && !reviewerId) {
+      throw new AppError("Advisor email or reviewer authentication is required", 400);
     }
 
-    const dispute = await disputeService.getDisputeForBooking(bookingId, advisorEmail);
+    const filter: { advisorEmail?: string; reviewerId?: number } = {};
+    if (advisorEmail) filter.advisorEmail = advisorEmail;
+    if (reviewerId) filter.reviewerId = reviewerId;
+
+    const dispute = await disputeService.getDisputeForBooking(bookingId, filter);
     return res.json({
       status: "success",
       data: dispute,
@@ -44,7 +52,7 @@ export const disputeController = {
   listAdminDisputes: async (req: Request, res: Response) => {
     const status = req.query.status as any;
     const page = Number(req.query.page) || 1;
-    const limit = Number(req.query.limit) || 20;
+    const limit = Number(req.query.limit) || 5;
 
     const result = await disputeService.listAdminDisputes({ status, page, limit });
     return res.json({

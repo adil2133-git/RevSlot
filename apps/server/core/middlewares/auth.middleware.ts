@@ -157,3 +157,16 @@ export const requireMeetingParticipant = (
     message: "Invalid or expired token",
   });
 };
+
+export const optionalAuth = (req: Request, res: Response, next: NextFunction) => {
+  const token = extractBearerToken(req);
+  if (token) {
+    try {
+      const payload = verifyAccessToken(token);
+      req.user = payload;
+    } catch {
+      // ignore expired / invalid optional token
+    }
+  }
+  next();
+};

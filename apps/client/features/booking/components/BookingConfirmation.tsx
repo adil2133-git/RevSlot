@@ -54,18 +54,36 @@ export default function BookingConfirmation({
           </div>
         )}
 
-        {meetLink && (
-          <div className="mt-4">
-            <a
-              href={meetLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary transition hover:opacity-90"
-            >
-              Join Google Meet
-            </a>
-          </div>
-        )}
+        {meetLink && (() => {
+          const slotStart = heldSlot ? dayjs(`${heldSlot.date}T${heldSlot.startTime}`) : null;
+          const slotEnd = heldSlot ? dayjs(`${heldSlot.date}T${heldSlot.endTime}`) : null;
+          const now = dayjs();
+          // Meeting join window: set to 1 day (24h) for testing; revert to 15, "minute" for 15 minutes
+          const canJoin =
+            slotStart && slotEnd
+              ? now.isAfter(slotStart.subtract(1, "day")) && now.isBefore(slotEnd)
+              : false;
+
+          return canJoin ? (
+            <div className="mt-4">
+              <a
+                href={meetLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary transition hover:opacity-90"
+              >
+                Join Google Meet
+              </a>
+            </div>
+          ) : (
+            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-center text-xs text-slate-600">
+              <span className="font-semibold text-slate-800">Meeting Room</span>
+              <p className="mt-0.5 text-slate-500">
+                The join link will activate 1 day before your session begins. You can also join anytime from &ldquo;Check My Bookings&rdquo;.
+              </p>
+            </div>
+          );
+        })()}
 
         <div className="mt-6 flex flex-col gap-2">
           <Link

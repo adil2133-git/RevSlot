@@ -5,7 +5,7 @@ export const ListReviewersQuerySchema = z.object({
   search: z.string().trim().max(150).optional(),
   status: z.enum(["active", "inactive", "all"]).optional().default("all"),
   page: z.coerce.number().int().min(1).optional().default(1),
-  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(5),
 });
 
 export type ListReviewersQuery = z.infer<typeof ListReviewersQuerySchema>;
@@ -30,7 +30,7 @@ export const ListBookingsQuerySchema = z.object({
   fromDate: z.string().date().optional(),
   toDate: z.string().date().optional(),
   page: z.coerce.number().int().min(1).optional().default(1),
-  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(5),
 });
 
 export type ListBookingsQuery = z.infer<typeof ListBookingsQuerySchema>;
@@ -42,7 +42,7 @@ export const ListFeedbackHistoryQuerySchema = z.object({
   fromDate: z.string().optional(),
   toDate: z.string().optional(),
   page: z.coerce.number().int().min(1).optional().default(1),
-  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(5),
 });
 
 export type ListFeedbackHistoryQuery = z.infer<typeof ListFeedbackHistoryQuerySchema>;

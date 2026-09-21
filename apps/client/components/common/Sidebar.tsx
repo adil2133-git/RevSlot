@@ -1,207 +1,364 @@
 "use client";
 
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
 import { useAuthStore } from "@/features/auth/store/authStore";
-import NotificationBell from "@/features/notifications/components/NotificationBell";
-import { InstallPwaButton } from "@/components/common/InstallPwaButton";
+import {
+  LayoutGrid,
+  Calendar,
+  CalendarCheck,
+  Layers,
+  HelpCircle,
+  MessageSquare,
+  Palmtree,
+  Wallet,
+  Settings,
+  ShieldCheck,
+  ChevronsUpDown,
+  ChevronUp,
+  LogOut,
+} from "lucide-react";
 
-const NAV_ITEMS = [
+interface NavItem {
+  href: string;
+  label: string;
+  icon: React.ElementType;
+  badge?: string | number;
+  hasDot?: boolean;
+}
+
+const NAV_ITEMS: NavItem[] = [
   {
     href: "/dashboard",
     label: "Overview",
-    icon: (
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="3" width="7" height="9" rx="1.5" />
-        <rect x="14" y="3" width="7" height="5" rx="1.5" />
-        <rect x="14" y="12" width="7" height="9" rx="1.5" />
-        <rect x="3" y="16" width="7" height="5" rx="1.5" />
-      </svg>
-    ),
+    icon: LayoutGrid,
   },
   {
     href: "/availability",
     label: "Availability",
-    icon: (
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="4" width="18" height="17" rx="2" />
-        <path d="M3 9h18" />
-        <path d="M8 2v4M16 2v4" />
-      </svg>
-    ),
+    icon: Calendar,
   },
   {
     href: "/dashboard/bookings",
     label: "Bookings",
-    icon: (
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="4" width="18" height="17" rx="2" />
-        <path d="M3 9h18" />
-        <path d="m9 15 2 2 4-4" />
-      </svg>
-    ),
+    icon: CalendarCheck,
   },
   {
     href: "/dashboard/event-types",
     label: "Event Types",
-    icon: (
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M10 13a5 5 0 0 0 7.07 0l2.5-2.5a5 5 0 0 0-7.07-7.07L11 4.93" />
-        <path d="M14 11a5 5 0 0 0-7.07 0l-2.5 2.5a5 5 0 0 0 7.07 7.07L13 19.07" />
-      </svg>
-    ),
+    icon: Layers,
   },
   {
     href: "/dashboard/question-banks",
     label: "Question Banks",
-    icon: (
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-      </svg>
-    ),
+    icon: HelpCircle,
   },
-    {
+  {
     href: "/dashboard/feedback-forms",
     label: "Feedback & Forms",
-    icon: (
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-      </svg>
-    ),
+    icon: MessageSquare,
   },
   {
     href: "/dashboard/vacation",
     label: "Vacation Mode",
-    icon: (
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M2 22h20" />
-        <path d="M6.36 17.4 4 17l-2-4 1.44-.72a2 2 0 0 1 2.12.24l1.4 1.12a4 4 0 0 0 2.8 1H12l6.28-6.28a2.17 2.17 0 0 1 3.06 3.07L15 18l-4-2.5" />
-        <path d="M9 11.2 8 5l4-1.5" />
-      </svg>
-    ),
-  },
-
-    {
-    href: "/dashboard/wallet",
-    label: "Earnings & Wallet",
-    icon: (
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" />
-        <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" />
-        <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" />
-      </svg>
-    ),
+    icon: Palmtree,
   },
   {
-    href: "/dashboard/settings",
-    label: "Settings",
-    icon: (
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="3" />
-        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
-      </svg>
-    ),
+    href: "/dashboard/wallet",
+    label: "Earnings & Wallet",
+    icon: Wallet,
   },
 ];
 
-function initials(name: string) {
-  return name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
 }
 
-export default function Sidebar() {
+interface SidebarProps {
+  collapsed?: boolean;
+}
+
+export default function Sidebar({ collapsed = false }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuthStore();
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  // Close popover on outside click or ESC
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        popoverRef.current &&
+        !popoverRef.current.contains(e.target as Node) &&
+        triggerRef.current &&
+        !triggerRef.current.contains(e.target as Node)
+      ) {
+        setPopoverOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPopoverOpen(false);
+    };
+
+    window.addEventListener("mousedown", handleClickOutside);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
 
   const handleLogout = async () => {
     await logout();
     router.push("/reviewer/login");
   };
 
-  return (
-    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-slate-100 bg-surface-card">
-      <div className="flex h-16 items-center justify-between px-6">
-        <Link href="/dashboard" className="text-lg font-semibold tracking-tight text-primary">
-          RevSlot
-        </Link>
-       <NotificationBell />
-      </div>
+  const displayName = user?.name || "Reviewer";
+  const displayEmail = user?.email || "";
+  const displayUsername = user?.username ? `@${user.username}` : (user?.role || "Reviewer");
+  const initials = user?.name ? getInitials(user.name) : "R";
 
-      <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-2">
-        <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-          Main
-        </p>
-        {NAV_ITEMS.map((item) => {
-          const active =
-            item.href === "/dashboard"
-              ? pathname === "/dashboard"
-              : pathname.startsWith(item.href);
-
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${
-                active
-                  ? "bg-primary text-on-primary shadow-surface"
-                  : "text-on-surface hover:bg-surface-hover"
-              }`}
-            >
-              <span className={active ? "text-on-primary" : "text-slate-400 group-hover:text-primary"}>
-                {item.icon}
-              </span>
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
-
-      {/* PWA Install Button (renders only if browser supports install & not yet installed) */}
-      <div className="px-3 pb-1">
-        <InstallPwaButton className="flex w-full items-center justify-center gap-2 rounded-lg bg-secondary/80 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-secondary cursor-pointer" />
-      </div>
-
-      {/* Account section — anchored to bottom, cal.com style */}
-      <div className="relative border-t border-slate-100 p-3">
-        {menuOpen && (
-          <button
-            onClick={handleLogout}
-            className="mb-1 flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-error transition-colors hover:bg-error-container"
+  // -------------------------------------------------------------
+  // VARIANT C: COLLAPSED RAIL (Width 72px)
+  // -------------------------------------------------------------
+  if (collapsed) {
+    return (
+      <aside className="relative flex h-full w-[72px] shrink-0 flex-col items-center justify-between border-r border-slate-200/80 bg-white py-4 transition-all duration-200">
+        {/* Top Brand Shield Icon */}
+        <div className="flex flex-col items-center gap-6">
+          <Link
+            href="/dashboard"
+            className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-white shadow-xs hover:scale-105 transition-transform"
+            title="RevSlot Reviewer"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-              <polyline points="16 17 21 12 16 7" />
-              <line x1="21" y1="12" x2="9" y2="12" />
-            </svg>
-            Log out
-          </button>
-        )}
-        <button
-          onClick={() => setMenuOpen((v) => !v)}
-          className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-surface-hover"
-        >
-          
-          <div className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-secondary text-xs font-semibold text-primary">
-            {user?.avatarUrl ? (
-           <Image src={user.avatarUrl} alt={user.name} fill sizes="32px" className="object-cover" />
-           ) : (
-            user ? initials(user.name) : "…"
-         )}
+            <ShieldCheck className="h-6 w-6" />
+          </Link>
+
+          {/* Navigation Icon Stack */}
+          <nav className="flex flex-col items-center gap-2">
+            {NAV_ITEMS.map((item) => {
+              const Icon = item.icon;
+              const active =
+                item.href === "/dashboard"
+                  ? pathname === "/dashboard"
+                  : pathname.startsWith(item.href);
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`group relative flex h-11 w-11 items-center justify-center rounded-xl transition-all ${
+                    active
+                      ? "bg-primary text-white shadow-sm"
+                      : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                  }`}
+                >
+                  <Icon className="h-5 w-5" />
+
+                  {/* Hover Tooltip Reveal */}
+                  <span className="absolute left-full ml-3 hidden rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white shadow-lg whitespace-nowrap group-hover:block z-50 animate-in fade-in duration-150">
+                    {item.label}
+                  </span>
+                </Link>
+              );
+            })}
+          </nav>
         </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-on-surface">
-              {user?.name ?? "Loading…"}
-            </p>
-            <p className="truncate text-xs capitalize text-slate-400">
-              {user?.username ? `@${user.username}` : user?.role}
-            </p>
+
+        {/* Bottom Stack: User Avatar */}
+        <div className="flex flex-col items-center">
+          <button
+            onClick={() => setPopoverOpen(!popoverOpen)}
+            className="relative flex h-10 w-10 items-center justify-center rounded-full bg-primary text-white text-xs font-bold hover:ring-2 hover:ring-primary/20 transition-all cursor-pointer"
+            title={displayName}
+          >
+            {user?.avatarUrl ? (
+              <Image
+                src={user.avatarUrl}
+                alt={displayName}
+                fill
+                sizes="40px"
+                className="rounded-full object-cover"
+              />
+            ) : (
+              initials
+            )}
+          </button>
+        </div>
+      </aside>
+    );
+  }
+
+  // -------------------------------------------------------------
+  // VARIANT A & B: FULL NOMINAL SIDEBAR (Width 248px)
+  // -------------------------------------------------------------
+  return (
+    <aside className="relative flex h-full w-[248px] shrink-0 flex-col justify-between border-r border-slate-200/80 bg-white">
+      {/* Top Header & Main Navigation */}
+      <div className="flex flex-col flex-1 overflow-hidden">
+        {/* Brand Header */}
+        <div className="flex h-16 items-center justify-between px-5 border-b border-slate-100">
+          <Link href="/dashboard" className="flex items-center gap-2.5 group">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-white shadow-xs group-hover:scale-105 transition-transform">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+            <div>
+              <span className="text-sm font-bold tracking-tight text-primary leading-none block">
+                RevSlot
+              </span>
+              <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400 block mt-0.5">
+                Reviewer
+              </span>
+            </div>
+          </Link>
+        </div>
+
+        {/* Main Nav Items */}
+        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+          <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            Main
+          </p>
+
+          {NAV_ITEMS.map((item) => {
+            const Icon = item.icon;
+            const active =
+              item.href === "/dashboard"
+                ? pathname === "/dashboard"
+                : pathname.startsWith(item.href);
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`group flex items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
+                  active
+                    ? "bg-primary text-white shadow-sm font-bold"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Icon
+                    className={`h-4 w-4 ${
+                      active
+                        ? "text-white"
+                        : "text-slate-400 group-hover:text-primary"
+                    }`}
+                  />
+                  <span>{item.label}</span>
+                </div>
+
+                {/* Right Badges / Indicators */}
+                {item.hasDot && !item.badge && (
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      active ? "bg-white" : "bg-slate-300"
+                    }`}
+                  />
+                )}
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
+
+      {/* Bottom Section: User Account Popover */}
+      <div className="p-3 border-t border-slate-100 bg-white relative">
+        {/* VARIANT B: ELEVATED USER POPOVER (8px above the user tile) */}
+        {popoverOpen && (
+          <div
+            ref={popoverRef}
+            className="absolute bottom-[calc(100%+8px)] left-3 right-3 rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xl shadow-blue-950/15 z-50 animate-in fade-in zoom-in-95 duration-150"
+          >
+            {/* Header: User Info + Role */}
+            <div className="pb-3 border-b border-slate-100">
+              <div className="flex items-center justify-between gap-2">
+                <h4 className="text-xs font-bold text-slate-900 truncate">
+                  {displayName}
+                </h4>
+                <span className="rounded-md bg-primary text-white text-[9px] font-bold px-1.5 py-0.5 uppercase tracking-wide">
+                  {user?.role ? user.role : "Faculty"}
+                </span>
+              </div>
+              {displayEmail && (
+                <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                  {displayEmail}
+                </p>
+              )}
+            </div>
+
+            {/* Menu Items: Only Settings */}
+            <div className="py-2 space-y-0.5 text-xs font-semibold text-slate-700">
+              <Link
+                href="/dashboard/settings"
+                onClick={() => setPopoverOpen(false)}
+                className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+              >
+                <Settings className="h-4 w-4 text-slate-400" />
+                <span>Settings</span>
+              </Link>
+            </div>
+
+            {/* Divider & Log out */}
+            <div className="pt-2 border-t border-slate-100">
+              <button
+                onClick={handleLogout}
+                className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+              >
+                <LogOut className="h-4 w-4 text-rose-500" />
+                <span>Log out</span>
+              </button>
+            </div>
           </div>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-slate-400">
-            <path d="m18 15-6-6-6 6" />
-          </svg>
+        )}
+
+        {/* User Tile / Trigger */}
+        <button
+          ref={triggerRef}
+          onClick={() => setPopoverOpen(!popoverOpen)}
+          className={`flex w-full items-center justify-between rounded-xl p-2 transition-all cursor-pointer ${
+            popoverOpen
+              ? "bg-blue-50/90 border border-blue-200/80 shadow-xs"
+              : "hover:bg-slate-50 border border-transparent"
+          }`}
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary text-white text-xs font-bold">
+              {user?.avatarUrl ? (
+                <Image
+                  src={user.avatarUrl}
+                  alt={displayName}
+                  fill
+                  sizes="32px"
+                  className="object-cover"
+                />
+              ) : (
+                initials
+              )}
+            </div>
+            <div className="min-w-0 flex-1 text-left">
+              <p className="truncate text-xs font-bold text-slate-900 leading-tight">
+                {displayName}
+              </p>
+              <p className="truncate text-[11px] text-slate-400">
+                {displayUsername}
+              </p>
+            </div>
+          </div>
+
+          {popoverOpen ? (
+            <ChevronUp className="h-4 w-4 text-primary shrink-0" />
+          ) : (
+            <ChevronsUpDown className="h-4 w-4 text-slate-400 shrink-0" />
+          )}
         </button>
       </div>
     </aside>

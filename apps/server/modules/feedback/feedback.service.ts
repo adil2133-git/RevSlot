@@ -3,6 +3,10 @@ import { db } from "../../config/db.js";
 import { bookings, eventTypes, feedback, feedbackForms, feedbackFormFields, feedbackFormQuestions, feedbackPendingQuestions, } from "../../db/index.js";
 import { questions } from "../questionBank/questions.schema.js";
 import { questionBanks } from "../questionBank/questionBanks.schema.js";
+import { reviewers } from "../auth/reviewers.schema.js";
+import { emailService } from "../../services/email.service.js";
+import { feedbackSubmittedTemplate, feedbackSubmittedTemplateData } from "../../emails/templates/feedbackSubmitted.js";
+import { notificationService } from "../notification/notification.service.js";
 import { AppError } from "../../core/errors/AppError.js";
 import type {
   CreateFormInput,
@@ -336,6 +340,70 @@ export async function submitFeedback(bookingId: number, reviewerId: number, inpu
     if (!input.isNoShow && input.pendingQuestionIds?.length) {
     await assignPendingQuestions(created.id, reviewerId, input.pendingQuestionIds);
   }
+
+  // 1. In-app notification to Reviewer (Socket.IO live alert)
+  await notificationService.createNotification({
+    reviewerId,
+    type: "feedback_submitted",
+    title: "Feedback recorded",
+    message: `Feedback for ${booking.internName} (${booking.weekStage}) recorded successfully`,
+    bookingId,
+  });
+
+  // 2. Email summary to Advisor & Intern(s)
+  const [reviewer] = await db
+    .select({ name: reviewers.name })
+    .from(reviewers)
+    .where(eq(reviewers.id, reviewerId))
+    .limit(1);
+
+  const [eventType] = await db
+    .select({ name: eventTypes.name })
+    .from(eventTypes)
+    .where(eq(eventTypes.id, booking.eventTypeId))
+    .limit(1);
+
+  const recipients: { email: string; name: string; role: "advisor" | "intern" }[] = [
+    { email: booking.advisorEmail, name: booking.advisorName, role: "advisor" },
+    ...(booking.internEmails ?? []).map((email) => ({
+      email,
+      name: booking.internName,
+      role: "intern" as const,
+    })),
+  ];
+
+  await Promise.all(
+    recipients.map(({ email, name, role }) => {
+      const { html: fallbackHtml } = feedbackSubmittedTemplate({
+        recipientName: name,
+        recipientRole: role,
+        eventTypeName: eventType?.name || "Review Session",
+        reviewerName: reviewer?.name || "Reviewer",
+        internName: booking.internName,
+        reviewMark: input.isNoShow ? null : input.reviewMark !== undefined ? String(input.reviewMark) : null,
+        understandingLevel: input.isNoShow ? null : input.understandingLevel || null,
+        taskMark: input.isNoShow || effectiveTaskMark === undefined ? null : String(effectiveTaskMark),
+        comments: input.comments || null,
+        isNoShow: input.isNoShow,
+      });
+      const { templateId, subject, variables } = feedbackSubmittedTemplateData({
+        recipientName: name,
+        recipientRole: role,
+        eventTypeName: eventType?.name || "Review Session",
+        reviewerName: reviewer?.name || "Reviewer",
+        internName: booking.internName,
+        reviewMark: input.isNoShow ? null : input.reviewMark !== undefined ? String(input.reviewMark) : null,
+        understandingLevel: input.isNoShow ? null : input.understandingLevel || null,
+        taskMark: input.isNoShow || effectiveTaskMark === undefined ? null : String(effectiveTaskMark),
+        comments: input.comments || null,
+        isNoShow: input.isNoShow,
+      });
+
+      return emailService.sendTemplateEmail({ to: email, templateId, subject, variables, fallbackHtml }).catch((err) => {
+        console.error(`[Feedback] Failed to send evaluation email to ${email}:`, err);
+      });
+    })
+  );
 
   return created;
 }

@@ -6,6 +6,7 @@ import { useFeedbackStore } from "@/features/feedback/store/feedbackStore";
 import FeedbackDetailsModal from "@/features/feedback/components/FeedbackDetailsModal";
 import type { FeedbackFieldType, FormFieldInput, FeedbackFormField } from "@/features/feedback/types";
 import SubmitFeedbackModal from "@/features/feedback/components/SubmitFeedbackModal";
+import FeedbackFormBuilder from "@/features/feedback/components/FeedbackFormBuilder";
 
 const FIELD_TYPES: { value: FeedbackFieldType; label: string }[] = [
   { value: "text", label: "Short text" },
@@ -742,36 +743,60 @@ const totalPages = Math.max(
 );
 
     return (
-    <div className={`mx-auto py-2 ${isEditorOpen ? "max-w-6xl" : "max-w-4xl"}`}>
-      {/* Header */}
+    <div className="mx-auto max-w-4xl py-2">
       {isEditorOpen ? (
-        <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <button
-              onClick={cancelEdit}
-              className="mb-2 flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-on-surface"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M19 12H5M12 19l-7-7 7-7" />
-              </svg>
-              Back to Feedback Forms
-            </button>
-            <h1 className="text-2xl font-bold tracking-tight text-on-surface sm:text-3xl">
-              {editingId === "new" ? "Create Feedback Form" : "Edit Feedback Form"}
-            </h1>
-            <p className="mt-1 text-sm text-slate-500">
-              Design a feedback form to evaluate your sessions. Standard fields are enabled by default. Add Task Mark (optional) and custom fields.
-            </p>
-          </div>
-
-          
-
-        </div>
+        <FeedbackFormBuilder
+          key={editingId === "new" ? "new" : `edit-${editingId}`}
+          initialName={name}
+          initialDescription={description}
+          initialTaskMarkEnabled={taskMarkEnabled}
+          initialFields={fields}
+          initialQuestionIds={selectedQuestionIds}
+          isEditing={editingId !== "new"}
+          formId={typeof editingId === "number" ? editingId : undefined}
+          onSave={async (payload) => {
+            setSubmitting(true);
+            setFormError(null);
+            try {
+              if (editingId === "new") {
+                await createForm({
+                  name: payload.name,
+                  description: payload.description,
+                  fields: payload.fields,
+                  taskMarkEnabled: payload.taskMarkEnabled,
+                  questionIds: payload.questionIds,
+                });
+              } else if (typeof editingId === "number") {
+                await updateForm(editingId, {
+                  name: payload.name,
+                  description: payload.description,
+                  fields: payload.fields,
+                  taskMarkEnabled: payload.taskMarkEnabled,
+                  questionIds: payload.questionIds,
+                });
+              }
+              await fetchForms(true);
+              cancelEdit();
+            } catch (err) {
+              const msg =
+                err instanceof Error
+                  ? err.message
+                  : "Failed to save feedback form.";
+              setFormError(msg);
+              throw new Error(msg);
+            } finally {
+              setSubmitting(false);
+            }
+          }}
+          onCancel={cancelEdit}
+          submitting={submitting}
+          errorMessage={formError || error}
+        />
       ) : (
         <div className="mb-6 flex items-start justify-between">
           <div>
             <h1 className="mb-1 text-2xl font-bold tracking-tight text-on-surface sm:text-3xl">
-              Feedback & Forms
+              Feedback &amp; Forms
             </h1>
             <p className="text-sm text-slate-500">
               Create reusable feedback forms and review your recent submissions.
@@ -780,284 +805,12 @@ const totalPages = Math.max(
           {!viewingAllFeedback && (
             <button
               onClick={startCreate}
-              className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary shadow-surface transition-all duration-200 hover:bg-primary/95 hover:shadow-raised hover:-translate-y-[1px] active:translate-y-0"
+              className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary shadow-surface transition-all duration-200 hover:bg-primary/95 hover:shadow-raised hover:-translate-y-[1px] active:translate-y-0 cursor-pointer"
             >
               <PlusIcon />
               New Form
             </button>
           )}
-        </div>
-      )}
-
-      {/* Editor */}
-      {isEditorOpen && (
-        <div className="mb-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
-          {/* ── Left: form builder ─────────────────────────────── */}
-          <div className="space-y-5 lg:col-span-2">
-            {/* Basic Information */}
-            <div className="rounded-xl border border-slate-100 bg-surface-card p-5 shadow-surface">
-              <h2 className="text-sm font-bold text-on-surface">Basic Information</h2>
-              <p className="mt-1 text-xs text-slate-500">
-                Provide a name and description for your feedback form.
-              </p>
-
-              <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-400">
-                    Form Name <span className="text-error">*</span>
-                  </label>
-                  <input
-                    autoFocus
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Technical Review, HR Interview, Mock Interview"
-                    className="w-full rounded-lg border border-slate-200 bg-slate-50/50 px-3.5 py-2 text-sm outline-none transition-all focus:border-primary focus:bg-surface-card focus:ring-4 focus:ring-secondary/60"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-400">
-                    Description
-                  </label>
-                  <textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value.slice(0, 200))}
-                    placeholder="Briefly describe the purpose of this feedback form..."
-                    rows={1}
-                    maxLength={200}
-                    className="w-full resize-none rounded-lg border border-slate-200 bg-slate-50/50 px-3.5 py-2 text-sm outline-none transition-all focus:border-primary focus:bg-surface-card focus:ring-4 focus:ring-secondary/60"
-                  />
-                  <p className="mt-1 text-right text-[10px] text-slate-400">{description.length}/200</p>
-                </div>
-              </div>
-            </div>
-
-         {/* Standard Fields */}
-            <div className="rounded-xl border border-slate-100 bg-surface-card p-5 shadow-surface">
-              <h2 className="text-sm font-bold text-on-surface">Standard Fields</h2>
-              <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="11" width="18" height="11" rx="2" />
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                </svg>
-                These core fields are always included in every feedback form.
-              </p>
-
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                {SYSTEM_FIELDS.map((field) => (
-                  <div key={field.label}>
-                    <p className="text-sm font-medium text-on-surface">{field.label}</p>
-                    <p className="mt-0.5 text-xs text-slate-500">{field.description}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Task Mark */}
-            <div className="rounded-xl border border-slate-100 bg-surface-card p-5 shadow-surface">
-              <h2 className="text-sm font-bold text-on-surface">
-                Task Mark <span className="font-normal text-slate-400">(Optional)</span>
-              </h2>
-              <p className="mt-1 text-xs text-slate-500">
-                Include a section to evaluate specific tasks or assignments.
-              </p>
-
-              <div className="mt-4 flex items-center justify-between gap-4 rounded-lg border border-slate-200 bg-slate-50/50 p-4">
-                <div>
-                  <p className="text-sm font-semibold text-on-surface">Task Mark</p>
-                  <p className="mt-0.5 text-xs text-slate-500">
-                    Allow reviewers to give marks for completed tasks or assignments.
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={taskMarkEnabled}
-                  onClick={() => setTaskMarkEnabled((prev) => !prev)}
-                  className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-                    taskMarkEnabled ? "bg-primary" : "bg-slate-200"
-                  }`}
-                 >
-                  <span
-                    className={`absolute top-1 left-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
-                      taskMarkEnabled ? "translate-x-5" : "translate-x-0"
-                    }`}
-                  />
-                </button>
-              </div>
-            </div>
-
-            {/* Custom Fields */}
-            <div className="rounded-xl border border-slate-100 bg-surface-card p-5 shadow-surface">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-sm font-bold text-on-surface">
-                    Custom Fields <span className="font-normal text-slate-400">(Optional)</span>
-                  </h2>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Add your own custom questions or fields to collect specific feedback.
-                  </p>
-                </div>
-
-                <div className="flex shrink-0 gap-2">
-                  <button
-                    type="button"
-                    onClick={addField}
-                    className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-surface-hover"
-                  >
-                    <PlusIcon />
-                    Create Custom Field
-                  </button>
-                </div>
-              </div>
-
-              {fields.length === 0 ? (
-                <div className="mt-4 flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 py-10 text-center">
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mb-2 text-slate-300">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                    <path d="M14 2v6h6" />
-                  </svg>
-                  <p className="text-sm font-semibold text-slate-500">No custom fields added yet</p>
-                  <p className="mt-1 text-xs text-slate-400">
-                    Choose from suggestions on the right or create your own.
-                  </p>
-                </div>
-              ) : (
-                <div className="mt-4 space-y-3">
-                  {fields.map((field, index) => (
-                    <div key={index} className="rounded-lg border border-slate-200 p-3">
-                      <div className="flex items-start gap-2">
-                        <input
-                          value={field.label}
-                          onChange={(e) => updateField(index, { label: e.target.value })}
-                          placeholder="Field label"
-                          className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-secondary/60"
-                        />
-                        <select
-                          value={field.fieldType}
-                          onChange={(e) => updateField(index, { fieldType: e.target.value as FeedbackFieldType })}
-                          className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-primary"
-                        >
-                          {FIELD_TYPES.map((t) => (
-                            <option key={t.value} value={t.value}>
-                              {t.label}
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          onClick={() => removeField(index)}
-                          className="rounded-lg p-2 text-slate-400 hover:bg-error-container hover:text-error"
-                          aria-label="Remove field"
-                          type="button"
-                        >
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                            <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                          </svg>
-                        </button>
-                      </div>
-
-                    {field.fieldType === "select" && (
-                        <input
-                          value={field.optionsText}
-                          onChange={(e) => updateField(index, { optionsText: e.target.value })}
-                          placeholder="Options, comma separated — e.g. Excellent, Good, Needs Work"
-                          className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-secondary/60"
-                        />
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {(formError || error) && (
-                <p className="mt-4 text-xs font-semibold text-error">{formError ?? error}</p>
-              )}
-            </div>
-          </div>
-
-          {/* ── Right: suggested custom fields ────────────────────── */}
-          <div className="lg:col-span-1">
-            <div className="sticky top-4 rounded-xl border border-slate-100 bg-surface-card p-5 shadow-surface">
-              <h2 className="text-sm font-bold text-primary">Suggested Custom Fields</h2>
-              <p className="mt-1 text-xs text-slate-500">
-                Add commonly used fields to make feedback more effective.
-              </p>
-
-              <div className="mt-4 space-y-2">
-                {SUGGESTED_CUSTOM_FIELDS.map((suggestion) => {
-                  const added = fields.some(
-                    (f) => f.label.trim().toLowerCase() === suggestion.label.toLowerCase()
-                  );
-                  return (
-                    <div
-                      key={suggestion.label}
-                      className="flex items-start justify-between gap-3 rounded-lg border border-slate-200 p-3"
-                    >
-                      <div className="flex items-start gap-2.5">
-                        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-secondary/60 text-primary">
-                          <SuggestionIcon path={suggestion.icon} className="h-3.5 w-3.5" />
-                        </span>
-                        <div>
-                          <p className="text-xs font-semibold text-on-surface">{suggestion.label}</p>
-                          <p className="mt-0.5 text-[11px] leading-snug text-slate-500">
-                            {suggestion.description}
-                          </p>
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => toggleSuggestedField(suggestion)}
-                        className={`shrink-0 rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-                          added
-                            ? "border-primary/20 bg-secondary/60 text-primary"
-                            : "border-slate-200 text-slate-600 hover:bg-surface-hover"
-                        }`}
-                      >
-                        {added ? "Added" : "+ Add"}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="mt-4 border-t border-slate-100 pt-4">
-                <p className="mb-2 text-xs text-slate-400">Or create your own custom field</p>
-                <button
-                  type="button"
-                  onClick={addField}
-                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-slate-200 py-2.5 text-xs font-semibold text-slate-500 hover:border-primary/30 hover:bg-slate-50/50"
-                >
-                  <PlusIcon />
-                  Create Custom Field
-                </button>
-              </div>
-            </div>
-          </div>
-           {/* Form Actions */}
-          <div className="col-span-full flex justify-start gap-3 border-t border-slate-200 pt-5">
-            <button
-              type="button"
-              onClick={cancelEdit}
-              className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-surface-hover"
-            >
-              Cancel
-            </button>
-
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={submitting}
-              className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary shadow-surface disabled:opacity-60"
-            >
-              {submitting
-                ? "Saving…"
-                : editingId === "new"
-                  ? "Create Form"
-                  : "Save Form"}
-            </button>
-          </div>
         </div>
       )}
 

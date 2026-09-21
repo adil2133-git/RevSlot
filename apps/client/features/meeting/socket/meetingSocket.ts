@@ -6,6 +6,7 @@ import type {
   MeetingMessage,
   MeetingParticipant,
   MeetingSignal,
+  ScreenShareState,
 } from "../types/meeting.types";
 
 const SOCKET_URL = (
@@ -39,6 +40,12 @@ export type ClientToServerEvents = {
     },
     ack?: (response: { ok: boolean; error?: string }) => void
   ) => void;
+  "webrtc:ready": () => void;
+   "screen:start": (
+    payload: { streamId: string },
+    ack: (response: { ok: boolean; error?: string }) => void
+  ) => void;
+  "screen:stop": () => void;
   "chat:send": (
     payload: { message: string },
     ack?: (response: { ok: boolean; error?: string }) => void
@@ -49,6 +56,8 @@ export type ServerToClientEvents = {
   "participant:joined": (participant: MeetingParticipant) => void;
   "participant:left": (payload: { participantId: string }) => void;
   "webrtc:signal": (signal: MeetingSignal) => void;
+  "participant:ready": (payload: { participantId: string }) => void;
+  "screen:state": (state: ScreenShareState | null) => void;
   "chat:message": (message: MeetingMessage) => void;
   "meeting:error": (payload: { message: string }) => void;
 };

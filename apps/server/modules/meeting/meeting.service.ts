@@ -127,6 +127,13 @@ export const meetingService = {
       throw new AppError("This meeting is not active", 409);
     }
 
+    // Meeting join window: set to 1 day (24h) for testing; revert to 15 * 60 * 1000 for 15 minutes
+    const JOIN_WINDOW_MS = 24 * 60 * 60 * 1000;
+    const earliestJoinTime = new Date(booking.startTime).getTime() - JOIN_WINDOW_MS;
+    if (Date.now() < earliestJoinTime) {
+      throw new AppError("The meeting room opens 1 day before the scheduled start time", 403);
+    }
+
     if (Date.now() >= new Date(booking.endTime).getTime()) {
       throw new AppError("The meeting has ended", 403);
     }

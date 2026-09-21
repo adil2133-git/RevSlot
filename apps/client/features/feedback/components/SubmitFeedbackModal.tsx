@@ -5,6 +5,7 @@ import Modal from "@/components/common/Modal";
 import { XIcon, SearchIcon, BookmarkIcon, InfoIcon } from "@/features/booking/components/icons";
 import { useFeedbackStore } from "../store/feedbackStore";
 import { submitFeedback } from "../api/feedbackApi";
+import { markBookingOutcome } from "@/features/booking/api/bookingApi";
 import { useQuestionBankStore } from "@/features/questionBanks/store/questionBankStore";
 import type { MyBooking } from "@/features/booking/type";
 import type { UnderstandingLevel } from "../types";
@@ -115,7 +116,7 @@ export default function SubmitFeedbackModal({ booking, onClose, onSubmitted }: S
     clearSelectedBank,
   } = useQuestionBankStore();
   const [selectedFormId, setSelectedFormId] = useState<number | null>(null);
-  const [isNoShow, setIsNoShow] = useState(false);
+  const [markingNoShow, setMarkingNoShow] = useState(false);
   const [reviewMark, setReviewMark] = useState("");
   const [understandingLevel, setUnderstandingLevel] = useState<UnderstandingLevel | "">("");
   const [taskMark, setTaskMark] = useState("");
@@ -128,7 +129,7 @@ export default function SubmitFeedbackModal({ booking, onClose, onSubmitted }: S
   const [checkedQuestionIds, setCheckedQuestionIds] = useState<number[]>([]);
   const [questionSearch, setQuestionSearch] = useState("");
 
-    const filteredBankQuestions = useMemo(() => {
+  const filteredBankQuestions = useMemo(() => {
     if (!questionBank) return [];
     const term = questionSearch.trim().toLowerCase();
     if (!term) return questionBank.questions;
@@ -150,25 +151,24 @@ export default function SubmitFeedbackModal({ booking, onClose, onSubmitted }: S
     fetchForms();
     fetchBanks();
     return () => {
-    clearSelectedForm();
-    clearSelectedBank();
-    }
+      clearSelectedForm();
+      clearSelectedBank();
+    };
   }, []);
 
-   useEffect(() => {
+  useEffect(() => {
     if (selectedBankId !== null) {
       fetchQuestionBank(selectedBankId);
     }
   }, [selectedBankId]);
 
-    const handleSelectForm = (formId: number) => {
+  const handleSelectForm = (formId: number) => {
     setSelectedFormId(formId);
     setReviewMark("");
     setUnderstandingLevel("");
     setTaskMark("");
     setComments("");
     setCustomValues({});
-    setIsNoShow(false);
     setError(null);
     setSelectedBankId(null);
     setCheckedQuestionIds([]);
@@ -183,29 +183,53 @@ export default function SubmitFeedbackModal({ booking, onClose, onSubmitted }: S
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [forms]);
 
-    const handleSubmit = async () => {
+  const handleMarkNoShowFallback = async () => {
+    if (
+      !window.confirm(
+        `Are you sure you want to mark this session with ${booking.internName} as No-Show? This will record that the intern was absent, and feedback will not be required.`
+      )
+    ) {
+      return;
+    }
+
+    setMarkingNoShow(true);
+    setError(null);
+
+    try {
+      await markBookingOutcome(booking.id, { outcome: "no_show" });
+      onSubmitted();
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to mark session as no-show."
+      );
+    } finally {
+      setMarkingNoShow(false);
+    }
+  };
+
+  const handleSubmit = async () => {
     setError(null);
 
     if (!selectedFormId) return setError("Please choose a feedback form.");
 
-    if (!isNoShow) {
-      if (!reviewMark) return setError("Review mark is required.");
+    if (!reviewMark) return setError("Review mark is required.");
 
-      if (!understandingLevel) {
-        return setError("Understanding level is required.");
-      }
+    if (!understandingLevel) {
+      return setError("Understanding level is required.");
+    }
 
-      if (selectedForm?.taskMarkEnabled && !taskMark) {
-        return setError("Task mark is required for this form.");
-      }
+    if (selectedForm?.taskMarkEnabled && !taskMark) {
+      return setError("Task mark is required for this form.");
+    }
 
-      for (const field of selectedForm?.fields ?? []) {
-        if (
-          field.required &&
-          !customValues[String(field.id)]?.trim()
-        ) {
-          return setError(`"${field.label}" is required.`);
-        }
+    for (const field of selectedForm?.fields ?? []) {
+      if (
+        field.required &&
+        !customValues[String(field.id)]?.trim()
+      ) {
+        return setError(`"${field.label}" is required.`);
       }
     }
 
@@ -214,20 +238,16 @@ export default function SubmitFeedbackModal({ booking, onClose, onSubmitted }: S
     try {
       await submitFeedback(booking.id, {
         formId: selectedFormId,
-        isNoShow,
-        reviewMark: isNoShow ? undefined : Number(reviewMark),
-        understandingLevel: isNoShow
-          ? undefined
-          : understandingLevel || undefined,
+        isNoShow: false,
+        reviewMark: Number(reviewMark),
+        understandingLevel,
         taskMark:
-          isNoShow ||
-          !selectedForm?.taskMarkEnabled ||
-          !taskMark
-            ? undefined
-            : Number(taskMark),
-        comments: isNoShow ? undefined : comments.trim() || undefined,
-        customFieldValues: isNoShow ? {} : customValues,
-        pendingQuestionIds: isNoShow ? [] : checkedQuestionIds,
+          selectedForm?.taskMarkEnabled && taskMark
+            ? Number(taskMark)
+            : undefined,
+        comments: comments.trim() || undefined,
+        customFieldValues: customValues,
+        pendingQuestionIds: checkedQuestionIds,
       });
       onSubmitted();
     } catch (err) {
@@ -334,40 +354,27 @@ export default function SubmitFeedbackModal({ booking, onClose, onSubmitted }: S
                   </p>
                 </div>
 
-                {/* NO SHOW */}
-                <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3.5 py-3 text-sm font-medium text-on-surface">
-                  <input
-                    type="checkbox"
-                    checked={isNoShow}
-                    onChange={(e) => {
-                      setIsNoShow(e.target.checked);
+                {/* FALLBACK PROMPT FOR ABSENT INTERN */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-xs text-slate-600 flex items-center justify-between">
+                  <span>Intern did not show up for this session?</span>
+                  <button
+                    type="button"
+                    disabled={markingNoShow}
+                    onClick={handleMarkNoShowFallback}
+                    className="font-semibold text-rose-600 hover:text-rose-700 hover:underline disabled:opacity-50"
+                  >
+                    {markingNoShow ? "Recording No-Show..." : "Mark as Student No-Show instead"}
+                  </button>
+                </div>
 
-                      if (e.target.checked) {
-                        setReviewMark("");
-                        setUnderstandingLevel("");
-                        setTaskMark("");
-                        setCustomValues({});
-                        setSelectedBankId(null);
-                        setCheckedQuestionIds([]);
-                        setQuestionSearch("");
-                      }
-                    }}
-                    className="h-4 w-4 rounded border-slate-300"
-                  />
-
-                  <span>Mark as no-show</span>
-                </label>
-
-                {!isNoShow && (
-                  <>
-                    {/* STANDARD MARKS */}
-                    <div
-                      className={`grid gap-4 ${
-                        selectedForm.taskMarkEnabled
-                          ? "grid-cols-1 sm:grid-cols-3"
-                          : "grid-cols-1 sm:grid-cols-2"
-                      }`}
-                    >
+                {/* STANDARD MARKS */}
+                <div
+                  className={`grid gap-4 ${
+                    selectedForm.taskMarkEnabled
+                      ? "grid-cols-1 sm:grid-cols-3"
+                      : "grid-cols-1 sm:grid-cols-2"
+                  }`}
+                >
                       <Field label="Review Mark" required>
                         <select
                           value={reviewMark}
@@ -502,8 +509,6 @@ export default function SubmitFeedbackModal({ booking, onClose, onSubmitted }: S
                         ))}
                       </section>
                     )}
-                  </>
-                )}
 
                 <Field label="Comments">
                   <div className="rounded-xl border border-slate-200 bg-white p-3.5">
@@ -536,7 +541,7 @@ export default function SubmitFeedbackModal({ booking, onClose, onSubmitted }: S
           </div>
            
           {/* ASSIGN PENDING QUESTIONS */}
-          {selectedForm && !isNoShow && (
+          {selectedForm && (
             <div className="w-80 shrink-0 overflow-y-auto p-6">
               <div className="mb-1 flex items-center justify-between">
                 <h4 className="flex items-center gap-1.5 text-sm font-bold text-on-surface">

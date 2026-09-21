@@ -237,6 +237,7 @@ export default function AdvisorBookingsDashboard({ advisorEmail, onLogout }: Adv
                 activeTab={scope}
                 onActionClick={(b) => setActionModalBooking(b)}
                 onViewFeedback={(b) => setFeedbackModalBookingId(b.id)}
+                onDisputeUpdated={fetchBookings}
               />
             ))}
           </div>

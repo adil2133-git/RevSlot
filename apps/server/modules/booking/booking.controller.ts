@@ -59,6 +59,16 @@ export const bookingController = {
     const id = parseBookingId(req.params);
     const result = await bookingService.cancelBooking(req.user!.userId, id, req.body);
 
+    if (result) {
+      await notificationService.createNotification({
+        reviewerId: req.user!.userId,
+        type: "booking_cancelled",
+        title: "Booking cancelled",
+        message: `Session with ${result.advisorName} (${result.internName}) was cancelled`,
+        bookingId: result.id,
+      });
+    }
+
     res.status(200).json({ success: true, data: result });
   },
 
@@ -125,6 +135,16 @@ export const bookingController = {
     const { outcome } = req.body;
     const result = await bookingService.markOutcome(req.user!.userId, id, outcome);
     
+    if (result) {
+      await notificationService.createNotification({
+        reviewerId: req.user!.userId,
+        type: outcome === "completed" ? "booking_completed" : "booking_cancelled",
+        title: outcome === "completed" ? "Session completed" : "Marked as no-show",
+        message: `Session with ${result.advisorName} (${result.internName}) was marked as ${outcome === "completed" ? "completed" : "no-show"}`,
+        bookingId: result.id,
+      });
+    }
+
     res.status(200).json({ success: true, data: result });
   },
 };

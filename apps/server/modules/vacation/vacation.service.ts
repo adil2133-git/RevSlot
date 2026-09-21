@@ -6,8 +6,9 @@ import { vacationBlocks } from "./vacation.schema.js";
 import { bookings } from "../booking/bookings.schema.js";
 import { eventTypes } from "../eventType/eventTypes.schema.js";
 import { emailService } from "../../services/email.service.js";
-import { bookingCancelledTemplate } from "../../emails/templates/bookingCancelled.js";
+import { bookingCancelledTemplate, bookingCancelledTemplateData } from "../../emails/templates/bookingCancelled.js";
 import { reviewers } from "../auth/reviewers.schema.js";
+import { notificationService } from "../notification/notification.service.js";
 
 import { AppError } from "../../core/errors/AppError.js";
 
@@ -155,7 +156,17 @@ const sendVacationCancellationEmails = async (
       ];
 
       return recipients.map(({ email, name, role }) => {
-        const { subject, html } = bookingCancelledTemplate({
+        const { html: fallbackHtml } = bookingCancelledTemplate({
+          recipientName: name,
+          recipientRole: role,
+          eventTypeName: booking.eventTypeName,
+          reviewerName: booking.reviewerName,
+          advisorName: booking.advisorName,
+          formattedDate,
+          formattedTime,
+          reason,
+        });
+        const { templateId, subject, variables } = bookingCancelledTemplateData({
           recipientName: name,
           recipientRole: role,
           eventTypeName: booking.eventTypeName,
@@ -167,10 +178,12 @@ const sendVacationCancellationEmails = async (
         });
 
         return emailService
-          .sendEmail({
+          .sendTemplateEmail({
             to: email,
+            templateId,
             subject,
-            html,
+            variables,
+            fallbackHtml,
           })
           .catch((err) => {
             console.error(
@@ -243,6 +256,16 @@ export const vacationService = {
         affectedBookings,
         cancellationReason
       );
+
+      for (const booking of affectedBookings) {
+        notificationService.createNotification({
+          reviewerId,
+          type: "booking_cancelled",
+          title: "Booking cancelled (Vacation)",
+          message: `Session with ${booking.advisorName} on ${dayjs(booking.startTime).format("ddd, MMM D")} was cancelled due to vacation`,
+          bookingId: booking.id,
+        }).catch((err) => console.error("[Vacation] Notification error:", err));
+      }
     }
 
     return result;

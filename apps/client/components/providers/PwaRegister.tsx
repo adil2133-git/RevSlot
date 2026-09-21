@@ -5,15 +5,25 @@ import { useEffect } from "react";
 export default function PwaRegister() {
   useEffect(() => {
     if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-      // Register service worker after window load to not block initial render
+      if (process.env.NODE_ENV !== "production") {
+        // In development mode, unregister any active service worker and clear cache to prevent Turbopack HMR chunk collisions
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+          for (const registration of registrations) {
+            registration.unregister();
+          }
+        });
+        if ("caches" in window) {
+          caches.keys().then((keys) => {
+            keys.forEach((key) => caches.delete(key));
+          });
+        }
+        return;
+      }
+
+      // Register service worker in production
       const registerSW = () => {
         navigator.serviceWorker
           .register("/sw.js")
-          .then((registration) => {
-            if (process.env.NODE_ENV !== "production") {
-              console.log("[PWA] Service Worker registered:", registration.scope);
-            }
-          })
           .catch((error) => {
             console.error("[PWA] Service Worker registration failed:", error);
           });

@@ -11,14 +11,16 @@ import { otpService } from "../auth/otp.service.js";
 import { slotService } from "../slot/slot.service.js";
 import { calendarService } from "../calendar/calendar.service.js";
 import { emailService } from "../../services/email.service.js";
-import { advisorOtpTemplate } from "../../emails/templates/advisorOtp.js";
-import { bookingCancelledTemplate } from "../../emails/templates/bookingCancelled.js";
+import { advisorOtpTemplate, advisorOtpTemplateData } from "../../emails/templates/advisorOtp.js";
+import { bookingCancelledTemplate, bookingCancelledTemplateData } from "../../emails/templates/bookingCancelled.js";
 import { generateAdvisorToken } from "../../core/utils/jwt.js";
 import { meetingService } from "../meeting/meeting.service.js";
 import { refundService } from "../payment/refund.service.js";
-import { bookingService } from "../booking/booking.service.js";
-import { walletTransactions } from "../wallet/wallet.schema.js";
 import { payments } from "../payment/payments.schema.js";
+import { walletTransactions } from "../wallet/wallet.schema.js";
+import { bookingService } from "../booking/booking.service.js";
+import { notificationService } from "../notification/notification.service.js";
+import { bookingDisputes } from "../dispute/disputes.schema.js";
 import { AppError } from "../../core/errors/AppError.js";
 
 
@@ -27,15 +29,21 @@ export const advisorService = {
     const trimmedEmail = email.trim().toLowerCase();
     const code = await otpService.generateOtp(trimmedEmail, "advisor_access");
 
-    const { subject, html } = advisorOtpTemplate({
+    const { html: fallbackHtml } = advisorOtpTemplate({
+      advisorEmail: trimmedEmail,
+      otpCode: code,
+    });
+    const { templateId, subject, variables } = advisorOtpTemplateData({
       advisorEmail: trimmedEmail,
       otpCode: code,
     });
 
-    await emailService.sendEmail({
+    await emailService.sendTemplateEmail({
       to: trimmedEmail,
+      templateId,
       subject,
-      html,
+      variables,
+      fallbackHtml,
     });
 
     return { message: "Verification code sent to email" };
@@ -129,12 +137,20 @@ export const advisorService = {
         reviewerName: reviewers.name,
         timezone: sql<string>`'IST'`,
         hasFeedback: sql<boolean>`${feedback.id} is not null`,
+        disputeId: bookingDisputes.id,
+        disputeReason: bookingDisputes.reason,
+        disputeDescription: bookingDisputes.description,
+        disputeStatus: bookingDisputes.status,
+        disputeAdminNotes: bookingDisputes.adminNotes,
+        disputeCreatedAt: bookingDisputes.createdAt,
+        disputeResolvedAt: bookingDisputes.resolvedAt,
       })
       .from(bookings)
       .innerJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
       .innerJoin(reviewers, eq(bookings.reviewerId, reviewers.id))
       .leftJoin(payments, eq(payments.bookingId, bookings.id))
       .leftJoin(feedback, eq(feedback.bookingId, bookings.id))
+      .leftJoin(bookingDisputes, eq(bookingDisputes.bookingId, bookings.id))
       .where(and(...scopeConditions))
       .orderBy(orderBy);
 
@@ -153,10 +169,34 @@ export const advisorService = {
         .where(and(eq(bookings.advisorEmail, cleanEmail), eq(bookings.status, "cancelled"))),
     ]);
 
-    const bookingsWithMeetingLinks = rows.map((booking) => ({
-     ...booking,
-     meetLink: meetingService.getMeetingLink(booking.id),
-    }));
+    const bookingsWithMeetingLinks = rows.map((r) => {
+      const {
+        disputeId,
+        disputeReason,
+        disputeDescription,
+        disputeStatus,
+        disputeAdminNotes,
+        disputeCreatedAt,
+        disputeResolvedAt,
+        ...booking
+      } = r;
+
+      return {
+        ...booking,
+        meetLink: meetingService.getMeetingLink(booking.id),
+        dispute: disputeId
+          ? {
+              id: disputeId,
+              reason: disputeReason,
+              description: disputeDescription,
+              status: disputeStatus,
+              adminNotes: disputeAdminNotes,
+              createdAt: disputeCreatedAt ? disputeCreatedAt.toISOString() : null,
+              resolvedAt: disputeResolvedAt ? disputeResolvedAt.toISOString() : null,
+            }
+          : null,
+      };
+    });
 
   return {
     bookings: bookingsWithMeetingLinks,
@@ -364,7 +404,7 @@ export const advisorService = {
 
       await Promise.all(
         recipients.map(({ email, name, role }) => {
-          const { subject, html } = bookingCancelledTemplate({
+          const { html: fallbackHtml } = bookingCancelledTemplate({
             recipientName: name,
             recipientRole: role,
             eventTypeName: eventType.name,
@@ -375,11 +415,30 @@ export const advisorService = {
             reason: reasonText,
             refundStatusText,
           });
-          return emailService.sendEmail({ to: email, subject, html }).catch((err) => {
+          const { templateId, subject, variables } = bookingCancelledTemplateData({
+            recipientName: name,
+            recipientRole: role,
+            eventTypeName: eventType.name,
+            reviewerName: reviewer.name,
+            advisorName: booking.advisorName,
+            formattedDate,
+            formattedTime,
+            reason: reasonText,
+            refundStatusText,
+          });
+          return emailService.sendTemplateEmail({ to: email, templateId, subject, variables, fallbackHtml }).catch((err) => {
             console.error(`[AdvisorBooking] Failed to send cancellation email to ${email}:`, err);
           });
         })
       );
+
+      await notificationService.createNotification({
+        reviewerId: booking.reviewerId,
+        type: "booking_cancelled",
+        title: "Booking cancelled by advisor",
+        message: `${booking.advisorName} cancelled their session for ${dayjs(booking.startTime).format("ddd, MMM D")}`,
+        bookingId: booking.id,
+      });
     }
 
     return updated;
@@ -496,7 +555,14 @@ export const advisorService = {
       }
     );
 
+    await notificationService.createNotification({
+      reviewerId: updatedBooking.reviewerId,
+      type: "booking_rescheduled",
+      title: "Booking rescheduled by advisor",
+      message: `${updatedBooking.advisorName} rescheduled their session to ${dayjs(updatedBooking.startTime).format("ddd, MMM D, h:mm A")}`,
+      bookingId: updatedBooking.id,
+    });
+
     return updatedBooking;
   },
 };
-

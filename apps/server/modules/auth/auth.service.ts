@@ -26,8 +26,8 @@ import {
 
 import { otpService } from "./otp.service.js";
 import { emailService } from "../../services/email.service.js";
-import { forgotPasswordTemplate } from "../../emails/templates/forgotPassword.js";
-import { verifyEmailTemplate } from "../../emails/templates/verifyEmail.js";
+import { forgotPasswordTemplate, forgotPasswordTemplateData } from "../../emails/templates/forgotPassword.js";
+import { verifyEmailTemplate, verifyEmailTemplateData } from "../../emails/templates/verifyEmail.js";
 import { refreshTokenService } from "./refreshToken.service.js";
 import { cloudinary } from "../../config/cloudinary.js";
 
@@ -115,6 +115,7 @@ const createAuthResponse = async (user: AuthUser, password: string, role: "revie
       role,
       avatarUrl: user.avatarUrl,
       bio: user.bio,
+      whatsappNumber: ("whatsappNumber" in user ? user.whatsappNumber : null) ?? null,
     },
   };
 };
@@ -124,7 +125,15 @@ const createAuthResponse = async (user: AuthUser, password: string, role: "revie
 // proven a different way.
 const issueSession = async (
   role: "reviewer" | "admin",
-  userRow: { id: number; name: string; username?: string | null; email: string; avatarUrl: string | null; bio: string | null },
+  userRow: {
+    id: number;
+    name: string;
+    username?: string | null;
+    email: string;
+    avatarUrl: string | null;
+    bio: string | null;
+    whatsappNumber?: string | null;
+  },
 ) => {
   const payload = { userId: userRow.id, role };
   const { accessToken, refreshToken } = await refreshTokenService.issueTokenPair(payload);
@@ -139,6 +148,7 @@ const issueSession = async (
       role,
       avatarUrl: userRow.avatarUrl,
       bio: userRow.bio,
+      whatsappNumber: userRow.whatsappNumber ?? null,
     },
   };
 };
@@ -238,8 +248,9 @@ export const authService = {
     }
 
     const otpCode = await otpService.generateOtp(newReviewer.email, "email_verification");
-    const { subject, html } = verifyEmailTemplate({ name: newReviewer.name, otpCode });
-    await emailService.sendEmail({ to: newReviewer.email, subject, html });
+    const { html: fallbackHtml } = verifyEmailTemplate({ name: newReviewer.name, otpCode });
+    const { templateId, subject, variables } = verifyEmailTemplateData({ name: newReviewer.name, otpCode });
+    await emailService.sendTemplateEmail({ to: newReviewer.email, templateId, subject, variables, fallbackHtml });
 
     return {
       requiresVerification: true,
@@ -622,8 +633,9 @@ export const authService = {
     }
 
     const otpCode = await otpService.generateOtp(data.email, "forgot_password");
-    const { subject, html } = forgotPasswordTemplate({ name: user.name, otpCode });
-    await emailService.sendEmail({ to: data.email, subject, html });
+    const { html: fallbackHtml } = forgotPasswordTemplate({ name: user.name, otpCode });
+    const { templateId, subject, variables } = forgotPasswordTemplateData({ name: user.name, otpCode });
+    await emailService.sendTemplateEmail({ to: data.email, templateId, subject, variables, fallbackHtml });
 
     return { message: "If that email is registered, a reset code has been sent." };
   },
@@ -722,8 +734,9 @@ export const authService = {
     }
 
     const otpCode = await otpService.generateOtp(reviewer.email, "email_verification");
-    const { subject, html } = verifyEmailTemplate({ name: reviewer.name, otpCode });
-    await emailService.sendEmail({ to: reviewer.email, subject, html });
+    const { html: fallbackHtml } = verifyEmailTemplate({ name: reviewer.name, otpCode });
+    const { templateId, subject, variables } = verifyEmailTemplateData({ name: reviewer.name, otpCode });
+    await emailService.sendTemplateEmail({ to: reviewer.email, templateId, subject, variables, fallbackHtml });
 
     return { message: "If that email is registered and unverified, a new code has been sent." };
   },

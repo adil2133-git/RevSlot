@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAdminStore } from "@/features/admin/store/adminStore";
+import AdminPagination from "@/components/admin/AdminPagination";
 
 function initials(name: string) {
   return name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
@@ -16,14 +17,14 @@ export default function AdminReviewersPage() {
   const [pendingId, setPendingId] = useState<number | null>(null);
 
   useEffect(() => {
-    fetchReviewers({ search: search || undefined, status, page, limit: 20 });
+    fetchReviewers({ search: search || undefined, status, page, limit: 5 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, page]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setPage(1);
-    fetchReviewers({ search: search || undefined, status, page: 1, limit: 20 });
+    fetchReviewers({ search: search || undefined, status, page: 1, limit: 5 });
   };
 
   const handleToggle = async (id: number, nextActive: boolean) => {
@@ -131,31 +132,16 @@ export default function AdminReviewersPage() {
             ))}
           </tbody>
         </table>
-      </div>
 
-      {reviewersPagination && reviewersPagination.totalPages > 1 && (
-        <div className="mt-4 flex items-center justify-between text-sm text-slate-500">
-          <span>
-            Page {reviewersPagination.page} of {reviewersPagination.totalPages} · {reviewersPagination.total} total
-          </span>
-          <div className="flex gap-2">
-            <button
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="rounded-lg border border-slate-200 px-3 py-1.5 font-medium disabled:opacity-40"
-            >
-              Prev
-            </button>
-            <button
-              disabled={page >= reviewersPagination.totalPages}
-              onClick={() => setPage((p) => p + 1)}
-              className="rounded-lg border border-slate-200 px-3 py-1.5 font-medium disabled:opacity-40"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
+        <AdminPagination
+          page={reviewersPagination?.page ?? page}
+          totalPages={reviewersPagination?.totalPages ?? 1}
+          total={reviewersPagination?.total ?? reviewers.length}
+          limit={5}
+          onPageChange={setPage}
+          label="reviewers"
+        />
+      </div>
     </div>
   );
 }
