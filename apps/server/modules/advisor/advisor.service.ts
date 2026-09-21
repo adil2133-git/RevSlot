@@ -11,8 +11,8 @@ import { otpService } from "../auth/otp.service.js";
 import { slotService } from "../slot/slot.service.js";
 import { calendarService } from "../calendar/calendar.service.js";
 import { emailService } from "../../services/email.service.js";
-import { advisorOtpTemplate } from "../../emails/templates/advisorOtp.js";
-import { bookingCancelledTemplate } from "../../emails/templates/bookingCancelled.js";
+import { advisorOtpTemplate, advisorOtpTemplateData } from "../../emails/templates/advisorOtp.js";
+import { bookingCancelledTemplate, bookingCancelledTemplateData } from "../../emails/templates/bookingCancelled.js";
 import { generateAdvisorToken } from "../../core/utils/jwt.js";
 import { meetingService } from "../meeting/meeting.service.js";
 import { refundService } from "../payment/refund.service.js";
@@ -28,15 +28,21 @@ export const advisorService = {
     const trimmedEmail = email.trim().toLowerCase();
     const code = await otpService.generateOtp(trimmedEmail, "advisor_access");
 
-    const { subject, html } = advisorOtpTemplate({
+    const { html: fallbackHtml } = advisorOtpTemplate({
+      advisorEmail: trimmedEmail,
+      otpCode: code,
+    });
+    const { templateId, subject, variables } = advisorOtpTemplateData({
       advisorEmail: trimmedEmail,
       otpCode: code,
     });
 
-    await emailService.sendEmail({
+    await emailService.sendTemplateEmail({
       to: trimmedEmail,
+      templateId,
       subject,
-      html,
+      variables,
+      fallbackHtml,
     });
 
     return { message: "Verification code sent to email" };
@@ -365,7 +371,7 @@ export const advisorService = {
 
       await Promise.all(
         recipients.map(({ email, name, role }) => {
-          const { subject, html } = bookingCancelledTemplate({
+          const { html: fallbackHtml } = bookingCancelledTemplate({
             recipientName: name,
             recipientRole: role,
             eventTypeName: eventType.name,
@@ -376,7 +382,18 @@ export const advisorService = {
             reason: reasonText,
             refundStatusText,
           });
-          return emailService.sendEmail({ to: email, subject, html }).catch((err) => {
+          const { templateId, subject, variables } = bookingCancelledTemplateData({
+            recipientName: name,
+            recipientRole: role,
+            eventTypeName: eventType.name,
+            reviewerName: reviewer.name,
+            advisorName: booking.advisorName,
+            formattedDate,
+            formattedTime,
+            reason: reasonText,
+            refundStatusText,
+          });
+          return emailService.sendTemplateEmail({ to: email, templateId, subject, variables, fallbackHtml }).catch((err) => {
             console.error(`[AdvisorBooking] Failed to send cancellation email to ${email}:`, err);
           });
         })
@@ -516,4 +533,3 @@ export const advisorService = {
     return updatedBooking;
   },
 };
-

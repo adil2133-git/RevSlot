@@ -1,3 +1,5 @@
+import { BRAND, renderEmailShell, renderInfoCard, renderFooter, renderPrimaryButton } from "../layout.js";
+
 interface BookingEmailParams {
   recipientName: string;
 
@@ -30,95 +32,86 @@ const roleIntro: Record<
     `You've been added to a review session - <strong>${p.eventTypeName}</strong> with ${p.reviewerName}.`,
 };
 
-export const bookingConfirmationTemplate = (
-  params: BookingEmailParams
-) => {
-  const {
-    recipientName,
-    recipientRole,
-    formattedDate,
-    formattedTime,
-    meetLink,
-    internName,
-  } = params;
+export const BOOKING_CONFIRMATION_TEMPLATE_ID = "revslot-booking-confirmation";
+
+function buildMeetSection(meetLink: string | null): string {
+  return meetLink
+    ? `
+      <div style="margin: 24px 0; padding: 16px; background: ${BRAND.primaryLight}; border-radius: 8px; text-align: center;">
+        <p style="margin: 0 0 10px 0; font-size: 13px; color: ${BRAND.muted};">
+          Join with Google Meet
+        </p>
+        ${renderPrimaryButton(meetLink, "Join meeting")}
+      </div>
+    `
+    : `
+      <p style="color: ${BRAND.muted}; font-size: 13px; line-height: 1.6;">
+        A meeting link hasn't been set up yet - the reviewer will share one separately before the session.
+      </p>
+    `;
+}
+
+function buildPaymentSection(price?: number | null, paymentId?: string | null): string {
+  if (price == null) return "";
+  return `
+    <div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed ${BRAND.border};">
+      <p style="margin: 0; font-size: 13px; font-weight: 600; color: ${BRAND.text};">
+        Payment: ${price > 0 ? `<span style="color: #047857;">Paid ₹${price}</span>` : '<span style="color: #4b5563;">Free Session</span>'}
+      </p>
+      ${paymentId ? `<p style="margin: 3px 0 0 0; font-size: 11px; font-family: monospace; color: ${BRAND.faint};">Receipt: ${paymentId}</p>` : ""}
+    </div>
+  `;
+}
+
+// Variables + subject for emailService.sendTemplateEmail(). The role intro
+// and the meet/payment sections still branch in code (Resend Templates
+// don't support conditionals), then get injected as raw HTML variables
+// (use {{{TRIPLE_BRACES}}} for these in the Resend template body).
+export const bookingConfirmationTemplateData = (params: BookingEmailParams) => {
+  const subject =
+    params.recipientRole === "reviewer"
+      ? `New booking: ${params.eventTypeName} with ${params.advisorName}`
+      : `Booking confirmed: ${params.eventTypeName}`;
+
+  return {
+    templateId: BOOKING_CONFIRMATION_TEMPLATE_ID,
+    subject,
+    variables: {
+      RECIPIENT_NAME: params.recipientName,
+      ROLE_INTRO: roleIntro[params.recipientRole](params),
+      FORMATTED_DATE: params.formattedDate,
+      FORMATTED_TIME: params.formattedTime,
+      INTERN_NAME: params.internName,
+      PAYMENT_SECTION: buildPaymentSection(params.price, params.paymentId),
+      MEET_SECTION: buildMeetSection(params.meetLink),
+      REVIEWER_NAME: params.reviewerName,
+    },
+  };
+};
+
+export const bookingConfirmationTemplate = (params: BookingEmailParams) => {
+  const { recipientName, recipientRole, formattedDate, formattedTime, meetLink, internName } = params;
 
   const subject =
     recipientRole === "reviewer"
       ? `New booking: ${params.eventTypeName} with ${params.advisorName}`
       : `Booking confirmed: ${params.eventTypeName}`;
 
-  const meetSection = meetLink
-    ? `
-      <div style="margin: 24px 0; padding: 16px; background: #f3f4f6; border-radius: 8px; text-align: center;">
-        <p style="margin: 0 0 10px 0; font-size: 13px; color: #6b7280;">
-          Join with Google Meet
-        </p>
+  const html = renderEmailShell({
+    subtitle: "Booking Confirmed",
+    bodyHtml: `
+      <p style="color: ${BRAND.bodyText}; font-size: 15px; line-height: 1.6;">Hi ${recipientName},</p>
+      <p style="color: ${BRAND.bodyText}; font-size: 15px; line-height: 1.6;">${roleIntro[recipientRole](params)}</p>
+      ${renderInfoCard(`
+        <p style="margin: 0 0 4px 0; font-size: 14px; color: ${BRAND.text}; font-weight: 600;">${formattedDate}</p>
+        <p style="margin: 0 0 10px 0; font-size: 13px; color: ${BRAND.muted};">${formattedTime}</p>
+        <p style="margin: 0; font-size: 13px; color: ${BRAND.muted};">Intern: ${internName}</p>
+        ${buildPaymentSection(params.price, params.paymentId)}
+      `)}
+      ${buildMeetSection(meetLink)}
+      ${renderFooter(params.reviewerName)}
+    `,
+  });
 
-        <a
-          href="${meetLink}"
-          style="display: inline-block; padding: 10px 20px; background: #003366; color: #ffffff; border-radius: 6px; font-size: 14px; font-weight: 600; text-decoration: none;"
-        >
-          Join meeting
-        </a>
-      </div>
-    `
-    : `
-      <p style="color: #6b7280; font-size: 13px; line-height: 1.6;">
-        A meeting link hasn't been set up yet - the reviewer will share one separately before the session.
-      </p>
-    `;
-
-  const html = `
-    <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px;">
-
-      <h2 style="color: #111827; margin-bottom: 8px;">
-        Booking confirmed
-      </h2>
-
-      <p style="color: #374151; font-size: 15px; line-height: 1.6;">
-        Hi ${recipientName},
-      </p>
-
-      <p style="color: #374151; font-size: 15px; line-height: 1.6;">
-        ${roleIntro[recipientRole](params)}
-      </p>
-
-      <div style="margin: 20px 0; padding: 16px 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
-
-        <p style="margin: 0 0 4px 0; font-size: 14px; color: #111827; font-weight: 600;">
-          ${formattedDate}
-        </p>
-
-        <p style="margin: 0 0 10px 0; font-size: 13px; color: #6b7280;">
-          ${formattedTime}
-        </p>
-
-        <p style="margin: 0; font-size: 13px; color: #6b7280;">
-          Intern: ${internName}
-        </p>
-
-        ${params.price != null ? `
-          <div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e5e7eb;">
-            <p style="margin: 0; font-size: 13px; font-weight: 600; color: #111827;">
-              Payment: ${params.price > 0 ? `<span style="color: #047857;">Paid ₹${params.price}</span>` : '<span style="color: #4b5563;">Free Session</span>'}
-            </p>
-            ${params.paymentId ? `<p style="margin: 3px 0 0 0; font-size: 11px; font-family: monospace; color: #9ca3af;">Receipt: ${params.paymentId}</p>` : ''}
-          </div>
-        ` : ''}
-
-      </div>
-
-      ${meetSection}
-
-      <p style="color: #9ca3af; font-size: 12px; line-height: 1.6; margin-top: 24px;">
-        Sent by RevSlot on behalf of ${params.reviewerName}.
-      </p>
-
-    </div>
-  `;
-
-  return {
-    subject,
-    html,
-  };
+  return { subject, html };
 };
