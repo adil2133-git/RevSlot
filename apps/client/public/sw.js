@@ -1,5 +1,5 @@
 // RevSlot Service Worker
-const CACHE_NAME = "revslot-cache-v2";
+const CACHE_NAME = "revslot-cache-v1";
 
 const PRECACHE_RESOURCES = [
   "/",
@@ -44,18 +44,15 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Do not cache API endpoints, auth calls, or Next.js internal / dev bundles
-  if (
-    url.pathname.startsWith("/api") ||
-    url.pathname.includes("/auth/") ||
-    url.pathname.startsWith("/_next/")
-  ) {
+  // Do not cache API endpoints or auth calls (Network Only)
+  if (url.pathname.startsWith("/api") || url.pathname.includes("/auth/")) {
     return;
   }
 
-  // Static assets (images, fonts, stylesheets, icons): Cache first with network fallback
+  // Static assets (images, fonts, scripts, stylesheets): Cache first with network fallback
   if (
     request.destination === "style" ||
+    request.destination === "script" ||
     request.destination === "image" ||
     request.destination === "font" ||
     url.pathname.startsWith("/icons/")

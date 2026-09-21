@@ -1,18 +1,20 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, Suspense } from "react";
 import { fetchDashboardSummary } from "@/features/dashboard/api/dashboardApi";
 import type { DashboardSummaryData } from "@/features/dashboard/type";
 import { DashboardHeader } from "@/features/dashboard/components/DashboardHeader";
 import { MetricsCards } from "@/features/dashboard/components/MetricsCards";
 import { AlertsStack } from "@/features/dashboard/components/AlertsStack";
 import { TodaysSchedule } from "@/features/dashboard/components/TodaysSchedule";
-import DashboardActionBanners from "@/features/dashboard/components/DashboardActionBanners";
+import { NextReviewCard } from "@/features/dashboard/components/NextReviewCard";
 import BookingDetailsModal from "@/features/booking/components/BookingDetailsModal";
 import { ReferenceQuestionsDrawer } from "@/features/dashboard/components/ReferenceQuestionsDrawer";
 import { RecentActivityFeed } from "@/features/dashboard/components/RecentActivityFeed";
 import { QuickShareWidget } from "@/features/dashboard/components/QuickShareWidget";
 import { AvailabilityWidget } from "@/features/dashboard/components/AvailabilityWidget";
+import GoogleCalendarCard from "@/features/calendar/components/GoogleCalendarCard";
+import WhatsappReminderBanner from "@/components/common/WhatsappReminderBanner";
 
 export default function ReviewerDashboardPage() {
   const [timeframe, setTimeframe] = useState<"today" | "week" | "month">("today");
@@ -69,27 +71,32 @@ export default function ReviewerDashboardPage() {
 
   return (
     <div className="space-y-6 pb-12">
-      {/* 1. Top Action Banners (Add WhatsApp & Connect Google Calendar) */}
-      <DashboardActionBanners />
+      {/* 0. WhatsApp Setup Reminder if missing */}
+      <WhatsappReminderBanner />
 
-      {/* 2. Welcome Header with Date & Action Buttons */}
+      {/* 1. Header & Welcome */}
       <DashboardHeader reviewer={data?.reviewer} todayCount={todaySessionCount} />
+
+      {/* 2. Google Calendar Integration Card */}
+      <Suspense fallback={null}>
+        <GoogleCalendarCard />
+      </Suspense>
 
       {/* Loading Skeleton */}
       {loading && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-28 animate-pulse rounded-2xl border border-slate-200/80 bg-white" />
+              <div key={i} className="h-28 animate-pulse rounded-xl border border-slate-200/80 bg-surface-card" />
             ))}
           </div>
-          <div className="h-64 animate-pulse rounded-2xl border border-slate-200/80 bg-white" />
+          <div className="h-48 animate-pulse rounded-xl border border-slate-200/80 bg-surface-card" />
         </div>
       )}
 
       {/* Error state */}
       {error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-xs font-semibold text-red-700">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
           {error}
         </div>
       )}
@@ -97,27 +104,28 @@ export default function ReviewerDashboardPage() {
       {/* Real Dashboard Content */}
       {!loading && data && (
         <>
-          {/* 3. Metrics 4 Cards Row */}
+          {/* 3. Metrics 4 Cards */}
           <MetricsCards
             metrics={data.metrics}
             timeframe={timeframe}
             onTimeframeChange={(tf) => setTimeframe(tf)}
           />
 
-          {/* 4. Alerts Stack (if any) */}
+          {/* 4. Alerts Stack */}
           {data.alerts && <AlertsStack alerts={data.alerts} />}
 
-          {/* 5. Today's Schedule Card */}
+          <NextReviewCard
+              nextReview={data.nextReview}
+              onViewDetails={(bookingId) => setDetailsBookingId(bookingId)}
+          />
+          {/* 5. Today's Schedule */}
           <TodaysSchedule
             schedule={scheduleList}
-            nextReview={data.nextReview}
-            username={data.reviewer?.username}
             onOpenReferenceDrawer={handleOpenReferenceDrawer}
             onOutcomeChanged={handleOutcomeChanged}
-            onViewDetails={(bookingId) => setDetailsBookingId(bookingId)}
           />
 
-          {/* 6. Activity Feed & Quick Widgets Row */}
+          {/* 6. Bottom Row: Activity Feed & Quick Widgets */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             {/* Left Column (2/3 width on lg): Activity Feed */}
             <div className="lg:col-span-2">
@@ -145,11 +153,11 @@ export default function ReviewerDashboardPage() {
 
       {/* Booking Details Modal */}
       {detailsBookingId !== null && (
-        <BookingDetailsModal
-          bookingId={detailsBookingId}
-          onClose={() => setDetailsBookingId(null)}
-        />
-      )}
+      <BookingDetailsModal
+       bookingId={detailsBookingId}
+       onClose={() => setDetailsBookingId(null)}
+     />
+    )}
     </div>
   );
 }

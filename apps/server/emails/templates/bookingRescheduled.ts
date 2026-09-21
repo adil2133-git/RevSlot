@@ -1,5 +1,3 @@
-import { BRAND, renderEmailShell, renderInfoCard, renderFooter, renderPrimaryButton } from "../layout.js";
-
 interface RescheduledEmailParams {
   recipientName: string;
   recipientRole: "advisor" | "reviewer" | "intern";
@@ -23,53 +21,43 @@ function getRoleIntro(params: RescheduledEmailParams): string {
   return "The review session <strong>" + params.eventTypeName + "</strong> with " + params.reviewerName + " has a new time.";
 }
 
-export const BOOKING_RESCHEDULED_TEMPLATE_ID = "revslot-booking-rescheduled";
-
-function buildMeetSection(meetLink: string | null): string {
-  if (!meetLink) return "";
-  return (
-    `<div style="margin: 24px 0; padding: 16px; background: ${BRAND.primaryLight}; border-radius: 8px; text-align: center;">` +
-    `<p style="margin: 0 0 10px 0; font-size: 13px; color: ${BRAND.muted};">Join with Google Meet</p>` +
-    renderPrimaryButton(meetLink, "Join meeting") +
-    `</div>`
-  );
-}
-
-export const bookingRescheduledTemplateData = (params: RescheduledEmailParams) => ({
-  templateId: BOOKING_RESCHEDULED_TEMPLATE_ID,
-  subject: "Booking rescheduled: " + params.eventTypeName,
-  variables: {
-    RECIPIENT_NAME: params.recipientName,
-    ROLE_INTRO: getRoleIntro(params),
-    OLD_FORMATTED_DATE: params.oldFormattedDate,
-    OLD_FORMATTED_TIME: params.oldFormattedTime,
-    NEW_FORMATTED_DATE: params.newFormattedDate,
-    NEW_FORMATTED_TIME: params.newFormattedTime,
-    MEET_SECTION: buildMeetSection(params.meetLink),
-    REVIEWER_NAME: params.reviewerName,
-  },
-});
-
 export function bookingRescheduledTemplate(params: RescheduledEmailParams) {
-  const { recipientName, oldFormattedDate, oldFormattedTime, newFormattedDate, newFormattedTime, meetLink } = params;
+  const recipientName = params.recipientName;
+  const oldFormattedDate = params.oldFormattedDate;
+  const oldFormattedTime = params.oldFormattedTime;
+  const newFormattedDate = params.newFormattedDate;
+  const newFormattedTime = params.newFormattedTime;
+  const meetLink = params.meetLink;
+
   const subject = "Booking rescheduled: " + params.eventTypeName;
 
-  const html = renderEmailShell({
-    subtitle: "Booking Rescheduled",
-    bodyHtml:
-      `<p style="color: ${BRAND.bodyText}; font-size: 15px; line-height: 1.6;">Hi ${recipientName},</p>` +
-      `<p style="color: ${BRAND.bodyText}; font-size: 15px; line-height: 1.6;">${getRoleIntro(params)}</p>` +
-      `<div style="margin: 16px 0; padding: 12px 16px; border: 1px solid ${BRAND.border}; border-radius: 8px; opacity: 0.6;">` +
-      `<p style="margin: 0; font-size: 12px; color: ${BRAND.faint}; text-decoration: line-through;">Previously: ${oldFormattedDate}, ${oldFormattedTime}</p>` +
-      `</div>` +
-      renderInfoCard(
-        `<p style="margin: 0 0 4px 0; font-size: 14px; color: ${BRAND.text}; font-weight: 600;">New time: ${newFormattedDate}</p>` +
-        `<p style="margin: 0; font-size: 13px; color: ${BRAND.muted};">${newFormattedTime}</p>`,
-        BRAND.primary
-      ) +
-      buildMeetSection(meetLink) +
-      renderFooter(params.reviewerName),
-  });
+  let meetSection = "";
+  if (meetLink) {
+    meetSection =
+      '<div style="margin: 24px 0; padding: 16px; background: #f3f4f6; border-radius: 8px; text-align: center;">' +
+      '<p style="margin: 0 0 10px 0; font-size: 13px; color: #6b7280;">Join with Google Meet</p>' +
+      '<a href="' + meetLink + '" style="display: inline-block; padding: 10px 20px; background: #003366; color: #ffffff; border-radius: 6px; font-size: 14px; font-weight: 600; text-decoration: none;">Join meeting</a>' +
+      '</div>';
+  }
 
-  return { subject, html };
+  const html =
+    '<div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px;">' +
+    '<h2 style="color: #111827; margin-bottom: 8px;">Booking rescheduled</h2>' +
+    '<p style="color: #374151; font-size: 15px; line-height: 1.6;">Hi ' + recipientName + ',</p>' +
+    '<p style="color: #374151; font-size: 15px; line-height: 1.6;">' + getRoleIntro(params) + '</p>' +
+    '<div style="margin: 16px 0; padding: 12px 16px; border: 1px solid #e5e7eb; border-radius: 8px; opacity: 0.6;">' +
+    '<p style="margin: 0; font-size: 12px; color: #9ca3af; text-decoration: line-through;">Previously: ' + oldFormattedDate + ', ' + oldFormattedTime + '</p>' +
+    '</div>' +
+    '<div style="margin: 0 0 20px 0; padding: 16px 20px; border: 1px solid #003366; border-radius: 8px;">' +
+    '<p style="margin: 0 0 4px 0; font-size: 14px; color: #111827; font-weight: 600;">New time: ' + newFormattedDate + '</p>' +
+    '<p style="margin: 0; font-size: 13px; color: #6b7280;">' + newFormattedTime + '</p>' +
+    '</div>' +
+    meetSection +
+    '<p style="color: #9ca3af; font-size: 12px; line-height: 1.6; margin-top: 24px;">Sent by RevSlot on behalf of ' + params.reviewerName + '.</p>' +
+    '</div>';
+
+  return {
+    subject: subject,
+    html: html,
+  };
 }
