@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import dayjs from "dayjs";
+import dayjs from "../../config/dayjs.js";
 import { z } from "zod";
 import { eq, and, ne, inArray, gte, lte, lt, sql } from "drizzle-orm";
 import { db } from "../../config/db.js";
@@ -23,6 +23,7 @@ import { payments } from "../payment/payments.schema.js";
 import { reviewerWallets, walletTransactions } from "../wallet/wallet.schema.js";
 import { refundService } from "../payment/refund.service.js";
 import { bookingDisputes } from "../dispute/disputes.schema.js";
+import { availabilityTemplates } from "../availability/schema/availabilityTemplates.schema.js";
 
 export interface GetMyBookingsOptions {
 
@@ -37,6 +38,20 @@ type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 const CANCEL_CUTOFF_HOURS = 3;
 
+const getEventTimezone = async (eventTypeId: number): Promise<string> => {
+  const [templateRow] = await db
+    .select({ timezone: availabilityTemplates.timezone })
+    .from(eventTypes)
+    .innerJoin(
+      availabilityTemplates,
+      eq(eventTypes.availabilityTemplateId, availabilityTemplates.id)
+    )
+    .where(eq(eventTypes.id, eventTypeId))
+    .limit(1);
+
+  return templateRow?.timezone || "Asia/Kolkata";
+};
+
 const getOwnedBookingOrThrow = async (reviewerId: number, bookingId: number) => {
   const [booking] = await db
     .select()
@@ -45,26 +60,28 @@ const getOwnedBookingOrThrow = async (reviewerId: number, bookingId: number) => 
     .limit(1);
 
   if (!booking) {
-    throw new AppError("Booking not found", 404);
+    throw new AppError("Booking not found or access denied", 404);
   }
 
   return booking;
 };
 
 const assertOutsideCutoff = (startTime: Date) => {
-  const hoursUntilStart = dayjs(startTime).diff(dayjs(), "hour", true);
-  if (hoursUntilStart < CANCEL_CUTOFF_HOURS) {
+  const cutoffTime = dayjs().add(CANCEL_CUTOFF_HOURS, "hour");
+
+  if (dayjs(startTime).isBefore(cutoffTime)) {
     throw new AppError(
-      "This session starts in less than " + CANCEL_CUTOFF_HOURS + " hours and can no longer be changed here",
-      409
+      `Actions cannot be performed within ${CANCEL_CUTOFF_HOURS} hours of the session start time`,
+      400
     );
   }
 };
 
 const releaseBookingSlot = async (tx: Transaction, booking: typeof bookings.$inferSelect) => {
-  const slotDate = dayjs(booking.startTime).format("YYYY-MM-DD");
-  const startTime = dayjs(booking.startTime).format("HH:mm:ss");
-  const endTime = dayjs(booking.endTime).format("HH:mm:ss");
+  const timezone = await getEventTimezone(booking.eventTypeId);
+  const slotDate = dayjs(booking.startTime).tz(timezone).format("YYYY-MM-DD");
+  const startTime = dayjs(booking.startTime).tz(timezone).format("HH:mm:ss");
+  const endTime = dayjs(booking.endTime).tz(timezone).format("HH:mm:ss");
 
   await tx
     .update(slots)
@@ -86,8 +103,10 @@ export const bookingService = {
     slotDate: string,
     startTime: string,
     endTime: string,
-    excludeSlotId: number
+    excludeSlotId: number,
+    timezone: string = "Asia/Kolkata"
   ) => {
+    // 1. Check slots table
     const conflicts = await db
       .select()
       .from(slots)
@@ -101,7 +120,25 @@ export const bookingService = {
         )
       );
 
-    return conflicts.length > 0;
+    if (conflicts.length > 0) return true;
+
+    // 2. Check bookings table
+    const targetStart = dayjs.tz(`${slotDate} ${startTime}`, timezone).toDate();
+    const targetEnd = dayjs.tz(`${slotDate} ${endTime}`, timezone).toDate();
+
+    const bookingConflicts = await db
+      .select({ id: bookings.id })
+      .from(bookings)
+      .where(
+        and(
+          eq(bookings.reviewerId, reviewerId),
+          sql`${bookings.status} IN ('confirmed', 'rescheduled')`,
+          sql`(${bookings.startTime}, ${bookings.endTime}) OVERLAPS (${targetStart}::timestamptz, ${targetEnd}::timestamptz)`
+        )
+      )
+      .limit(1);
+
+    return bookingConflicts.length > 0;
   },
 
   createBooking: async (data: CreateBookingInput) => {
@@ -125,12 +162,15 @@ export const bookingService = {
         );
       }
 
+      const timezone = await getEventTimezone(slot.eventTypeId);
+
       const hasConflict = await bookingService.checkCrossEventConflict(
         slot.reviewerId,
         slot.slotDate,
         slot.startTime,
         slot.endTime,
-        slot.id
+        slot.id,
+        timezone
       );
 
       if (hasConflict) {
@@ -164,17 +204,6 @@ export const bookingService = {
           throw new AppError("Payment verification failed", 400);
         }
 
-        // Replay prevention: check if this payment ID was already used
-        const [existingPayment] = await tx
-          .select({ id: payments.id })
-          .from(payments)
-          .where(eq(payments.razorpayPaymentId, razorpayPaymentId))
-          .limit(1);
-
-        if (existingPayment) {
-          throw new AppError("This payment has already been redeemed", 400);
-        }
-
         // Match order record in database and verify amount
         const [paymentRecord] = await tx
           .select()
@@ -186,17 +215,41 @@ export const bookingService = {
           throw new AppError("Payment order not found in database", 404);
         }
 
+        if (paymentRecord.bookingId) {
+          throw new AppError("This payment has already been redeemed", 400);
+        }
+
         if (paymentRecord.amount !== priceCheckEventType.price * 100) {
           throw new AppError("Payment amount mismatch", 400);
+        }
+
+        // Replay prevention: check if this payment ID was already used for ANOTHER payment record
+        const [existingPayment] = await tx
+          .select({ id: payments.id })
+          .from(payments)
+          .where(
+            and(
+              eq(payments.razorpayPaymentId, razorpayPaymentId),
+              ne(payments.id, paymentRecord.id)
+            )
+          )
+          .limit(1);
+
+        if (existingPayment) {
+          throw new AppError("This payment has already been redeemed", 400);
         }
 
         verifiedPayment = paymentRecord;
       }
 
-      const startTimestamp = dayjs(
-        `${slot.slotDate}T${slot.startTime}`
+      const startTimestamp = dayjs.tz(
+        `${slot.slotDate} ${slot.startTime}`,
+        timezone
       ).toDate();
-      const endTimestamp = dayjs(`${slot.slotDate}T${slot.endTime}`).toDate();
+      const endTimestamp = dayjs.tz(
+        `${slot.slotDate} ${slot.endTime}`,
+        timezone
+      ).toDate();
 
 
   const allowedKeys = new Set<string>([
@@ -836,8 +889,9 @@ for (const [key, value] of Object.entries(formData)) {
       endTime: data.endTime,
     });
 
-    const newStartTime = dayjs(`${data.date}T${data.startTime}`).toDate();
-    const newEndTime = dayjs(`${data.date}T${data.endTime}`).toDate();
+    const timezone = await getEventTimezone(booking.eventTypeId);
+    const newStartTime = dayjs.tz(`${data.date} ${data.startTime}`, timezone).toDate();
+    const newEndTime = dayjs.tz(`${data.date} ${data.endTime}`, timezone).toDate();
 
     const updatedBooking = await db.transaction(async (tx) => {
       // Release old slot occupied by previous start/end time
@@ -901,8 +955,9 @@ for (const [key, value] of Object.entries(formData)) {
       endTime: data.endTime,
     });
 
-    const proposedStartTime = dayjs(`${data.date}T${data.startTime}`).toDate();
-    const proposedEndTime = dayjs(`${data.date}T${data.endTime}`).toDate();
+    const timezone = await getEventTimezone(booking.eventTypeId);
+    const proposedStartTime = dayjs.tz(`${data.date} ${data.startTime}`, timezone).toDate();
+    const proposedEndTime = dayjs.tz(`${data.date} ${data.endTime}`, timezone).toDate();
     const rescheduleToken = crypto.randomUUID();
     const rescheduleTokenExpiresAt = dayjs().add(48, "hour").toDate();
 
@@ -1115,8 +1170,9 @@ for (const [key, value] of Object.entries(formData)) {
         endTime: data.endTime,
       });
 
-      const newStartTime = dayjs(`${data.date}T${data.startTime}`).toDate();
-      const newEndTime = dayjs(`${data.date}T${data.endTime}`).toDate();
+      const timezone = await getEventTimezone(booking.eventTypeId);
+      const newStartTime = dayjs.tz(`${data.date} ${data.startTime}`, timezone).toDate();
+      const newEndTime = dayjs.tz(`${data.date} ${data.endTime}`, timezone).toDate();
 
       const updatedBooking = await db.transaction(async (tx) => {
         await releaseBookingSlot(tx, booking);
