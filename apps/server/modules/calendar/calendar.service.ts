@@ -117,8 +117,8 @@ export const calendarService = {
   },
 
   // Called from booking.service.ts right after a booking is confirmed.
-  // Creates a Calendar event on the reviewer's calendar with
-  // conferenceData set to auto-generate a Google Meet link.
+// Creates a Google Calendar event on the reviewer's calendar.
+// RevSlot WebRTC is used as the meeting platform.
   createMeetEvent: async (params: {
     reviewerId: number;
     summary: string;
@@ -158,7 +158,6 @@ export const calendarService = {
         {
           calendarId: "primary",
           sendUpdates: "all",
-          conferenceDataVersion: 1,
           requestBody: {
             summary: params.summary,
 
@@ -183,29 +182,19 @@ export const calendarService = {
               .filter(Boolean)
               .map((email) => ({ email })),
 
-            conferenceData: {
-              createRequest: {
-                requestId: `revslot-${Date.now()}-${params.reviewerId}`,
-                conferenceSolutionKey: {
-                  type: "hangoutsMeet",
-                },
-              },
-            },
           },
         },
         {}
       );
 
-      const meetLink = event.hangoutLink;
+      if (!event.id) {
+  return null;
+}
 
-      if (!meetLink || !event.id) {
-        return null;
-      }
-
-      return {
-        meetLink,
-        googleEventId: event.id,
-      };
+return {
+  meetLink: params.meetingLink,
+  googleEventId: event.id,
+};
     } catch (err: any) {
       console.error(
         `[Calendar Service] Failed to create Meet event for reviewer ${params.reviewerId}:`,
