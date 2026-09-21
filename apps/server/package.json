@@ -13,8 +13,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx db/seed.ts",
-    "db:reset": "drizzle-kit drop",
-    "resend:provision-templates": "tsx scripts/provisionResendTemplates.ts"
+    "db:reset": "drizzle-kit drop"
   },
   "keywords": [],
   "author": "",

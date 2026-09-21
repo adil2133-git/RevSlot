@@ -1,182 +1,186 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import {
-  LayoutGrid,
-  Users,
-  Calendar,
-  CreditCard,
-  AlertTriangle,
-  MessageSquare,
-  FileText,
-  BarChart2,
-  Download,
-  Settings,
-  LogOut,
-  ChevronsUpDown,
-  Shield,
-  ShieldCheck,
-} from "lucide-react";
+import { useState } from "react";
 import { useAuthStore } from "@/features/auth/store/authStore";
 import { InstallPwaButton } from "@/components/common/InstallPwaButton";
 
+// Matches the Stitch "Dashboard Overview" design sidebar. Feedback
+// History, Audit Log, and Analytics are in the design but have no
+// backend yet (outside tasks 7-11) — shown but disabled until those
+// modules exist, rather than left out of the nav entirely.
 const NAV_ITEMS = [
-  { href: "/admin/dashboard", label: "Dashboard", icon: LayoutGrid },
-  { href: "/admin/reviewers", label: "Reviewers", icon: Users },
-  { href: "/admin/bookings", label: "Bookings", icon: Calendar },
-  { href: "/admin/payouts", label: "Payout Requests", icon: CreditCard },
-  { href: "/admin/disputes", label: "Disputes & No-Shows", icon: AlertTriangle },
-  { href: "/admin/feedback", label: "Feedback History", icon: MessageSquare },
-  { href: "/admin/audit-log", label: "Audit Log", icon: FileText },
-  { href: "/admin/analytics", label: "Analytics", icon: BarChart2 },
+  { href: "/admin/dashboard", label: "Dashboard", enabled: true, icon: (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="9" rx="1.5" />
+      <rect x="14" y="3" width="7" height="5" rx="1.5" />
+      <rect x="14" y="12" width="7" height="9" rx="1.5" />
+      <rect x="3" y="16" width="7" height="5" rx="1.5" />
+    </svg>
+  ) },
+  { href: "/admin/reviewers", label: "Reviewers", enabled: true, icon: (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  ) },
+  { href: "/admin/bookings", label: "Bookings", enabled: true, icon: (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="17" rx="2" />
+      <path d="M3 9h18" />
+      <path d="M8 2v4M16 2v4" />
+    </svg>
+  ) },
+  { href: "/admin/payouts", label: "Payout Requests", enabled: true, icon: (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="5" width="20" height="14" rx="2" />
+      <line x1="2" y1="10" x2="22" y2="10" />
+    </svg>
+  ) },
+  { href: "/admin/disputes", label: "Disputes & No-Shows", enabled: true, icon: (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+      <line x1="12" y1="9" x2="12" y2="13" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  ) },
+  { href: "/admin/feedback", label: "Feedback History", enabled: true, icon: (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  ) },
+  { href: "/admin/audit-log", label: "Audit Log", enabled: true, icon: (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
+    </svg>
+  ) },
+  { href: "/admin/analytics", label: "Analytics", enabled: true, icon: (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 3v18h18" />
+      <path d="M18 17V9M13 17V5M8 17v-3" />
+    </svg>
+  ) },
 ];
+
+function initials(name: string) {
+  return name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
+}
 
 export default function AdminSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuthStore();
-  const [popoverOpen, setPopoverOpen] = useState(false);
-  const popoverRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
-        setPopoverOpen(false);
-      }
-    };
-    window.addEventListener("mousedown", handleClickOutside);
-    return () => window.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const handleLogout = async () => {
     await logout();
     router.push("/admin/login");
   };
 
-  const displayName = user?.name || "Admin Executive";
-  const displayHandle = user?.email ? `@${user.email.split("@")[0]} · Admin` : "@superadmin · Admin";
-
   return (
-    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-slate-200/80 bg-white select-none">
-      {/* 1. Header: Shield Icon Brand */}
-      <div className="flex h-20 items-center px-6 border-b border-slate-100/80">
-        <Link href="/admin/dashboard" className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#002b49] text-white shadow-xs">
-            <Shield className="h-5 w-5 fill-white/20 text-white" />
+    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-slate-100 bg-white">
+      <div className="flex h-16 flex-col justify-center px-6">
+        <Link href="/admin/dashboard" className="flex items-center gap-2 text-lg font-bold tracking-tight text-[#003366]">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#003366] text-xs font-bold text-white">
+            R
           </div>
           <div>
-            <div className="text-base font-extrabold tracking-tight text-slate-900 leading-tight">
-              RevSlot
-            </div>
-            <div className="text-[10px] font-extrabold tracking-wider text-slate-400 uppercase">
-              SUPER ADMIN
-            </div>
+            <div className="leading-none">RevSlot</div>
+            <div className="text-[10px] font-semibold tracking-wider text-slate-400 uppercase">SUPER ADMIN</div>
           </div>
         </Link>
       </div>
 
-      {/* 2. Navigation */}
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
         {NAV_ITEMS.map((item) => {
-          const active = pathname === item.href || (item.href !== "/admin/dashboard" && pathname.startsWith(item.href));
-          const Icon = item.icon;
+          const active = pathname.startsWith(item.href);
 
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`group flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all ${
+              className={`group flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all ${
                 active
-                  ? "bg-[#002b49] text-white shadow-xs"
+                  ? "bg-[#e8f0f8] text-[#003366] font-semibold shadow-xs"
                   : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
               }`}
             >
-              <Icon
-                className={`h-4 w-4 shrink-0 transition-colors ${
-                  active ? "text-white" : "text-slate-400 group-hover:text-slate-700"
-                }`}
-              />
-              <span>{item.label}</span>
+              <span className={active ? "text-[#003366]" : "text-slate-400 group-hover:text-slate-600"}>
+                {item.icon}
+              </span>
+              {item.label}
             </Link>
           );
         })}
       </nav>
 
-      {/* 3. Bottom Session Box */}
+      {/* Academic session badge */}
       <div className="px-3 pb-2">
-        <div className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              Session
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200/60">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              <span>Active</span>
-            </span>
+        <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2.5 text-xs">
+          <div>
+            <div className="text-[10px] font-medium text-slate-400">Academic Session</div>
+            <div className="font-bold text-slate-800">2024-2025 Tier I</div>
           </div>
-          <p className="mt-1 text-xs font-bold text-slate-900">
-            2024-2025 Tier 1
-          </p>
+          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </div>
         </div>
       </div>
 
-      {/* 4. Install App Row */}
-      <div className="px-3 pb-2">
-        <div className="flex items-center justify-between rounded-xl border border-slate-200/80 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 transition-colors">
-          <div className="flex items-center gap-2">
-            <Download className="h-3.5 w-3.5 text-slate-400" />
-            <span>Install App</span>
-          </div>
-          <span className="rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-primary">
-            v2.4
-          </span>
-        </div>
+      {/* PWA Install Button */}
+      <div className="px-3 pb-1">
+        <InstallPwaButton className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-800 transition-colors hover:bg-slate-200 cursor-pointer" />
       </div>
 
-      {/* 5. User Card & Popover */}
-      <div ref={popoverRef} className="relative border-t border-slate-100 p-3">
-        {popoverOpen && (
-          <div className="absolute bottom-full left-3 right-3 mb-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl z-50 animate-in fade-in-0 zoom-in-95">
-            <div className="px-3 py-2 border-b border-slate-100">
-              <p className="text-xs font-bold text-slate-900 truncate">{displayName}</p>
-              <p className="text-[11px] text-slate-400 truncate">{user?.email || "superadmin@revslot.internal"}</p>
-            </div>
-            <div className="py-1 space-y-0.5">
-              <Link
-                href="/admin/settings"
-                onClick={() => setPopoverOpen(false)}
-                className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
-              >
-                <Settings className="h-4 w-4 text-slate-400" />
-                <span>Settings</span>
-              </Link>
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-              >
-                <LogOut className="h-4 w-4 text-rose-500" />
-                <span>Log out</span>
-              </button>
-            </div>
-          </div>
+      <div className="relative border-t border-slate-100 p-3">
+        {menuOpen && (
+          <>
+            <Link
+              href="/admin/settings"
+              onClick={() => setMenuOpen(false)}
+              className="mb-1 flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+              Settings
+            </Link>
+            <button
+              onClick={handleLogout}
+              className="mb-1 flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+              Log out
+            </button>
+          </>
         )}
-
         <button
-          type="button"
-          onClick={() => setPopoverOpen((prev) => !prev)}
-          className="flex w-full items-center gap-2.5 rounded-xl p-1.5 text-left hover:bg-slate-50 transition-colors cursor-pointer"
+          onClick={() => setMenuOpen((v) => !v)}
+          className="flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left transition-colors hover:bg-slate-50"
         >
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">
-            SA
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#003366] text-xs font-semibold text-white">
+            {user ? initials(user.name) : "AD"}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-bold text-slate-900">{displayName}</p>
-            <p className="truncate text-[11px] text-slate-500 font-medium">{displayHandle}</p>
+            <p className="truncate text-xs font-bold text-slate-900">
+              {user?.name ?? "Super Administrator"}
+            </p>
+            <p className="truncate text-[11px] capitalize text-slate-400">Super Administrator</p>
           </div>
-          <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-slate-400">
+            <path d="m18 15-6-6-6 6" />
+          </svg>
         </button>
       </div>
     </aside>

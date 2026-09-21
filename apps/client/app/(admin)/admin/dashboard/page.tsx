@@ -1,335 +1,187 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
-import {
-  Users,
-  Calendar,
-  Info,
-  TrendingUp,
-  Clock,
-  ShieldCheck,
-  RotateCcw,
-  ArrowRight,
-  Contact,
-  CheckCircle2,
-  CalendarX2,
-} from "lucide-react";
 import { useAdminStore } from "@/features/admin/store/adminStore";
 
-function getInitials(name: string) {
-  return name
-    .split(" ")
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+const STATUS_STYLES: Record<string, string> = {
+  confirmed: "bg-emerald-50 text-emerald-700",
+  completed: "bg-emerald-50 text-emerald-700",
+  cancelled: "bg-red-50 text-red-700",
+  no_show: "bg-red-50 text-red-700",
+  rescheduled: "bg-amber-50 text-amber-700",
+};
+
+function formatTime(iso: string) {
+  const d = new Date(iso);
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) +
+    ", " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 }
 
-function formatBookingTime(isoDate: string) {
-  const d = new Date(isoDate);
-  const isToday = new Date().toDateString() === d.toDateString();
-  const timeStr = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  if (isToday) return `Today, ${timeStr}`;
-  return `${d.toLocaleDateString([], { month: "short", day: "numeric" })}, ${timeStr}`;
+function initials(name: string) {
+  return name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
 }
 
 export default function AdminDashboardPage() {
   const { stats, bookings, isLoading, fetchStats, fetchBookings } = useAdminStore();
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     fetchStats();
-    fetchBookings({ limit: 5 });
+    fetchBookings({ limit: 4 });
   }, [fetchStats, fetchBookings]);
 
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    await Promise.all([fetchStats(), fetchBookings({ limit: 5 })]);
-    setTimeout(() => setIsRefreshing(false), 500);
+  const refresh = () => {
+    fetchStats();
+    fetchBookings({ limit: 4 });
   };
 
-  const totalReviewers = stats?.totalReviewers ?? 0;
-  const activeReviewers = stats?.activeReviewers ?? 0;
-  const inactiveReviewers = Math.max(0, totalReviewers - activeReviewers);
-  const bookingsThisWeek = stats?.bookingsThisWeek ?? 0;
-  const weekChangePct = stats?.bookingsWeekChangePct;
-  const noShowRate = stats?.noShowRatePct ?? 0;
-
   return (
-    <div className="space-y-6 pb-12">
-      {/* 1. Page Title & Header Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div>
+      <div className="mb-8 flex items-start justify-between">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
+          <h1 className="mb-1.5 text-2xl font-semibold tracking-tight text-on-surface">
             Dashboard Overview
           </h1>
-          <p className="mt-1 text-xs sm:text-sm text-slate-500">
-            Monitor platform performance and scheduling activity
+          <p className="text-sm text-slate-600">
+            Monitor platform performance and scheduling activity.
           </p>
         </div>
-
         <button
-          type="button"
-          onClick={handleRefresh}
-          className="inline-flex items-center gap-2 rounded-xl border border-slate-200/90 bg-white px-4 py-2 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 transition-all cursor-pointer shrink-0"
+          onClick={refresh}
+          className="flex items-center gap-2 rounded-lg border border-slate-200 bg-surface-card px-4 py-2 text-sm font-medium text-on-surface shadow-surface hover:bg-surface-hover"
         >
-          <RotateCcw className={`h-3.5 w-3.5 text-slate-500 ${isRefreshing ? "animate-spin" : ""}`} />
-          <span>Refresh Data</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M23 4v6h-6M1 20v-6h6" />
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+          </svg>
+          Refresh Data
         </button>
       </div>
 
-      {/* 2. Top 3 Real Metric Cards */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-        {/* Card 1: TOTAL REVIEWERS */}
-        <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs transition-all hover:border-slate-300">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              Total Reviewers
-            </span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-primary">
-              <Users className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="flex items-center gap-2.5">
-            <span className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
-              {totalReviewers}
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200/60 px-2.5 py-0.5 text-xs font-bold text-primary">
-              <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-              <span>{activeReviewers} Active</span>
+      {/* Stat cards */}
+      <div className="mb-6 grid grid-cols-1 gap-5 sm:grid-cols-3">
+        <div className="rounded-xl border border-slate-100 bg-surface-card p-5 shadow-surface">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="text-xs font-medium text-slate-500">Total Reviewers</span>
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary text-primary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /></svg>
             </span>
           </div>
-          <div className="mt-3 flex items-center gap-1.5 text-xs text-slate-500">
-            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-            <span className="truncate">{activeReviewers} verified active in roster</span>
-          </div>
-        </div>
-
-        {/* Card 2: BOOKINGS THIS WEEK */}
-        <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs transition-all hover:border-slate-300">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              Bookings This Week
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-semibold text-on-surface">
+              {stats ? stats.totalReviewers : "—"}
             </span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-primary">
-              <Calendar className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="flex items-center gap-2.5">
-            <span className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
-              {bookingsThisWeek}
-            </span>
-            {typeof weekChangePct === "number" && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200/60 px-2.5 py-0.5 text-xs font-bold text-primary">
-                <TrendingUp className="h-3 w-3 text-primary" />
-                <span>{weekChangePct >= 0 ? `+${weekChangePct}%` : `${weekChangePct}%`} vs last week</span>
+            {stats && (
+              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                {stats.activeReviewers} Active
               </span>
             )}
           </div>
-          <div className="mt-3 flex items-center gap-1.5 text-xs text-slate-500">
-            <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-            <span className="truncate">Active evaluation schedule</span>
+        </div>
+
+        <div className="rounded-xl border border-slate-100 bg-surface-card p-5 shadow-surface">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="text-xs font-medium text-slate-500">Bookings This Week</span>
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary text-primary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75"><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M3 9h18" /></svg>
+            </span>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-semibold text-on-surface">
+              {stats ? stats.bookingsThisWeek : "—"}
+            </span>
+            {stats && stats.bookingsWeekChangePct !== null && (
+              <span className={`text-xs font-medium ${stats.bookingsWeekChangePct >= 0 ? "text-emerald-700" : "text-red-600"}`}>
+                {stats.bookingsWeekChangePct >= 0 ? "+" : ""}
+                {stats.bookingsWeekChangePct}% vs last week
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Card 3: NO-SHOW RATE */}
-        <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs transition-all hover:border-slate-300">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              No-Show Rate
-            </span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
-              <Info className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="flex items-center gap-2.5">
-            <span className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
-              {noShowRate}%
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200/60 px-2.5 py-0.5 text-xs font-bold text-primary">
-              <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-              <span>{noShowRate <= 5 ? "In Compliance" : "Action Required"}</span>
+        <div className="rounded-xl border border-slate-100 bg-surface-card p-5 shadow-surface">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="text-xs font-medium text-slate-500">No-Show Rate</span>
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-50 text-red-600">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75"><circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" /></svg>
             </span>
           </div>
-          <div className="mt-3 flex items-center gap-1.5 text-xs text-slate-500">
-            <span className="truncate">Target &lt; 5% institutional standard</span>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-semibold text-on-surface">
+              {stats ? `${stats.noShowRatePct}%` : "—"}
+            </span>
+            <span className="text-xs font-medium text-slate-400">Target &lt; 5%</span>
           </div>
         </div>
       </div>
 
-      {/* 3. Middle Section: Reviewer Management (Left) & Recent Bookings (Right) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column: Reviewer Management */}
-        <div className="lg:col-span-5 rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xs flex flex-col justify-between">
-          <div>
-            {/* Top Icon */}
-            <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-primary">
-              <Contact className="h-5 w-5" />
-            </div>
-
-            <h2 className="text-lg font-extrabold text-slate-900">
-              Reviewer Management
-            </h2>
-            <p className="mt-1.5 text-xs text-slate-500 leading-relaxed">
-              Manage academic evaluator rosters, verify technical competencies, monitor workload balance, and approve onboarding credentials across all active disciplines.
-            </p>
-
-            {/* Real Reviewer Status Badges */}
-            <div className="mt-4 flex items-center gap-2 flex-wrap">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200/60 px-3 py-1 text-xs font-bold text-primary">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                <span>{activeReviewers} Active Faculty</span>
-              </span>
-              {inactiveReviewers > 0 && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 border border-slate-200/80 px-3 py-1 text-xs font-bold text-slate-600">
-                  <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
-                  <span>{inactiveReviewers} Inactive</span>
-                </span>
-              )}
-            </div>
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_2fr]">
+        {/* Reviewer management promo card */}
+        <div className="rounded-xl border border-slate-100 bg-surface-card p-6 shadow-surface">
+          <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-on-primary">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /></svg>
           </div>
-
-          {/* Action CTA Button */}
-          <div className="pt-6">
-            <Link
-              href="/admin/reviewers"
-              className="w-full rounded-xl bg-[#002b49] text-white hover:bg-[#00223a] transition-all font-bold text-xs py-3 px-4 flex items-center justify-center gap-2 shadow-xs cursor-pointer"
-            >
-              <span>View All Reviewers</span>
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          </div>
+          <h3 className="mb-1.5 text-base font-semibold text-on-surface">Reviewer Management</h3>
+          <p className="mb-6 text-sm text-slate-600">
+            Oversee reviewer accounts, availability, and expertise profiles to ensure optimal scheduling.
+          </p>
+          <Link
+            href="/admin/reviewers"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary shadow-surface hover:opacity-90"
+          >
+            View All Reviewers
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
+          </Link>
         </div>
 
-        {/* Right Column: Recent Bookings */}
-        <div className="lg:col-span-7 rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xs flex flex-col justify-between">
-          <div>
-            {/* Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-2">
-              <div className="flex items-center gap-2.5">
-                <h3 className="text-base font-extrabold text-slate-900">
-                  Recent Bookings
-                </h3>
-                <span className="inline-flex items-center gap-1 rounded-full bg-[#002b49] px-2.5 py-0.5 text-[10px] font-extrabold text-white">
-                  <span className="h-1 w-1 rounded-full bg-emerald-400" />
-                  <span>Live Feed</span>
-                </span>
-              </div>
-              {bookings.length > 0 && (
-                <span className="text-xs text-slate-400 font-medium">
-                  Showing latest {Math.min(5, bookings.length)}
-                </span>
+        {/* Recent bookings */}
+        <div className="rounded-xl border border-slate-100 bg-surface-card p-6 shadow-surface">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-base font-semibold text-on-surface">Recent Bookings</h3>
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-100 text-left text-xs font-medium text-slate-400">
+                <th className="pb-2 pr-3 font-medium">Reviewer</th>
+                <th className="pb-2 pr-3 font-medium">Advisor/Intern</th>
+                <th className="pb-2 pr-3 font-medium">Status</th>
+                <th className="pb-2 font-medium">Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading && bookings.length === 0 && (
+                <tr><td colSpan={4} className="py-6 text-center text-slate-400">Loading…</td></tr>
               )}
-            </div>
-
-            {/* Table or Empty State */}
-            {isLoading && bookings.length === 0 ? (
-              <div className="py-12 text-center text-xs text-slate-400">
-                Loading live session feed...
-              </div>
-            ) : bookings.length === 0 ? (
-              <div className="py-12 flex flex-col items-center justify-center text-center">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-400 mb-2.5">
-                  <CalendarX2 className="h-5 w-5" />
-                </div>
-                <p className="text-xs font-bold text-slate-700">No bookings recorded yet</p>
-                <p className="text-[11px] text-slate-400 mt-0.5 max-w-xs">
-                  Review sessions scheduled across faculty rosters will appear here in real time.
-                </p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-left text-xs">
-                  <thead>
-                    <tr className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                      <th className="py-2.5 pr-3 font-extrabold">Reviewer</th>
-                      <th className="py-2.5 pr-3 font-extrabold">Advisor / Intern</th>
-                      <th className="py-2.5 pr-3 font-extrabold">Status</th>
-                      <th className="py-2.5 font-extrabold">Time</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {bookings.slice(0, 5).map((b) => {
-                      const isConfirmed = b.status === "confirmed";
-                      const isCompleted = b.status === "completed";
-                      const isCancelled = b.status === "cancelled" || b.status === "no_show";
-
-                      return (
-                        <tr key={b.id} className="hover:bg-slate-50/60 transition-colors">
-                          {/* Reviewer */}
-                          <td className="py-3 pr-3">
-                            <div className="flex items-center gap-2.5">
-                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-50 text-[10px] font-extrabold text-primary border border-blue-100">
-                                {getInitials(b.reviewerName || "Reviewer")}
-                              </div>
-                              <div>
-                                <p className="font-bold text-slate-900">{b.reviewerName || "Reviewer"}</p>
-                                <p className="text-[10px] text-slate-400 font-medium">
-                                  {b.eventTypeName || "Evaluation"}
-                                </p>
-                              </div>
-                            </div>
-                          </td>
-
-                          {/* Advisor / Intern */}
-                          <td className="py-3 pr-3">
-                            <p className="font-bold text-slate-900">{b.internName || "Candidate"}</p>
-                            <p className="text-[10px] text-slate-400 font-medium">
-                              {b.advisorEmail ? b.advisorEmail.split("@")[0] : b.batch || "Advisory"}
-                            </p>
-                          </td>
-
-                          {/* Status */}
-                          <td className="py-3 pr-3 whitespace-nowrap">
-                            <span
-                              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                                isConfirmed || isCompleted
-                                  ? "bg-blue-50 text-primary border border-blue-200/60"
-                                  : isCancelled
-                                  ? "bg-rose-50 text-rose-700 border border-rose-200"
-                                  : "bg-slate-100 text-slate-700"
-                              }`}
-                            >
-                              <span
-                                className={`h-1.5 w-1.5 rounded-full ${
-                                  isConfirmed || isCompleted
-                                    ? "bg-primary"
-                                    : isCancelled
-                                    ? "bg-rose-500"
-                                    : "bg-slate-400"
-                                }`}
-                              />
-                              <span className="capitalize">{b.status ?? "confirmed"}</span>
-                            </span>
-                          </td>
-
-                          {/* Time */}
-                          <td className="py-3 whitespace-nowrap text-slate-600">
-                            <div className="flex items-center gap-1 text-[11px] font-semibold text-slate-700">
-                              <Clock className="h-3 w-3 text-slate-400 shrink-0" />
-                              <span>{formatBookingTime(b.startTime)}</span>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          {/* Footer Link */}
-          <div className="pt-4 border-t border-slate-100 flex justify-end">
-            <Link
-              href="/admin/bookings"
-              className="text-xs font-bold text-[#002b49] hover:underline flex items-center gap-1 transition-colors"
-            >
-              <span>View All Bookings</span>
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          </div>
+              {!isLoading && bookings.length === 0 && (
+                <tr><td colSpan={4} className="py-6 text-center text-slate-400">No bookings yet</td></tr>
+              )}
+              {bookings.map((b) => (
+                <tr key={b.id} className="border-b border-slate-50 last:border-0">
+                  <td className="py-3 pr-3">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary text-[11px] font-semibold text-primary">
+                        {initials(b.reviewerName)}
+                      </span>
+                      <span className="font-medium text-on-surface">{b.reviewerName}</span>
+                    </div>
+                  </td>
+                  <td className="py-3 pr-3 text-slate-600">{b.advisorEmail.split("@")[0]}</td>
+                  <td className="py-3 pr-3">
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[b.status ?? "confirmed"]}`}>
+                      {(b.status ?? "confirmed").replace("_", " ")}
+                    </span>
+                  </td>
+                  <td className="py-3 text-slate-600">{formatTime(b.startTime)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <Link
+            href="/admin/bookings"
+            className="mt-4 inline-block text-sm font-medium text-primary hover:underline"
+          >
+            View All Bookings →
+          </Link>
         </div>
       </div>
     </div>
