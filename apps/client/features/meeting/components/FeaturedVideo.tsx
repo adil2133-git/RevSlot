@@ -24,15 +24,28 @@ export default function FeaturedVideo({
 
     if (!video) return;
 
-    video.srcObject = stream;
-    video.muted = true;
+    const playStream = () => {
+      if (video.srcObject !== stream) {
+        video.srcObject = stream;
+      }
+      video.muted = true;
+      if (stream) {
+        void video.play().catch(() => undefined);
+      }
+    };
+
+    playStream();
+
     if (stream) {
-      void video.play().catch(() => {
-        // Browser autoplay restriction.
-      });
+      stream.addEventListener("addtrack", playStream);
+      stream.addEventListener("removetrack", playStream);
     }
 
     return () => {
+      if (stream) {
+        stream.removeEventListener("addtrack", playStream);
+        stream.removeEventListener("removetrack", playStream);
+      }
       if (video.srcObject === stream) {
         video.srcObject = null;
       }
