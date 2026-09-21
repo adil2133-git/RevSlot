@@ -12,18 +12,13 @@ const api = axios.create({
   },
 });
 
-// In-memory only — never localStorage (readable by any injected/XSS JS)
-// and never a cookie (that's the whole point of moving it here). Lost on
-// a hard refresh by design; AuthProvider re-establishes it on every app
-// load via refreshAccessToken() + getMe().
-let currentAccessToken: string | null = null;
-export function setAccessToken(token: string | null) {
-  currentAccessToken = token;
-}
+import { getAccessToken, setAccessToken } from "./token";
+export { getAccessToken, setAccessToken };
 
 api.interceptors.request.use((config) => {
-  if (currentAccessToken) {
-    config.headers.Authorization = `Bearer ${currentAccessToken}`;
+  const token = getAccessToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });

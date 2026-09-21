@@ -176,6 +176,13 @@
       "when": 1789830772805,
       "tag": "0037_bent_monster_badoon",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1789900000000,
+      "tag": "0038_notification_enhancements",
+      "breakpoints": true
     }
   ]
 }

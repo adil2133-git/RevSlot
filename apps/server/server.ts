@@ -24,6 +24,9 @@ import walletRoutes from "./modules/wallet/wallet.routes.js";
 import { walletService } from "./modules/wallet/wallet.service.js";
 import meetingRoutes from "./modules/meeting/meeting.routes.js";
 import { registerMeetingSocket } from "./modules/meeting/meeting.socket.js";
+import { registerNotificationSocket } from "./modules/notification/notification.socket.js";
+import { startNotificationCron } from "./modules/notification/notification.cron.js";
+import { bookingReminderService } from "./modules/booking/bookingReminder.service.js";
 import disputeRoutes from "./modules/dispute/dispute.routes.js";
 
 import { notFound, errorMiddleware } from './core/middlewares/error.middleware.js';
@@ -90,6 +93,7 @@ const io = new Server(httpServer, {
 });
 
 registerMeetingSocket(io);
+registerNotificationSocket(io);
 
 const PORT = process.env.PORT || 5000;
 
@@ -113,6 +117,19 @@ const serverConnect = async () => {
         console.error("[EscrowJob] Periodic run error:", err);
       });
     }, 30 * 60 * 1000);
+
+    // Initial check and periodic pre-session reminder notifications (every 5 mins)
+    bookingReminderService.checkAndSendReminders().catch((err) => {
+      console.error("[ReminderJob] Initial run error:", err);
+    });
+    setInterval(() => {
+      bookingReminderService.checkAndSendReminders().catch((err) => {
+        console.error("[ReminderJob] Periodic run error:", err);
+      });
+    }, 5 * 60 * 1000);
+
+    // Schedule daily notification cleanup job (02:00 AM off-peak)
+    startNotificationCron();
   });
 };
 

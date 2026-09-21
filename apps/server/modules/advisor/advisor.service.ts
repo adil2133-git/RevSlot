@@ -19,6 +19,7 @@ import { refundService } from "../payment/refund.service.js";
 import { bookingService } from "../booking/booking.service.js";
 import { walletTransactions } from "../wallet/wallet.schema.js";
 import { payments } from "../payment/payments.schema.js";
+import { notificationService } from "../notification/notification.service.js";
 import { AppError } from "../../core/errors/AppError.js";
 
 
@@ -397,6 +398,14 @@ export const advisorService = {
           });
         })
       );
+
+      await notificationService.createNotification({
+        reviewerId: booking.reviewerId,
+        type: "booking_cancelled",
+        title: "Booking cancelled by advisor",
+        message: `${booking.advisorName} cancelled their session for ${dayjs(booking.startTime).format("ddd, MMM D")}`,
+        bookingId: booking.id,
+      });
     }
 
     return updated;
@@ -512,6 +521,14 @@ export const advisorService = {
         endTime: updatedBooking.endTime,
       }
     );
+
+    await notificationService.createNotification({
+      reviewerId: updatedBooking.reviewerId,
+      type: "booking_rescheduled",
+      title: "Booking rescheduled by advisor",
+      message: `${updatedBooking.advisorName} rescheduled their session to ${dayjs(updatedBooking.startTime).format("ddd, MMM D, h:mm A")}`,
+      bookingId: updatedBooking.id,
+    });
 
     return updatedBooking;
   },

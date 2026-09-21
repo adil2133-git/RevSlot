@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "@/features/auth/store/authStore";
 import { InstallPwaButton } from "@/components/common/InstallPwaButton";
+import NotificationBell from "@/features/notifications/components/NotificationBell";
 
 const NAV_ITEMS = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutGrid },
@@ -59,12 +60,11 @@ export default function AdminSidebar() {
   const displayHandle = user?.email ? `@${user.email.split("@")[0]} · Admin` : "@superadmin · Admin";
 
   return (
-    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-slate-200/80 bg-white select-none">
-      {/* 1. Header: Shield Icon Brand */}
-      <div className="flex h-20 items-center px-6 border-b border-slate-100/80">
-        <Link href="/admin/dashboard" className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#002b49] text-white shadow-xs">
-            <Shield className="h-5 w-5 fill-white/20 text-white" />
+    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-slate-100 bg-white">
+      <div className="flex h-16 items-center justify-between px-6">
+        <Link href="/admin/dashboard" className="flex items-center gap-2 text-lg font-bold tracking-tight text-[#003366]">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#003366] text-xs font-bold text-white">
+            R
           </div>
           <div>
             <div className="text-base font-extrabold tracking-tight text-slate-900 leading-tight">
@@ -75,6 +75,7 @@ export default function AdminSidebar() {
             </div>
           </div>
         </Link>
+        <NotificationBell role="admin" />
       </div>
 
       {/* 2. Navigation */}

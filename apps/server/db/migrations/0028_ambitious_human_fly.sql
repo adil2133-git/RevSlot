@@ -1,1 +1,1 @@
-ALTER TABLE "feedback_forms" ADD COLUMN "description" varchar(200);
+ALTER TABLE "feedback_forms" ADD COLUMN IF NOT EXISTS "description" varchar(200);

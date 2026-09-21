@@ -184,10 +184,10 @@ export const TodaysSchedule: React.FC<TodaysScheduleProps> = ({
             const isOutcomeRequired = isActive && now >= endTs;
             const canMarkNoShow = isActive && now >= graceEnd;
             const isJoinAvailable =
-              isActive &&
-              now >= startTs - 10 * 60 * 1000 &&
-              now < endTs &&
-              !!item.meetLink;
+                 isActive &&
+                 now >= startTs - 15 * 60 * 1000 &&
+                 now < endTs &&
+                 !!item.meetLink;
 
             const displayStatus = isOutcomeRequired
               ? "outcome_required"

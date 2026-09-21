@@ -2,6 +2,9 @@ import { eq, desc, sql } from "drizzle-orm";
 import { db } from "../../config/db.js";
 import { payoutRequests, reviewerWallets, walletTransactions, reviewerPayoutProfiles } from "../wallet/wallet.schema.js";
 import { reviewers } from "../auth/reviewers.schema.js";
+import { emailService } from "../../services/email.service.js";
+import { payoutProcessedTemplate } from "../../emails/templates/payoutProcessed.js";
+import { notificationService } from "../notification/notification.service.js";
 import { AppError } from "../../core/errors/AppError.js";
 
 export const adminPayoutsService = {
@@ -103,7 +106,7 @@ export const adminPayoutsService = {
       throw new AppError(`This payout has already been marked as ${payout.status}`, 400);
     }
 
-    return await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => {
       if (data.action === "approve") {
         if (!data.transactionReference?.trim()) {
           throw new AppError("Transaction reference / UTR number is required to approve a payout", 400);
@@ -184,5 +187,41 @@ export const adminPayoutsService = {
         return updated;
       }
     });
+
+    // Send in-app notification & email to reviewer
+    const [reviewer] = await db
+      .select({ name: reviewers.name, email: reviewers.email })
+      .from(reviewers)
+      .where(eq(reviewers.id, payout.reviewerId))
+      .limit(1);
+
+    if (reviewer && payout) {
+      const amountRupees = (payout.amount / 100).toFixed(2);
+      const isApproved = data.action === "approve";
+
+      // 1. In-app notification (live socket)
+      notificationService.createNotification({
+        reviewerId: payout.reviewerId,
+        type: isApproved ? "payout_processed" : "payout_rejected",
+        title: isApproved ? "Payout completed" : "Payout rejected",
+        message: isApproved
+          ? `Your withdrawal of ₹${amountRupees} was completed (Ref: ${data.transactionReference?.trim()})`
+          : `Your withdrawal of ₹${amountRupees} was rejected: ${data.adminNotes || "Administrative decision"}. Funds returned to balance.`,
+      }).catch((err) => console.error("[Payout] Notification error:", err));
+
+      // 2. Email alert
+      const { subject, html } = payoutProcessedTemplate({
+        reviewerName: reviewer.name,
+        amountPaise: payout.amount,
+        status: isApproved ? "completed" : "rejected",
+        transactionReference: data.transactionReference,
+        adminNotes: data.adminNotes,
+      });
+      emailService.sendEmail({ to: reviewer.email, subject, html }).catch((err) => {
+        console.error("[Payout] Email error:", err);
+      });
+    }
+
+    return result;
   },
 };

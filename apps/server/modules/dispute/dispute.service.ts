@@ -9,6 +9,11 @@ import { payments } from "../payment/payments.schema.js";
 import { walletTransactions, reviewerWallets } from "../wallet/wallet.schema.js";
 import { meetingService } from "../meeting/meeting.service.js";
 import { refundService } from "../payment/refund.service.js";
+import { emailService } from "../../services/email.service.js";
+import { disputeReportedTemplate } from "../../emails/templates/disputeReported.js";
+import { disputeResolvedTemplate } from "../../emails/templates/disputeResolved.js";
+import { notificationService } from "../notification/notification.service.js";
+import { admins } from "../admin/admins.schema.js";
 import { AppError } from "../../core/errors/AppError.js";
 
 export interface ReportDisputeInput {
@@ -25,13 +30,19 @@ export const disputeService = {
     const [booking] = await db
       .select({
         id: bookings.id,
+        advisorName: bookings.advisorName,
         advisorEmail: bookings.advisorEmail,
         reviewerId: bookings.reviewerId,
         startTime: bookings.startTime,
         endTime: bookings.endTime,
         status: bookings.status,
+        reviewerName: reviewers.name,
+        reviewerEmail: reviewers.email,
+        eventTypeName: eventTypes.name,
       })
       .from(bookings)
+      .innerJoin(reviewers, eq(bookings.reviewerId, reviewers.id))
+      .innerJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
       .where(eq(bookings.id, bookingId))
       .limit(1);
 
@@ -91,6 +102,80 @@ export const disputeService = {
           eq(walletTransactions.type, "credit_escrow")
         )
       );
+
+    // 1. In-app notification to Reviewer (Socket.IO live alert)
+    await notificationService.createNotification({
+      reviewerId: booking.reviewerId,
+      type: "dispute_filed",
+      title: "Issue reported on session",
+      message: `${booking.advisorName} reported an issue on Booking #${bookingId} (${data.reason.replace(/_/g, " ")})`,
+      bookingId,
+    });
+
+    // 2. In-app notification to Admins (Socket.IO live alert)
+    await notificationService.createAdminNotification({
+      type: "admin_new_dispute",
+      title: `New dispute: Booking #${bookingId}`,
+      message: `${booking.advisorName} filed a dispute for ${booking.eventTypeName} with ${booking.reviewerName}`,
+      bookingId,
+    });
+
+    // 3. Email notifications
+    // Advisor confirmation email
+    const advisorMail = disputeReportedTemplate({
+      recipientName: booking.advisorName,
+      recipientRole: "advisor",
+      bookingId,
+      eventTypeName: booking.eventTypeName,
+      reason: data.reason,
+      description: data.description,
+      reviewerName: booking.reviewerName,
+      advisorName: booking.advisorName,
+      advisorEmail: booking.advisorEmail,
+    });
+    emailService.sendEmail({ to: booking.advisorEmail, subject: advisorMail.subject, html: advisorMail.html }).catch((err) => {
+      console.error("[Dispute] Failed to send advisor dispute email:", err);
+    });
+
+    // Reviewer alert email
+    const reviewerMail = disputeReportedTemplate({
+      recipientName: booking.reviewerName,
+      recipientRole: "reviewer",
+      bookingId,
+      eventTypeName: booking.eventTypeName,
+      reason: data.reason,
+      description: data.description,
+      reviewerName: booking.reviewerName,
+      advisorName: booking.advisorName,
+      advisorEmail: booking.advisorEmail,
+    });
+    emailService.sendEmail({ to: booking.reviewerEmail, subject: reviewerMail.subject, html: reviewerMail.html }).catch((err) => {
+      console.error("[Dispute] Failed to send reviewer dispute email:", err);
+    });
+
+    // Admin alert email to active admins
+    db.select({ email: admins.email, name: admins.name })
+      .from(admins)
+      .where(eq(admins.isActive, true))
+      .then((activeAdmins) => {
+        for (const adm of activeAdmins) {
+          const adminMail = disputeReportedTemplate({
+            recipientName: adm.name,
+            recipientRole: "admin",
+            bookingId,
+            eventTypeName: booking.eventTypeName,
+            reason: data.reason,
+            description: data.description,
+            reviewerName: booking.reviewerName,
+            advisorName: booking.advisorName,
+            advisorEmail: booking.advisorEmail,
+          });
+          emailService.sendEmail({ to: adm.email, subject: adminMail.subject, html: adminMail.html }).catch((err) => {
+            console.error(`[Dispute] Failed to send admin email to ${adm.email}:`, err);
+          });
+        }
+      })
+      .catch((err) => console.error("[Dispute] Failed to fetch admins for email alert:", err));
 
     return dispute;
   },
@@ -197,6 +282,24 @@ export const disputeService = {
       throw new AppError("This dispute has already been resolved", 400);
     }
 
+    const [bookingData] = await db
+      .select({
+        id: bookings.id,
+        advisorName: bookings.advisorName,
+        advisorEmail: bookings.advisorEmail,
+        reviewerId: bookings.reviewerId,
+        reviewerName: reviewers.name,
+        reviewerEmail: reviewers.email,
+        eventTypeName: eventTypes.name,
+      })
+      .from(bookings)
+      .innerJoin(reviewers, eq(bookings.reviewerId, reviewers.id))
+      .innerJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
+      .where(eq(bookings.id, dispute.bookingId))
+      .limit(1);
+
+    let updatedResult;
+
     if (data.action === "refund_client") {
       // 100% full refund to client via Razorpay
       await refundService.processBookingRefund({
@@ -216,7 +319,7 @@ export const disputeService = {
         .where(eq(bookingDisputes.id, disputeId))
         .returning();
 
-      return updated;
+      updatedResult = updated;
     } else {
       // Dismiss false/fraudulent dispute: unfreeze escrow so funds mature normally
       await db
@@ -240,7 +343,50 @@ export const disputeService = {
         .where(eq(bookingDisputes.id, disputeId))
         .returning();
 
-      return updated;
+      updatedResult = updated;
     }
+
+    if (bookingData) {
+      const outcome = data.action === "refund_client" ? "resolved_refunded" : "resolved_dismissed";
+
+      // 1. In-app notification to reviewer (live socket)
+      await notificationService.createNotification({
+        reviewerId: bookingData.reviewerId,
+        type: "dispute_resolved",
+        title: data.action === "refund_client" ? "Dispute resolved (Refund)" : "Dispute dismissed",
+        message: data.action === "refund_client"
+          ? `Dispute for Booking #${dispute.bookingId} (${bookingData.eventTypeName}) was approved with client refund.`
+          : `Dispute for Booking #${dispute.bookingId} (${bookingData.eventTypeName}) was dismissed. Funds cleared.`,
+        bookingId: dispute.bookingId,
+      });
+
+      // 2. Email to Advisor
+      const advMail = disputeResolvedTemplate({
+        recipientName: bookingData.advisorName,
+        recipientRole: "advisor",
+        bookingId: dispute.bookingId,
+        eventTypeName: bookingData.eventTypeName,
+        outcome,
+        adminNotes: data.adminNotes,
+      });
+      emailService.sendEmail({ to: bookingData.advisorEmail, subject: advMail.subject, html: advMail.html }).catch((err) => {
+        console.error("[Dispute] Failed to send advisor resolution email:", err);
+      });
+
+      // 3. Email to Reviewer
+      const revMail = disputeResolvedTemplate({
+        recipientName: bookingData.reviewerName,
+        recipientRole: "reviewer",
+        bookingId: dispute.bookingId,
+        eventTypeName: bookingData.eventTypeName,
+        outcome,
+        adminNotes: data.adminNotes,
+      });
+      emailService.sendEmail({ to: bookingData.reviewerEmail, subject: revMail.subject, html: revMail.html }).catch((err) => {
+        console.error("[Dispute] Failed to send reviewer resolution email:", err);
+      });
+    }
+
+    return updatedResult;
   },
 };
