@@ -28,15 +28,16 @@ export default function BookingDetailsModal({ bookingId, onClose }: BookingDetai
 
   const now = dayjs();
   const isActive = !!detail && (detail.status === "confirmed" || detail.status === "rescheduled");
+  // Meeting join window: set to 1 day (24h) for testing; revert to 15, "minute" for 15 minutes
   const canJoinMeet =
     isActive &&
     !!detail?.meetLink &&
-    now.isAfter(dayjs(detail.startTime).subtract(15, "minute")) &&
+    now.isAfter(dayjs(detail.startTime).subtract(1, "day")) &&
     now.isBefore(dayjs(detail.endTime));
   const isBeforeJoinWindow =
     isActive &&
     !!detail?.meetLink &&
-    now.isBefore(dayjs(detail.startTime).subtract(15, "minute"));
+    now.isBefore(dayjs(detail.startTime).subtract(1, "day"));
 
   return (
     <Modal onClose={onClose} widthClassName="max-w-lg max-h-[90vh]">
@@ -134,7 +135,7 @@ export default function BookingDetailsModal({ bookingId, onClose }: BookingDetai
 
           {isBeforeJoinWindow && (
             <div className="flex items-center justify-center gap-2 rounded-lg bg-slate-100 px-5 py-2.5 text-xs font-semibold text-slate-500">
-              <span>Meeting link activates 15 minutes before start</span>
+              <span>Meeting link activates 1 day before start</span>
             </div>
           )}
 
