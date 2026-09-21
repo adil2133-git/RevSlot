@@ -1,13 +1,13 @@
 import { Router } from "express";
 import { disputeController } from "./dispute.controller.js";
 import { catchAsync } from "../../core/utils/catchAsync.js";
-import { requireAdmin } from "../../core/middlewares/auth.middleware.js";
+import { requireAdmin, optionalAuth } from "../../core/middlewares/auth.middleware.js";
 
 const router = Router();
 
 // Client / Advisor routes (public / token-verified by email)
 router.post("/report", catchAsync(disputeController.reportDispute));
-router.get("/booking/:bookingId", catchAsync(disputeController.getBookingDispute));
+router.get("/booking/:bookingId", optionalAuth, catchAsync(disputeController.getBookingDispute));
 
 // Admin routes
 router.get("/admin", requireAdmin, catchAsync(disputeController.listAdminDisputes));

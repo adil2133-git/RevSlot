@@ -22,6 +22,7 @@ import { meetingService } from "../meeting/meeting.service.js";
 import { payments } from "../payment/payments.schema.js";
 import { reviewerWallets, walletTransactions } from "../wallet/wallet.schema.js";
 import { refundService } from "../payment/refund.service.js";
+import { bookingDisputes } from "../dispute/disputes.schema.js";
 
 export interface GetMyBookingsOptions {
 
@@ -585,11 +586,19 @@ for (const [key, value] of Object.entries(formData)) {
           razorpayPaymentId: payments.razorpayPaymentId,
           rescheduleCount: bookings.rescheduleCount,
           hasFeedback: sql<boolean>`${feedback.id} is not null`,
+          disputeId: bookingDisputes.id,
+          disputeReason: bookingDisputes.reason,
+          disputeDescription: bookingDisputes.description,
+          disputeStatus: bookingDisputes.status,
+          disputeAdminNotes: bookingDisputes.adminNotes,
+          disputeCreatedAt: bookingDisputes.createdAt,
+          disputeResolvedAt: bookingDisputes.resolvedAt,
         })
         .from(bookings)
         .innerJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
         .leftJoin(payments, eq(payments.bookingId, bookings.id))
         .leftJoin(feedback, eq(feedback.bookingId, bookings.id))
+        .leftJoin(bookingDisputes, eq(bookingDisputes.bookingId, bookings.id))
         .where(and(...conditions))
         .orderBy(orderBy)
         .limit(limit)
@@ -616,10 +625,34 @@ for (const [key, value] of Object.entries(formData)) {
     const totalCount = countResult[0]?.count ?? 0;
     const defaultCounts = { all: 0, ongoing: 0, upcoming: 0, reschedule_requested: 0, completed: 0, rescheduled: 0, cancelled: 0, no_show: 0 };
 
-  const bookingsWithMeetingLinks = rows.map((booking) => ({
-  ...booking,
-  meetLink: meetingService.getMeetingLink(booking.id),
-  }));
+    const bookingsWithMeetingLinks = rows.map((r) => {
+      const {
+        disputeId,
+        disputeReason,
+        disputeDescription,
+        disputeStatus,
+        disputeAdminNotes,
+        disputeCreatedAt,
+        disputeResolvedAt,
+        ...booking
+      } = r;
+
+      return {
+        ...booking,
+        meetLink: meetingService.getMeetingLink(booking.id),
+        dispute: disputeId
+          ? {
+              id: disputeId,
+              reason: disputeReason,
+              description: disputeDescription,
+              status: disputeStatus,
+              adminNotes: disputeAdminNotes,
+              createdAt: disputeCreatedAt ? disputeCreatedAt.toISOString() : null,
+              resolvedAt: disputeResolvedAt ? disputeResolvedAt.toISOString() : null,
+            }
+          : null,
+      };
+    });
 
     return {
       bookings:  bookingsWithMeetingLinks,

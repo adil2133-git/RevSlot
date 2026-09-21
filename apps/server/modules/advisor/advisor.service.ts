@@ -16,10 +16,11 @@ import { bookingCancelledTemplate, bookingCancelledTemplateData } from "../../em
 import { generateAdvisorToken } from "../../core/utils/jwt.js";
 import { meetingService } from "../meeting/meeting.service.js";
 import { refundService } from "../payment/refund.service.js";
-import { bookingService } from "../booking/booking.service.js";
-import { walletTransactions } from "../wallet/wallet.schema.js";
 import { payments } from "../payment/payments.schema.js";
+import { walletTransactions } from "../wallet/wallet.schema.js";
+import { bookingService } from "../booking/booking.service.js";
 import { notificationService } from "../notification/notification.service.js";
+import { bookingDisputes } from "../dispute/disputes.schema.js";
 import { AppError } from "../../core/errors/AppError.js";
 
 
@@ -136,12 +137,20 @@ export const advisorService = {
         reviewerName: reviewers.name,
         timezone: sql<string>`'IST'`,
         hasFeedback: sql<boolean>`${feedback.id} is not null`,
+        disputeId: bookingDisputes.id,
+        disputeReason: bookingDisputes.reason,
+        disputeDescription: bookingDisputes.description,
+        disputeStatus: bookingDisputes.status,
+        disputeAdminNotes: bookingDisputes.adminNotes,
+        disputeCreatedAt: bookingDisputes.createdAt,
+        disputeResolvedAt: bookingDisputes.resolvedAt,
       })
       .from(bookings)
       .innerJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
       .innerJoin(reviewers, eq(bookings.reviewerId, reviewers.id))
       .leftJoin(payments, eq(payments.bookingId, bookings.id))
       .leftJoin(feedback, eq(feedback.bookingId, bookings.id))
+      .leftJoin(bookingDisputes, eq(bookingDisputes.bookingId, bookings.id))
       .where(and(...scopeConditions))
       .orderBy(orderBy);
 
@@ -160,10 +169,34 @@ export const advisorService = {
         .where(and(eq(bookings.advisorEmail, cleanEmail), eq(bookings.status, "cancelled"))),
     ]);
 
-    const bookingsWithMeetingLinks = rows.map((booking) => ({
-     ...booking,
-     meetLink: meetingService.getMeetingLink(booking.id),
-    }));
+    const bookingsWithMeetingLinks = rows.map((r) => {
+      const {
+        disputeId,
+        disputeReason,
+        disputeDescription,
+        disputeStatus,
+        disputeAdminNotes,
+        disputeCreatedAt,
+        disputeResolvedAt,
+        ...booking
+      } = r;
+
+      return {
+        ...booking,
+        meetLink: meetingService.getMeetingLink(booking.id),
+        dispute: disputeId
+          ? {
+              id: disputeId,
+              reason: disputeReason,
+              description: disputeDescription,
+              status: disputeStatus,
+              adminNotes: disputeAdminNotes,
+              createdAt: disputeCreatedAt ? disputeCreatedAt.toISOString() : null,
+              resolvedAt: disputeResolvedAt ? disputeResolvedAt.toISOString() : null,
+            }
+          : null,
+      };
+    });
 
   return {
     bookings: bookingsWithMeetingLinks,

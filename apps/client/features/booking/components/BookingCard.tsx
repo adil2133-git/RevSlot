@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { MailIcon, CalendarIcon, ClockIcon, CheckCircleIcon, UserXIcon, } from "./icons";
 import StatusBadge from "./StatusBadge";
 import BookingActionsMenu from "./BookingActionsMenu";
+import DisputeDetailsModal from "@/components/common/DisputeDetailsModal";
 import { initials, formatBookingDate, formatBookingTimeRange } from "../utils/bookingDisplay";
 import type { MyBooking } from "../type";
 
@@ -54,6 +55,7 @@ export default function BookingCard({
   "completed" | "no_show" | null
 >(null);
   const [isChangeOutcomeOpen, setIsChangeOutcomeOpen] = useState(false);
+  const [showDisputeModal, setShowDisputeModal] = useState(false);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -103,10 +105,11 @@ export default function BookingCard({
 
   return (
     <div
-      className={`flex flex-col gap-4 rounded-xl border border-slate-200/80 border-l-4 ${statusBorderColor} bg-surface-card p-4 sm:p-5 shadow-surface transition-all hover:border-slate-300 hover:shadow-raised md:flex-row md:items-center md:justify-between`}
+      className={`flex flex-col rounded-xl border border-slate-200/80 border-l-4 ${statusBorderColor} bg-surface-card p-4 sm:p-5 shadow-surface transition-all hover:border-slate-300 hover:shadow-raised`}
     >
-      {/* Left Info: Avatar + Intern Name + Event Type + Advisor */}
-      <div className="flex items-start gap-3.5">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        {/* Left Info: Avatar + Intern Name + Event Type + Advisor */}
+        <div className="flex items-start gap-3.5">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-secondary text-primary font-bold text-sm border border-primary/15 shadow-2xs">
           {initials(displayName)}
         </div>
@@ -281,8 +284,51 @@ export default function BookingCard({
             onChangeOutcome={() => setIsChangeOutcomeOpen(true)}
             onViewFeedback={() => onViewFeedback?.(booking)}
           />
-     </div>
-   </div>
+        </div>
+      </div>
+    </div>
+
+      {booking.dispute && (
+        <div
+          className={`mt-3.5 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3 text-xs ${
+            booking.dispute.status === "under_review"
+              ? "border-amber-200 bg-amber-50/80 text-amber-950"
+              : booking.dispute.status === "resolved_refunded"
+              ? "border-rose-200 bg-rose-50/80 text-rose-950"
+              : "border-slate-200 bg-slate-50 text-slate-800"
+          }`}
+        >
+          <div className="flex items-center gap-2.5">
+            <span className="text-base">⚠️</span>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold">
+                  {booking.dispute.status === "under_review"
+                    ? "Session Issue Reported • Payout On Hold"
+                    : booking.dispute.status === "resolved_refunded"
+                    ? "Dispute Resolved • Payout Refunded to Client"
+                    : "Dispute Resolved • Dismissed"}
+                </span>
+                <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-700 border border-slate-200">
+                  {booking.dispute.reason.replace(/_/g, " ")}
+                </span>
+              </div>
+              <span className="mt-0.5 block text-[11px] text-slate-600">
+                {booking.dispute.status === "under_review"
+                  ? "Escrow funds are temporarily frozen while RevSlot investigates attendance logs."
+                  : booking.dispute.adminNotes || "Administrative investigation completed."}
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowDisputeModal(true)}
+            className="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs border border-slate-200 hover:bg-slate-50 transition cursor-pointer"
+          >
+            View Dispute Details
+          </button>
+        </div>
+      )}
 
 {outcomeToConfirm && (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
@@ -387,6 +433,19 @@ export default function BookingCard({
     </div>
   </div>
 )}
-  </div>
-);
+
+      <DisputeDetailsModal
+        isOpen={showDisputeModal}
+        onClose={() => setShowDisputeModal(false)}
+        dispute={booking.dispute || null}
+        bookingInfo={{
+          id: booking.id,
+          eventTypeName: booking.eventTypeName,
+          advisorName: booking.advisorName,
+          startTime: booking.startTime,
+        }}
+        viewerRole="reviewer"
+      />
+    </div>
+  );
 };

@@ -4,12 +4,14 @@ import { useState } from "react";
 import dayjs from "dayjs";
 import type { AdvisorBookingItem, AdvisorBookingScope } from "../types";
 import ReportDisputeModal from "./ReportDisputeModal";
+import DisputeDetailsModal from "@/components/common/DisputeDetailsModal";
 
 interface AdvisorBookingCardProps {
   booking: AdvisorBookingItem;
   activeTab?: AdvisorBookingScope;
   onActionClick?: (booking: AdvisorBookingItem) => void;
   onViewFeedback?: (booking: AdvisorBookingItem) => void;
+  onDisputeUpdated?: () => void;
 }
 
 const CalendarIcon = () => (
@@ -50,8 +52,10 @@ export default function AdvisorBookingCard({
   activeTab,
   onActionClick,
   onViewFeedback,
+  onDisputeUpdated,
 }: AdvisorBookingCardProps) {
   const [showDisputeModal, setShowDisputeModal] = useState(false);
+  const [showDisputeDetailsModal, setShowDisputeDetailsModal] = useState(false);
   const formattedDate = dayjs(booking.startTime).format("ddd, D MMM YYYY");
   const formattedTime = `${dayjs(booking.startTime).format("h:mm A")} – ${dayjs(booking.endTime).format("h:mm A")} (${booking.timezone || "IST"})`;
 
@@ -329,7 +333,36 @@ export default function AdvisorBookingCard({
         )}
       </div>
 
-      {booking.status !== "cancelled" &&
+      {booking.dispute ? (
+        <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
+          <div className="flex items-center gap-2">
+            <span className="text-xs">⚠️</span>
+            {booking.dispute.status === "under_review" && (
+              <span className="font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg">
+                Dispute Under Review
+              </span>
+            )}
+            {booking.dispute.status === "resolved_refunded" && (
+              <span className="font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
+                Dispute Resolved • Refund Issued
+              </span>
+            )}
+            {booking.dispute.status === "resolved_dismissed" && (
+              <span className="font-semibold text-slate-700 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-lg">
+                Dispute Dismissed
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowDisputeDetailsModal(true)}
+            className="text-primary hover:text-primary/80 font-semibold hover:underline"
+          >
+            View Details
+          </button>
+        </div>
+      ) : (
+        booking.status !== "cancelled" &&
         dayjs().isAfter(dayjs(booking.startTime)) &&
         dayjs().diff(dayjs(booking.endTime), "hour", true) <= 48 && (
           <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
@@ -342,12 +375,27 @@ export default function AdvisorBookingCard({
               <span>⚠️</span> Report No-Show / Issue
             </button>
           </div>
-        )}
+        )
+      )}
 
       <ReportDisputeModal
         booking={booking}
         isOpen={showDisputeModal}
         onClose={() => setShowDisputeModal(false)}
+        onSuccess={onDisputeUpdated}
+      />
+
+      <DisputeDetailsModal
+        isOpen={showDisputeDetailsModal}
+        onClose={() => setShowDisputeDetailsModal(false)}
+        dispute={booking.dispute || null}
+        bookingInfo={{
+          id: booking.id,
+          eventTypeName: booking.eventTypeName,
+          reviewerName: booking.reviewerName,
+          startTime: booking.startTime,
+        }}
+        viewerRole="advisor"
       />
     </div>
   );
