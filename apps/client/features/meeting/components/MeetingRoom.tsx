@@ -81,7 +81,7 @@ export default function MeetingRoom({
   ] = useState(false);
 
   const [chatOpen, setChatOpen] =
-    useState(true);
+    useState(false);
 
   const [copied, setCopied] =
     useState(false);
@@ -253,6 +253,12 @@ export default function MeetingRoom({
     webRTC.getLocalMedia,
   ]);
 
+  useEffect(() => {
+  if (meeting.joined) {
+    setChatOpen(false);
+  }
+}, [meeting.joined]);
+
   /*
    * --------------------------------------------------
    * MANUAL JOIN
@@ -297,6 +303,8 @@ export default function MeetingRoom({
       if (!result) {
         return;
       }
+      setChatOpen(false);
+
     } catch (err: unknown) {
       webRTC.stopLocalMedia();
 
@@ -457,8 +465,8 @@ export default function MeetingRoom({
    * --------------------------------------------------
    */
   return (
-    <main className="min-h-[calc(100vh-64px)] bg-slate-950 text-white">
-      <div className="mx-auto flex h-[calc(100vh-64px)] max-w-[1600px] flex-col p-3 lg:flex-row lg:gap-3">
+    <main className="min-h-screen bg-slate-950 text-white">
+      <div className="mx-auto flex h-screen max-w-[1600px] flex-col p-3 lg:flex-row lg:gap-3">
         <section className="flex min-h-0 flex-1 flex-col rounded-2xl bg-slate-900 p-3">
           <MeetingHeader
             eventTypeName={
@@ -491,6 +499,9 @@ export default function MeetingRoom({
             remoteStreams={
               webRTC.remoteStreams
             }
+            screenSharer={webRTC.screenSharer}
+            remoteScreenStream={webRTC.remoteScreenStream}
+            localScreenStream={webRTC.localScreenStream}
           />
 
           <MeetingControls
@@ -500,6 +511,11 @@ export default function MeetingRoom({
             }
             sharing={
               webRTC.sharing
+            }
+            shareDisabled={
+              webRTC.screenSharer !== null &&
+              webRTC.screenSharer.participantId !==
+                (meeting.participantIdRef.current ?? "")
             }
             chatOpen={chatOpen}
             onToggleMic={

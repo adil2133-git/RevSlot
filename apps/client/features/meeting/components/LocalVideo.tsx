@@ -7,15 +7,23 @@ type LocalVideoProps = {
   videoRef: RefObject<HTMLVideoElement | null>;
   name: string;
   cameraOff: boolean;
+  compact?: boolean;
 };
 
 export default function LocalVideo({
   videoRef,
   name,
   cameraOff,
+  compact = false,
 }: LocalVideoProps) {
   return (
-    <div className="relative min-h-[220px] overflow-hidden rounded-xl bg-black">
+    <div
+      className={
+        compact
+          ? "relative h-full w-44 shrink-0 overflow-hidden rounded-xl bg-black sm:w-56 lg:h-36 lg:w-full"
+          : "relative min-h-[220px] overflow-hidden rounded-xl bg-black"
+      }
+    >
       <video
         ref={videoRef}
         autoPlay

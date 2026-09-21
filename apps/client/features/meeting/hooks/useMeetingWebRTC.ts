@@ -12,17 +12,31 @@ import type {
   MeetingParticipant,
   MeetingSignal,
   PeerState,
+  ScreenShareState,
 } from "../types/meeting.types";
 import type { MeetingSocket } from "../socket/meetingSocket";
 
-const ICE_SERVERS: RTCIceServer[] = [
-  {
-    urls: "stun:stun.l.google.com:19302",
-  },
-  {
-    urls: "stun:stun1.l.google.com:19302",
-  },
-];
+const buildIceServers = (): RTCIceServer[] => {
+  const servers: RTCIceServer[] = [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" },
+  ];
+
+  const turnUrls = (process.env.NEXT_PUBLIC_TURN_URLS ?? "")
+    .split(",")
+    .map((url) => url.trim())
+    .filter(Boolean);
+
+  const username = process.env.NEXT_PUBLIC_TURN_USERNAME;
+  const credential = process.env.NEXT_PUBLIC_TURN_CREDENTIAL;
+
+  if (turnUrls.length > 0 && username && credential) {
+    servers.push({ urls: turnUrls, username, credential });
+  }
+
+  return servers;
+};
+const ICE_SERVERS: RTCIceServer[] = buildIceServers();
 
 type UseMeetingWebRTCProps = {
   bookingId: number;
@@ -51,6 +65,47 @@ export function useMeetingWebRTC({
   const screenStreamRef =
     useRef<MediaStream | null>(null);
 
+  /*
+   * Screen share is sent as a SECOND, separate set of tracks
+   * (own MediaStream) next to the camera. senders are kept per
+   * remote peer so they can be removed when sharing stops.
+   */
+  const screenSendersRef =
+    useRef<Map<string, RTCRtpSender[]>>(
+      new Map()
+    );
+
+  /*
+   * Latest screen-share state announced by the server.
+   * A ref so `ontrack` (created once per peer) always
+   * reads the current value.
+   */
+  const screenInfoRef =
+    useRef<ScreenShareState | null>(null);
+
+  /*
+   * First stream received from a peer = its camera stream.
+   * Any other stream from the same peer is its screen.
+   */
+  const cameraStreamIdRef =
+    useRef<Map<string, string>>(
+      new Map()
+    );
+
+  /*
+   * Non-camera streams received from peers (screen shares).
+   */
+  const extraStreamsRef =
+    useRef<
+      Map<
+        string,
+        {
+          remoteId: string;
+          stream: MediaStream;
+        }
+      >
+    >(new Map());
+
   const peersRef =
     useRef<Map<string, PeerState>>(
       new Map()
@@ -60,6 +115,15 @@ export function useMeetingWebRTC({
     useRef<Map<string, RTCIceCandidateInit[]>>(
       new Map()
     );
+  
+  const disconnectTimersRef =
+    useRef<Map<string, ReturnType<typeof setTimeout>>>(
+      new Map()
+    );
+
+
+  const readyPeersRef =
+    useRef<Set<string>>(new Set());
 
   const [
     remoteStreams,
@@ -67,6 +131,23 @@ export function useMeetingWebRTC({
   ] = useState<Map<string, MediaStream>>(
     new Map()
   );
+
+  const [
+    screenSharer,
+    setScreenSharer,
+  ] = useState<ScreenShareState | null>(
+    null
+  );
+
+  const [
+    remoteScreenStream,
+    setRemoteScreenStream,
+  ] = useState<MediaStream | null>(null);
+
+  const [
+  localScreenStream,
+  setLocalScreenStream,
+] = useState<MediaStream | null>(null);
 
   const [muted, setMuted] =
     useState(false);
@@ -111,7 +192,7 @@ export function useMeetingWebRTC({
    * GET CAMERA + MICROPHONE
    * --------------------------------------------------
    */
-  const getLocalMedia =
+     const getLocalMedia =
     useCallback(async () => {
       if (
         !navigator.mediaDevices
@@ -122,23 +203,72 @@ export function useMeetingWebRTC({
         );
       }
 
-      const stream =
-        await navigator.mediaDevices.getUserMedia(
-          {
-            video: true,
-            audio: true,
-          }
+      try {
+        const stream =
+          await navigator.mediaDevices.getUserMedia(
+            {
+              video: true,
+              audio: true,
+            }
+          );
+
+        localStreamRef.current =
+          stream;
+
+        setLocalVideo(stream);
+
+        return stream;
+      } catch {
+        /* fall through to audio-only */
+      }
+
+      try {
+        const stream =
+          await navigator.mediaDevices.getUserMedia(
+            {
+              video: false,
+              audio: true,
+            }
+          );
+
+        localStreamRef.current =
+          stream;
+
+        setLocalVideo(stream);
+
+        setCameraOff(true);
+
+        setError(
+          "Camera is unavailable — you're joining with audio only."
         );
 
+        return stream;
+      } catch {
+        /* fall through to view-only */
+      }
+
+      const emptyStream =
+        new MediaStream();
+
       localStreamRef.current =
-        stream;
+        emptyStream;
 
-      setLocalVideo(stream);
+      setLocalVideo(null);
 
-      return stream;
+      setMuted(true);
+      setCameraOff(true);
+
+      setError(
+        "Camera and microphone are unavailable — you've joined in view-only mode."
+      );
+
+      return emptyStream;
     }, [
       localStreamRef,
       setLocalVideo,
+      setError,
+      setMuted,
+      setCameraOff,
     ]);
 
   /*
@@ -228,15 +358,179 @@ export function useMeetingWebRTC({
 
   /*
    * --------------------------------------------------
+   * REMOTE SCREEN STREAM (derived)
+   * --------------------------------------------------
+   *
+   * Picks the stream that the server says is the
+   * presenter's screen, if it has arrived over WebRTC.
+   */
+  const syncRemoteScreenStream =
+    useCallback(() => {
+      const info =
+        screenInfoRef.current;
+
+      const entry = info
+        ? extraStreamsRef.current.get(
+            info.streamId
+          )
+        : undefined;
+
+      const next =
+        info &&
+        entry &&
+        entry.remoteId ===
+          info.participantId
+          ? entry.stream
+          : null;
+
+      setRemoteScreenStream(
+        (current) =>
+          current === next
+            ? current
+            : next
+      );
+    }, []);
+
+  /*
+   * --------------------------------------------------
+   * RENEGOTIATE (used when screen tracks are added
+   * or removed on an already-connected peer)
+   * --------------------------------------------------
+   */
+  const renegotiate =
+    useCallback(
+      async (remoteId: string) => {
+        const connection =
+          peersRef.current.get(
+            remoteId
+          )?.connection;
+
+        if (!connection) {
+          return;
+        }
+
+        /*
+         * Wait for any in-flight negotiation to finish.
+         */
+        for (
+          let attempt = 0;
+          attempt < 20 &&
+          connection.signalingState !==
+            "stable";
+          attempt += 1
+        ) {
+          await new Promise(
+            (resolve) =>
+              setTimeout(resolve, 150)
+          );
+        }
+
+        if (
+          connection.signalingState !==
+          "stable"
+        ) {
+          return;
+        }
+
+        const offer =
+          await connection.createOffer();
+
+        await connection.setLocalDescription(
+          offer
+        );
+
+        await sendSignal(
+          remoteId,
+          "offer",
+          offer
+        );
+      },
+      [sendSignal]
+    );
+
+  /*
+   * Add the local screen tracks to one peer and
+   * renegotiate so that peer starts receiving them.
+   */
+  const attachScreenTo =
+    useCallback(
+      async (remoteId: string) => {
+        const peer =
+          peersRef.current.get(
+            remoteId
+          );
+
+        const screenStream =
+          screenStreamRef.current;
+
+        if (
+          !peer ||
+          !screenStream ||
+          screenSendersRef.current.has(
+            remoteId
+          )
+        ) {
+          return;
+        }
+
+        const senders =
+          screenStream
+            .getTracks()
+            .map((track) =>
+              peer.connection.addTrack(
+                track,
+                screenStream
+              )
+            );
+
+        screenSendersRef.current.set(
+          remoteId,
+          senders
+        );
+
+        await renegotiate(remoteId);
+      },
+      [renegotiate]
+    );
+
+  /*
+   * --------------------------------------------------
    * REMOVE PEER
    * --------------------------------------------------
    */
+
   const removePeer = useCallback(
-    (remoteId: string) => {
+    (remoteId: string, connection?: RTCPeerConnection) => {
+
       const peer =
         peersRef.current.get(
           remoteId
         );
+
+      if (
+        connection &&
+        peer &&
+        peer.connection !== connection
+      ) {
+      
+        return;
+      }
+
+      readyPeersRef.current.delete(
+        remoteId
+      );
+
+      const pendingTimer =
+        disconnectTimersRef.current.get(
+          remoteId
+        );
+
+      if (pendingTimer) {
+        clearTimeout(pendingTimer);
+        disconnectTimersRef.current.delete(
+          remoteId
+        );
+      }
 
       peer?.connection.close();
 
@@ -247,6 +541,27 @@ export function useMeetingWebRTC({
       pendingIceRef.current.delete(
         remoteId
       );
+
+      screenSendersRef.current.delete(
+        remoteId
+      );
+
+      cameraStreamIdRef.current.delete(
+        remoteId
+      );
+
+      for (const [
+        streamId,
+        entry,
+      ] of extraStreamsRef.current) {
+        if (entry.remoteId === remoteId) {
+          extraStreamsRef.current.delete(
+            streamId
+          );
+        }
+      }
+
+      syncRemoteScreenStream();
 
       setRemoteStreams(
         (current) => {
@@ -259,7 +574,7 @@ export function useMeetingWebRTC({
         }
       );
     },
-    []
+    [syncRemoteScreenStream]
   );
 
   /*
@@ -270,13 +585,24 @@ export function useMeetingWebRTC({
   const createPeer = useCallback(
     (remoteId: string) => {
       const existing =
-        peersRef.current.get(
-          remoteId
-        );
+  peersRef.current.get(
+    remoteId
+  );
 
-      if (existing) {
-        return existing.connection;
-      }
+if (existing) {
+  const existingState =
+    existing.connection
+      .connectionState;
+
+  if (
+    existingState !== "closed" &&
+    existingState !== "failed"
+  ) {
+    return existing.connection;
+  }
+
+  removePeer(remoteId);
+}
 
       const connection =
         new RTCPeerConnection({
@@ -317,6 +643,54 @@ export function useMeetingWebRTC({
       connection.ontrack = (
         event
       ) => {
+        const incoming =
+          event.streams[0];
+
+        if (incoming) {
+          const info =
+            screenInfoRef.current;
+
+          const knownCameraId =
+            cameraStreamIdRef.current.get(
+              remoteId
+            );
+
+          const isScreenStream =
+            !!info &&
+            info.participantId ===
+              remoteId &&
+            info.streamId ===
+              incoming.id;
+
+          /*
+           * Screen share: keep it OUT of the camera
+           * stream so the participant tile is unchanged.
+           */
+          if (
+            isScreenStream ||
+            (knownCameraId &&
+              knownCameraId !==
+                incoming.id)
+          ) {
+            extraStreamsRef.current.set(
+              incoming.id,
+              {
+                remoteId,
+                stream: incoming,
+              }
+            );
+
+            syncRemoteScreenStream();
+
+            return;
+          }
+
+          cameraStreamIdRef.current.set(
+            remoteId,
+            incoming.id
+          );
+        }
+
         const tracks =
           event.streams[0]
             ?.getTracks() ??
@@ -370,9 +744,6 @@ export function useMeetingWebRTC({
         ).catch(() => undefined);
       };
 
-      /*
-       * Peer connection lifecycle
-       */
       connection.onconnectionstatechange =
         () => {
           const state =
@@ -380,11 +751,67 @@ export function useMeetingWebRTC({
 
           if (
             state === "failed" ||
-            state === "closed" ||
-            state ===
-              "disconnected"
+            state === "closed"
           ) {
             removePeer(
+              remoteId,
+              connection
+            );
+            return;
+          }
+
+          if (state === "disconnected") {
+            const existingTimer =
+              disconnectTimersRef.current.get(
+                remoteId
+              );
+
+            if (existingTimer) {
+              clearTimeout(existingTimer);
+            }
+
+            const timer = setTimeout(() => {
+              disconnectTimersRef.current.delete(
+                remoteId
+              );
+
+              if (
+                connection.connectionState ===
+                "disconnected"
+              ) {
+                removePeer(remoteId, connection);
+              }
+            }, 8000);
+
+            disconnectTimersRef.current.set(
+              remoteId,
+              timer
+            );
+
+            return;
+          }
+
+          /*
+           * Someone is presenting and this peer just
+           * (re)connected -> start sending them the screen.
+           */
+          if (
+            state === "connected" &&
+            screenStreamRef.current
+          ) {
+            void attachScreenTo(
+              remoteId
+            ).catch(() => undefined);
+          }
+
+          const recoveredTimer =
+            disconnectTimersRef.current.get(
+              remoteId
+            );
+
+          if (recoveredTimer) {
+            clearTimeout(recoveredTimer);
+            disconnectTimersRef.current.delete(
               remoteId
             );
           }
@@ -396,6 +823,8 @@ export function useMeetingWebRTC({
       localStreamRef,
       removePeer,
       sendSignal,
+      syncRemoteScreenStream,
+      attachScreenTo,
     ]
   );
 
@@ -600,6 +1029,64 @@ export function useMeetingWebRTC({
 
   /*
    * --------------------------------------------------
+   * SCREEN SHARE STATE (from server)
+   * --------------------------------------------------
+   *
+   * Declared BEFORE the signal listener effect so the
+   * listener exists before `webrtc:ready` is emitted
+   * (the server answers that with the current state).
+   */
+  useEffect(() => {
+    if (
+      !joined ||
+      !socket
+    ) {
+      return;
+    }
+
+    const onScreenState = (
+      next: ScreenShareState | null
+    ) => {
+      const previous =
+        screenInfoRef.current;
+
+      if (
+        previous &&
+        previous.streamId !==
+          next?.streamId
+      ) {
+        extraStreamsRef.current.delete(
+          previous.streamId
+        );
+      }
+
+      screenInfoRef.current =
+        next;
+
+      setScreenSharer(next);
+
+      syncRemoteScreenStream();
+    };
+
+    socket.on(
+      "screen:state",
+      onScreenState
+    );
+
+    return () => {
+      socket.off(
+        "screen:state",
+        onScreenState
+      );
+    };
+  }, [
+    joined,
+    socket,
+    syncRemoteScreenStream,
+  ]);
+
+  /*
+   * --------------------------------------------------
    * WEBRTC SIGNAL LISTENER
    * --------------------------------------------------
    */
@@ -628,6 +1115,16 @@ export function useMeetingWebRTC({
       onSignal
     );
 
+    socket.emit("webrtc:ready");
+
+    for (const participant of participants) {
+      if (participant.id !== participantId) {
+        readyPeersRef.current.add(
+          participant.id
+        );
+      }
+    }
+
     return () => {
       socket.off(
         "webrtc:signal",
@@ -639,6 +1136,58 @@ export function useMeetingWebRTC({
     socket,
     handleSignal,
     setError,
+    participants,
+    participantId,
+  ]);
+
+  /*
+   * --------------------------------------------------
+   * REMOTE PEER ANNOUNCED READY
+   * --------------------------------------------------
+   */
+  useEffect(() => {
+    if (
+      !joined ||
+      !socket
+    ) {
+      return;
+    }
+
+    const onParticipantReady = ({
+      participantId: remoteId,
+    }: {
+      participantId: string;
+    }) => {
+      readyPeersRef.current.add(
+        remoteId
+      );
+
+      if (
+        !peersRef.current.has(
+          remoteId
+        )
+      ) {
+        void createOfferFor(
+          remoteId
+        ).catch(() => undefined);
+      }
+    };
+
+    socket.on(
+      "participant:ready",
+      onParticipantReady
+    );
+
+    return () => {
+      socket.off(
+        "participant:ready",
+        onParticipantReady
+      );
+    };
+  }, [
+    joined,
+    socket,
+    createOfferFor,
   ]);
 
   /*
@@ -664,6 +1213,9 @@ export function useMeetingWebRTC({
 
       if (
         !peersRef.current.has(
+          participant.id
+        ) &&
+        readyPeersRef.current.has(
           participant.id
         )
       ) {
@@ -723,6 +1275,20 @@ export function useMeetingWebRTC({
 
       pendingIceRef.current.clear();
 
+      readyPeersRef.current.clear();
+
+      screenSendersRef.current.clear();
+
+      cameraStreamIdRef.current.clear();
+
+      extraStreamsRef.current.clear();
+
+      screenInfoRef.current = null;
+
+      setScreenSharer(null);
+
+      setRemoteScreenStream(null);
+
       setRemoteStreams(
         new Map()
       );
@@ -776,66 +1342,93 @@ export function useMeetingWebRTC({
 
   /*
    * --------------------------------------------------
-   * RESTORE CAMERA AFTER SCREEN SHARE
+   * STOP SCREEN SHARE
    * --------------------------------------------------
+   *
+   * The camera track was never touched, so there is
+   * nothing to "restore" - we only remove the extra
+   * screen tracks and tell the server we stopped.
    */
-  const restoreCameraAfterScreenShare =
+  const stopScreenShare =
     useCallback(() => {
-      const cameraTrack =
-        localStreamRef.current
-          ?.getVideoTracks()[0];
+      const screenStream =
+        screenStreamRef.current;
 
-      if (cameraTrack) {
-        for (const {
-          connection,
-        } of peersRef.current.values()) {
-          const sender =
-            connection
-              .getSenders()
-              .find(
-                (item) =>
-                  item.track
-                    ?.kind ===
-                  "video"
-              );
+      if (!screenStream) {
+        return;
+      }
 
-          if (sender) {
-            void sender
-              .replaceTrack(
-                cameraTrack
-              )
-              .catch(() => undefined);
+      const remoteIds = [
+        ...screenSendersRef.current.keys(),
+      ];
+
+      for (const [
+        remoteId,
+        senders,
+      ] of screenSendersRef.current) {
+        const peer =
+          peersRef.current.get(
+            remoteId
+          );
+
+        if (!peer) {
+          continue;
+        }
+
+        for (const sender of senders) {
+          try {
+            peer.connection.removeTrack(
+              sender
+            );
+          } catch {
+            /*
+             * Connection already closed.
+             */
           }
         }
       }
 
-      screenStreamRef.current
-        ?.getTracks()
-        .forEach((track) =>
-          track.stop()
-        );
+      screenSendersRef.current.clear();
+
+      screenStream
+        .getTracks()
+        .forEach((track) => {
+          track.onended = null;
+          track.stop();
+        });
 
       screenStreamRef.current =
         null;
-
-      setLocalVideo(
-        localStreamRef.current
-      );
-
+      setLocalScreenStream(null);
       setSharing(false);
+
       sessionStorage.removeItem(
-         `revslot:meeting:${_bookingId}:screen-sharing`
+        `revslot:meeting:${_bookingId}:screen-sharing`
       );
+
       setScreenShareNeedsResume(false);
+
+      socket?.emit("screen:stop");
+
+      for (const remoteId of remoteIds) {
+        void renegotiate(
+          remoteId
+        ).catch(() => undefined);
+      }
     }, [
-      localStreamRef,
-      setLocalVideo,
+      _bookingId,
+      renegotiate,
+      socket,
     ]);
 
   /*
    * --------------------------------------------------
    * SCREEN SHARE
    * --------------------------------------------------
+   *
+   * Only ONE participant may present at a time
+   * (enforced by the server). The screen is sent as an
+   * additional video track; the camera keeps streaming.
    */
   const shareScreen =
     useCallback(async () => {
@@ -850,19 +1443,44 @@ export function useMeetingWebRTC({
         return;
       }
 
-      /*
-       * Stop current screen share.
-       */
       if (sharing) {
-        restoreCameraAfterScreenShare();
+        stopScreenShare();
         return;
       }
 
+      if (!socket?.connected) {
+        setError(
+          "Meeting connection is not available."
+        );
+
+        return;
+      }
+
+      const currentSharer =
+        screenInfoRef.current;
+
+      if (
+        currentSharer &&
+        currentSharer.participantId !==
+          participantId
+      ) {
+        setError(
+          "Someone else is already presenting. Wait until they stop sharing."
+        );
+
+        return;
+      }
+
+      let screenStream:
+        | MediaStream
+        | null = null;
+
       try {
-        const screenStream =
+        screenStream =
           await navigator.mediaDevices.getDisplayMedia(
             {
               video: true,
+              audio: true,
             }
           );
 
@@ -879,36 +1497,64 @@ export function useMeetingWebRTC({
           return;
         }
 
+        /*
+         * Ask the server for the (single) presenter slot.
+         */
+        const claim =
+          await new Promise<{
+            ok: boolean;
+            error?: string;
+          }>((resolve) => {
+            const timer = setTimeout(
+              () =>
+                resolve({
+                  ok: false,
+                  error:
+                    "Could not start screen sharing. Please try again.",
+                }),
+              5000
+            );
+
+            socket.emit(
+              "screen:start",
+              {
+                streamId:
+                  screenStream!.id,
+              },
+              (response) => {
+                clearTimeout(timer);
+                resolve(response);
+              }
+            );
+          });
+
+        if (!claim.ok) {
+          screenStream
+            .getTracks()
+            .forEach((track) =>
+              track.stop()
+            );
+
+          setError(
+            claim.error ??
+              "Someone else is already presenting."
+          );
+
+          return;
+        }
+
         screenStreamRef.current =
           screenStream;
 
+        setLocalScreenStream(screenStream);
+
         /*
-         * Replace camera track
-         * with screen track.
+         * Browser "Stop sharing" button.
          */
-        for (const {
-          connection,
-        } of peersRef.current.values()) {
-          const sender =
-            connection
-              .getSenders()
-              .find(
-                (item) =>
-                  item.track
-                    ?.kind ===
-                  "video"
-              );
-
-          if (sender) {
-            await sender.replaceTrack(
-              screenTrack
-            );
-          }
-        }
-
-        setLocalVideo(
-          screenStream
-        );
+        screenTrack.onended =
+          () => {
+            stopScreenShare();
+          };
 
         setSharing(true);
         setScreenShareNeedsResume(false);
@@ -918,22 +1564,28 @@ export function useMeetingWebRTC({
           "true"
         );
 
-        /*
-         * Browser stop-sharing button
-         * also restores camera.
-         */
-        screenTrack.onended =
-          () => {
-            restoreCameraAfterScreenShare();
-          };
+        for (const remoteId of peersRef.current.keys()) {
+          void attachScreenTo(
+            remoteId
+          ).catch(() => undefined);
+        }
       } catch {
+        screenStream
+          ?.getTracks()
+          .forEach((track) =>
+            track.stop()
+          );
+
         setSharing(false);
       }
     }, [
-      sharing,
-      restoreCameraAfterScreenShare,
+      _bookingId,
+      attachScreenTo,
+      participantId,
       setError,
-      setLocalVideo,
+      sharing,
+      socket,
+      stopScreenShare,
     ]);
 
       /*
@@ -1028,7 +1680,10 @@ export function useMeetingWebRTC({
     muted,
     cameraOff,
     sharing,
+    screenSharer,
+    remoteScreenStream,
     screenShareNeedsResume,
+    localScreenStream,
     getLocalMedia,
     stopLocalMedia,
     toggleMic,
