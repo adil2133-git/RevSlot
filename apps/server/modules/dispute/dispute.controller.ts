@@ -52,7 +52,7 @@ export const disputeController = {
   listAdminDisputes: async (req: Request, res: Response) => {
     const status = req.query.status as any;
     const page = Number(req.query.page) || 1;
-    const limit = Number(req.query.limit) || 20;
+    const limit = Number(req.query.limit) || 5;
 
     const result = await disputeService.listAdminDisputes({ status, page, limit });
     return res.json({

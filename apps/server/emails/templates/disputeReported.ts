@@ -17,33 +17,61 @@ const reasonLabels: Record<string, string> = {
   other: "Other Grievance",
 };
 
+export const DISPUTE_REPORTED_TEMPLATE_ID = "revslot-dispute-reported";
+
+function getSubjectAndIntro(params: DisputeReportedParams): { subject: string; intro: string } {
+  const { recipientRole, bookingId, eventTypeName, reviewerName, advisorName } = params;
+
+  if (recipientRole === "advisor") {
+    return {
+      subject: `Dispute Received: Booking #${bookingId}`,
+      intro: `We have received your report regarding your session with <strong>${reviewerName}</strong>. Our administration team is actively investigating the meeting logs and will issue a resolution within 48 hours.`,
+    };
+  }
+  if (recipientRole === "reviewer") {
+    return {
+      subject: `Action Notice: Issue reported for Booking #${bookingId}`,
+      intro: `An issue has been reported by <strong>${advisorName}</strong> for your session <strong>${eventTypeName}</strong>. Related payout funds are temporarily held in escrow pending administrative review.`,
+    };
+  }
+  return {
+    subject: `[Admin Alert] New Dispute Filed: Booking #${bookingId}`,
+    intro: `Advisor <strong>${advisorName}</strong> has filed a dispute for session <strong>${eventTypeName}</strong> with reviewer <strong>${reviewerName}</strong>.`,
+  };
+}
+
+// Variables + subject for emailService.sendTemplateEmail(). recipientRole
+// branching (advisor/reviewer/admin wording) happens in code and gets
+// passed in as the raw INTRO variable, since Resend Templates don't
+// support conditionals.
+export const disputeReportedTemplateData = (params: DisputeReportedParams) => {
+  const { subject, intro } = getSubjectAndIntro(params);
+  const humanReason = reasonLabels[params.reason] || params.reason;
+
+  return {
+    templateId: DISPUTE_REPORTED_TEMPLATE_ID,
+    subject,
+    variables: {
+      RECIPIENT_NAME: params.recipientName,
+      INTRO: intro,
+      BOOKING_ID: String(params.bookingId),
+      EVENT_TYPE_NAME: params.eventTypeName,
+      REASON_LABEL: humanReason,
+      DESCRIPTION: params.description,
+    },
+  };
+};
+
 export const disputeReportedTemplate = (params: DisputeReportedParams) => {
   const {
     recipientName,
-    recipientRole,
     bookingId,
     eventTypeName,
-    reason,
     description,
-    reviewerName,
-    advisorName,
   } = params;
 
-  const humanReason = reasonLabels[reason] || reason;
-
-  let subject: string;
-  let intro: string;
-
-  if (recipientRole === "advisor") {
-    subject = `Dispute Received: Booking #${bookingId}`;
-    intro = `We have received your report regarding your session with <strong>${reviewerName}</strong>. Our administration team is actively investigating the meeting logs and will issue a resolution within 48 hours.`;
-  } else if (recipientRole === "reviewer") {
-    subject = `Action Notice: Issue reported for Booking #${bookingId}`;
-    intro = `An issue has been reported by <strong>${advisorName}</strong> for your session <strong>${eventTypeName}</strong>. Related payout funds are temporarily held in escrow pending administrative review.`;
-  } else {
-    subject = `[Admin Alert] New Dispute Filed: Booking #${bookingId}`;
-    intro = `Advisor <strong>${advisorName}</strong> has filed a dispute for session <strong>${eventTypeName}</strong> with reviewer <strong>${reviewerName}</strong>.`;
-  }
+  const { subject, intro } = getSubjectAndIntro(params);
+  const humanReason = reasonLabels[params.reason] || params.reason;
 
   const html = `
     <!DOCTYPE html>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import dayjs from "dayjs";
 import { listDisputes, resolveDispute } from "@/features/admin/api/adminApi";
+import AdminPagination from "@/components/admin/AdminPagination";
 import type { AdminDisputeItem } from "@/features/admin/types";
 
 export default function AdminDisputesPage() {
@@ -27,7 +28,7 @@ export default function AdminDisputesPage() {
       const res = await listDisputes({
         status: status === "all" ? undefined : status,
         page,
-        limit: 20,
+        limit: 5,
       });
       setItems(res.items);
       setTotal(res.total);
@@ -222,6 +223,15 @@ export default function AdminDisputesPage() {
             </table>
           </div>
         )}
+
+        <AdminPagination
+          page={page}
+          totalPages={Math.max(1, Math.ceil(total / 5))}
+          total={total}
+          limit={5}
+          onPageChange={setPage}
+          label="disputes"
+        />
       </div>
 
       {/* Resolution Modal */}

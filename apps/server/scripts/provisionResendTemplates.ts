@@ -35,6 +35,11 @@ import { BOOKING_CONFIRMATION_TEMPLATE_ID } from "../emails/templates/bookingCon
 import { BOOKING_CANCELLED_TEMPLATE_ID } from "../emails/templates/bookingCancelled.js";
 import { BOOKING_RESCHEDULED_TEMPLATE_ID } from "../emails/templates/bookingRescheduled.js";
 import { BOOKING_RESCHEDULE_REQUESTED_TEMPLATE_ID } from "../emails/templates/bookingRescheduleRequested.js";
+import { DISPUTE_REPORTED_TEMPLATE_ID } from "../emails/templates/disputeReported.js";
+import { DISPUTE_RESOLVED_TEMPLATE_ID } from "../emails/templates/disputeResolved.js";
+import { FEEDBACK_SUBMITTED_TEMPLATE_ID } from "../emails/templates/feedbackSubmitted.js";
+import { PAYOUT_PROCESSED_TEMPLATE_ID } from "../emails/templates/payoutProcessed.js";
+import { SESSION_REMINDER_TEMPLATE_ID } from "../emails/templates/sessionReminder.js";
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 if (!RESEND_API_KEY) {
@@ -258,6 +263,275 @@ const templates: TemplateDef[] = [
       { key: "PROPOSED_FORMATTED_DATE", type: "string" },
       { key: "PROPOSED_FORMATTED_TIME", type: "string" },
       { key: "ACTION_URL", type: "string" },
+    ],
+  },
+  {
+    alias: DISPUTE_REPORTED_TEMPLATE_ID,
+    name: "RevSlot — Dispute Reported",
+    // Overridden per-send based on recipient role (advisor/reviewer/admin wording).
+    subject: "Dispute reported",
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>{{{RECIPIENT_NAME}}}</title>
+        </head>
+        <body style="margin: 0; padding: 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b;">
+          <div style="max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+            <div style="background: #991b1b; padding: 24px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: 700; letter-spacing: -0.5px;">RevSlot</h1>
+              <p style="margin: 4px 0 0 0; color: #fecaca; font-size: 12px; text-transform: uppercase; font-weight: 600;">Dispute & Resolution Center</p>
+            </div>
+            <div style="padding: 28px;">
+              <h2 style="margin: 0 0 8px 0; font-size: 18px; color: #0f172a;">Hello {{{RECIPIENT_NAME}}},</h2>
+              <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.5; color: #475569;">
+                {{{INTRO}}}
+              </p>
+
+              <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 13px;">
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                  <td style="padding: 10px 0; color: #64748b; width: 140px;">Booking ID:</td>
+                  <td style="padding: 10px 0; font-weight: 600; color: #0f172a;">#{{{BOOKING_ID}}}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                  <td style="padding: 10px 0; color: #64748b;">Session Type:</td>
+                  <td style="padding: 10px 0; font-weight: 600; color: #0f172a;">{{{EVENT_TYPE_NAME}}}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                  <td style="padding: 10px 0; color: #64748b;">Reported Reason:</td>
+                  <td style="padding: 10px 0; font-weight: 600; color: #b91c1c;">{{{REASON_LABEL}}}</td>
+                </tr>
+              </table>
+
+              <div style="margin: 20px 0; padding: 16px; background: #fef2f2; border: 1px solid #fee2e2; border-radius: 8px;">
+                <p style="margin: 0 0 6px 0; font-size: 12px; font-weight: 600; text-transform: uppercase; color: #991b1b;">Report Description</p>
+                <p style="margin: 0; font-size: 13px; line-height: 1.5; color: #7f1d1d; white-space: pre-wrap;">{{{DESCRIPTION}}}</p>
+              </div>
+
+              <p style="margin: 24px 0 0 0; font-size: 12px; line-height: 1.4; color: #94a3b8; text-align: center;">
+                RevSlot Support team will reach out if further clarification is required.
+              </p>
+            </div>
+            <div style="background: #f8fafc; padding: 14px; text-align: center; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8;">
+              © RevSlot Academic Scheduling. All rights reserved.
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+    variables: [
+      { key: "RECIPIENT_NAME", type: "string" },
+      { key: "INTRO", type: "string" },
+      { key: "BOOKING_ID", type: "string" },
+      { key: "EVENT_TYPE_NAME", type: "string" },
+      { key: "REASON_LABEL", type: "string" },
+      { key: "DESCRIPTION", type: "string" },
+    ],
+  },
+  {
+    alias: DISPUTE_RESOLVED_TEMPLATE_ID,
+    name: "RevSlot — Dispute Resolved",
+    subject: "Dispute resolution",
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>{{{RECIPIENT_NAME}}}</title>
+        </head>
+        <body style="margin: 0; padding: 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b;">
+          <div style="max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+            <div style="background: {{{BANNER_COLOR}}}; padding: 24px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: 700; letter-spacing: -0.5px;">RevSlot</h1>
+              <p style="margin: 4px 0 0 0; color: #e2e8f0; font-size: 12px; text-transform: uppercase; font-weight: 600;">Resolution Notice</p>
+            </div>
+            <div style="padding: 28px;">
+              <h2 style="margin: 0 0 8px 0; font-size: 18px; color: #0f172a;">Hello {{{RECIPIENT_NAME}}},</h2>
+              <h3 style="margin: 0 0 16px 0; font-size: 15px; color: {{{HEADLINE_COLOR}}}; font-weight: 700;">{{{HEADLINE}}}</h3>
+
+              <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #475569;">
+                {{{BODY_TEXT}}}
+              </p>
+
+              {{{ADMIN_NOTES_SECTION}}}
+
+              <p style="margin: 24px 0 0 0; font-size: 12px; line-height: 1.4; color: #94a3b8; text-align: center;">
+                For any questions regarding this resolution, reply directly to this email or visit RevSlot Support.
+              </p>
+            </div>
+            <div style="background: #f8fafc; padding: 14px; text-align: center; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8;">
+              © RevSlot Academic Scheduling. All rights reserved.
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+    variables: [
+      { key: "RECIPIENT_NAME", type: "string" },
+      { key: "BOOKING_ID", type: "string" },
+      { key: "EVENT_TYPE_NAME", type: "string" },
+      { key: "HEADLINE", type: "string" },
+      { key: "HEADLINE_COLOR", type: "string" },
+      { key: "BANNER_COLOR", type: "string" },
+      { key: "BODY_TEXT", type: "string" },
+      { key: "ADMIN_NOTES_SECTION", type: "string", fallbackValue: "" },
+    ],
+  },
+  {
+    alias: FEEDBACK_SUBMITTED_TEMPLATE_ID,
+    name: "RevSlot — Feedback Submitted",
+    subject: "Review feedback available",
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>{{{RECIPIENT_NAME}}}</title>
+        </head>
+        <body style="margin: 0; padding: 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b;">
+          <div style="max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+            <div style="background: #003366; padding: 24px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: 700; letter-spacing: -0.5px;">RevSlot</h1>
+              <p style="margin: 4px 0 0 0; color: #93c5fd; font-size: 12px; text-transform: uppercase; font-weight: 600;">Evaluation Report</p>
+            </div>
+            <div style="padding: 28px;">
+              <h2 style="margin: 0 0 8px 0; font-size: 18px; color: #0f172a;">Hello {{{RECIPIENT_NAME}}},</h2>
+              <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.5; color: #475569;">
+                Review feedback has been officially recorded by <strong>{{{REVIEWER_NAME}}}</strong> for session <strong>{{{EVENT_TYPE_NAME}}}</strong> with intern <strong>{{{INTERN_NAME}}}</strong>.
+              </p>
+
+              {{{EVALUATION_CONTENT}}}
+
+              <p style="margin: 24px 0 0 0; font-size: 12px; line-height: 1.4; color: #94a3b8; text-align: center;">
+                You can view complete history anytime through your RevSlot portal.
+              </p>
+            </div>
+            <div style="background: #f8fafc; padding: 14px; text-align: center; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8;">
+              © RevSlot Academic Scheduling. All rights reserved.
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+    variables: [
+      { key: "RECIPIENT_NAME", type: "string" },
+      { key: "EVENT_TYPE_NAME", type: "string" },
+      { key: "REVIEWER_NAME", type: "string" },
+      { key: "INTERN_NAME", type: "string" },
+      { key: "EVALUATION_CONTENT", type: "string" },
+    ],
+  },
+  {
+    alias: PAYOUT_PROCESSED_TEMPLATE_ID,
+    name: "RevSlot — Payout Processed",
+    // Overridden per-send: "Payout Processed: ₹X" or "Payout Request Rejected: ₹X"
+    subject: "Payout update",
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>{{{REVIEWER_NAME}}}</title>
+        </head>
+        <body style="margin: 0; padding: 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b;">
+          <div style="max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+            <div style="background: {{{BANNER_COLOR}}}; padding: 24px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: 700; letter-spacing: -0.5px;">RevSlot</h1>
+              <p style="margin: 4px 0 0 0; color: #e2e8f0; font-size: 12px; text-transform: uppercase; font-weight: 600;">Wallet & Payouts</p>
+            </div>
+            <div style="padding: 28px;">
+              <h2 style="margin: 0 0 8px 0; font-size: 18px; color: #0f172a;">Hello {{{REVIEWER_NAME}}},</h2>
+              <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.5; color: #475569;">
+                Here is an update regarding your recent withdrawal request.
+              </p>
+
+              {{{STATUS_CONTENT}}}
+
+              <p style="margin: 24px 0 0 0; font-size: 12px; line-height: 1.4; color: #94a3b8; text-align: center;">
+                You can review your updated wallet transactions anytime under Dashboard > Wallet.
+              </p>
+            </div>
+            <div style="background: #f8fafc; padding: 14px; text-align: center; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8;">
+              © RevSlot Academic Scheduling. All rights reserved.
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+    variables: [
+      { key: "REVIEWER_NAME", type: "string" },
+      { key: "AMOUNT_RUPEES", type: "string" },
+      { key: "BANNER_COLOR", type: "string" },
+      { key: "STATUS_CONTENT", type: "string" },
+    ],
+  },
+  {
+    alias: SESSION_REMINDER_TEMPLATE_ID,
+    name: "RevSlot — Session Reminder",
+    // Overridden per-send: "Reminder: <event type> starts <in X>"
+    subject: "Session reminder",
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>{{{RECIPIENT_NAME}}}</title>
+        </head>
+        <body style="margin: 0; padding: 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b;">
+          <div style="max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+            <div style="background: #003366; padding: 24px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: 700; letter-spacing: -0.5px;">RevSlot</h1>
+              <p style="margin: 4px 0 0 0; color: #93c5fd; font-size: 12px; text-transform: uppercase; font-weight: 600;">Upcoming Session Alert</p>
+            </div>
+            <div style="padding: 28px;">
+              <h2 style="margin: 0 0 8px 0; font-size: 18px; color: #0f172a;">Hello {{{RECIPIENT_NAME}}},</h2>
+              <p style="margin: 0 0 20px 0; font-size: 14px; line-height: 1.5; color: #475569;">
+                This is a friendly reminder that your review session <strong>{{{EVENT_TYPE_NAME}}}</strong> is scheduled to start <strong>{{{STARTS_IN_TEXT}}}</strong>.
+              </p>
+
+              <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 13px;">
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                  <td style="padding: 10px 0; color: #64748b; width: 120px;">Reviewer:</td>
+                  <td style="padding: 10px 0; font-weight: 600; color: #0f172a;">{{{REVIEWER_NAME}}}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                  <td style="padding: 10px 0; color: #64748b;">Advisor:</td>
+                  <td style="padding: 10px 0; font-weight: 600; color: #0f172a;">{{{ADVISOR_NAME}}}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                  <td style="padding: 10px 0; color: #64748b;">Intern:</td>
+                  <td style="padding: 10px 0; font-weight: 600; color: #0f172a;">{{{INTERN_NAME}}}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                  <td style="padding: 10px 0; color: #64748b;">Date & Time:</td>
+                  <td style="padding: 10px 0; font-weight: 600; color: #0f172a;">{{{FORMATTED_DATE}}} at {{{FORMATTED_TIME}}}</td>
+                </tr>
+              </table>
+
+              {{{MEET_SECTION}}}
+
+              <p style="margin: 20px 0 0 0; font-size: 12px; line-height: 1.4; color: #94a3b8; text-align: center;">
+                Please make sure your microphone and camera are working before joining.
+              </p>
+            </div>
+            <div style="background: #f8fafc; padding: 14px; text-align: center; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8;">
+              © RevSlot Academic Scheduling. All rights reserved.
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+    variables: [
+      { key: "RECIPIENT_NAME", type: "string" },
+      { key: "EVENT_TYPE_NAME", type: "string" },
+      { key: "REVIEWER_NAME", type: "string" },
+      { key: "INTERN_NAME", type: "string" },
+      { key: "ADVISOR_NAME", type: "string" },
+      { key: "FORMATTED_DATE", type: "string" },
+      { key: "FORMATTED_TIME", type: "string" },
+      { key: "STARTS_IN_TEXT", type: "string" },
+      { key: "MEET_SECTION", type: "string" },
     ],
   },
 ];

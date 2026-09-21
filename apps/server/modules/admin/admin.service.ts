@@ -20,7 +20,7 @@ import type {
 export const adminService = {
   // GET /api/admin/feedback — Feedback History
   listFeedbackHistory: async (query: Partial<ListFeedbackHistoryQuery> = {}) => {
-    const { search, reviewerId, fromDate, toDate, page = 1, limit = 20 } = query;
+    const { search, reviewerId, fromDate, toDate, page = 1, limit = 5 } = query;
 
     const conditions = [];
 

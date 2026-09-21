@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { listFeedbackHistory, listReviewers } from "@/features/admin/api/adminApi";
+import AdminPagination from "@/components/admin/AdminPagination";
 import type { AdminFeedbackHistoryItem, AdminReviewer, Pagination } from "@/features/admin/types";
 
 function initials(name: string) {
@@ -24,7 +25,7 @@ function formatDate(iso: string) {
 export default function AdminFeedbackHistoryPage() {
   const [feedbackList, setFeedbackList] = useState<AdminFeedbackHistoryItem[]>([]);
   const [reviewersList, setReviewersList] = useState<AdminReviewer[]>([]);
-  const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 9, total: 0, totalPages: 1 });
+  const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 5, total: 0, totalPages: 1 });
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedReviewerId, setSelectedReviewerId] = useState<number | undefined>(undefined);
@@ -41,7 +42,7 @@ export default function AdminFeedbackHistoryPage() {
         fromDate: fromDate || undefined,
         toDate: toDate || undefined,
         page,
-        limit: 9,
+        limit: 5,
       });
       setFeedbackList(res.feedback);
       setPagination(res.pagination);
@@ -70,9 +71,6 @@ export default function AdminFeedbackHistoryPage() {
       fetchFeedback(newPage);
     }
   };
-
-  const startRecord = (pagination.page - 1) * pagination.limit + 1;
-  const endRecord = Math.min(pagination.page * pagination.limit, pagination.total);
 
   return (
     <div className="space-y-6 pb-12">
@@ -273,53 +271,14 @@ export default function AdminFeedbackHistoryPage() {
           </table>
         </div>
 
-        {/* Pagination Footer */}
-        <div className="flex flex-col items-center justify-between gap-4 border-t border-slate-100 px-6 py-4 sm:flex-row text-xs">
-          <span className="font-medium text-slate-500">
-            Showing {pagination.total > 0 ? startRecord : 0} to {endRecord} of {pagination.total} submissions
-          </span>
-
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => handlePageChange(pagination.page - 1)}
-              disabled={pagination.page <= 1}
-              className="rounded-lg px-2.5 py-1.5 font-semibold text-slate-500 hover:bg-slate-50 disabled:opacity-30"
-            >
-              Prev
-            </button>
-
-            {Array.from({ length: pagination.totalPages }, (_, i) => i + 1)
-              .filter((p) => p === 1 || p === pagination.totalPages || Math.abs(p - pagination.page) <= 1)
-              .map((page, idx, arr) => {
-                const prev = arr[idx - 1];
-                const showEllipsis = prev && page - prev > 1;
-
-                return (
-                  <div key={page} className="flex items-center gap-1.5">
-                    {showEllipsis && <span className="px-1 text-slate-400">...</span>}
-                    <button
-                      onClick={() => handlePageChange(page)}
-                      className={`h-7 w-7 rounded-lg text-xs font-bold transition ${
-                        pagination.page === page
-                          ? "bg-[#002b55] text-white shadow-xs"
-                          : "text-slate-600 hover:bg-slate-100"
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  </div>
-                );
-              })}
-
-            <button
-              onClick={() => handlePageChange(pagination.page + 1)}
-              disabled={pagination.page >= pagination.totalPages}
-              className="rounded-lg px-2.5 py-1.5 font-semibold text-slate-500 hover:bg-slate-50 disabled:opacity-30"
-            >
-              Next
-            </button>
-          </div>
-        </div>
+        <AdminPagination
+          page={pagination.page}
+          totalPages={pagination.totalPages}
+          total={pagination.total}
+          limit={5}
+          onPageChange={handlePageChange}
+          label="submissions"
+        />
       </div>
 
       {/* Feedback Detail Modal */}

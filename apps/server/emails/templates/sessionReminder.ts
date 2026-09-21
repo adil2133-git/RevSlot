@@ -11,23 +11,10 @@ interface SessionReminderParams {
   startsInText?: string; // e.g. "in 1 hour" or "soon"
 }
 
-export const sessionReminderTemplate = (params: SessionReminderParams) => {
-  const {
-    recipientName,
-    recipientRole,
-    eventTypeName,
-    reviewerName,
-    internName,
-    advisorName,
-    formattedDate,
-    formattedTime,
-    meetLink,
-    startsInText = "in 1 hour",
-  } = params;
+export const SESSION_REMINDER_TEMPLATE_ID = "revslot-session-reminder";
 
-  const subject = `Reminder: ${eventTypeName} starts ${startsInText}`;
-
-  const meetSection = meetLink
+function buildMeetSection(meetLink: string | null): string {
+  return meetLink
     ? `
       <div style="margin: 24px 0; padding: 18px; background: #f0f7ff; border: 1px solid #cce3ff; border-radius: 8px; text-align: center;">
         <p style="margin: 0 0 10px 0; font-size: 13px; color: #003366; font-weight: 600;">
@@ -49,6 +36,46 @@ export const sessionReminderTemplate = (params: SessionReminderParams) => {
         Meeting link will be provided in your dashboard before start time.
       </div>
     `;
+}
+
+// Variables + subject for emailService.sendTemplateEmail(). meetLink
+// presence branching happens in code and is passed in as the raw
+// MEET_SECTION block, since Resend Templates don't support conditionals.
+export const sessionReminderTemplateData = (params: SessionReminderParams) => {
+  const startsInText = params.startsInText ?? "in 1 hour";
+
+  return {
+    templateId: SESSION_REMINDER_TEMPLATE_ID,
+    subject: `Reminder: ${params.eventTypeName} starts ${startsInText}`,
+    variables: {
+      RECIPIENT_NAME: params.recipientName,
+      EVENT_TYPE_NAME: params.eventTypeName,
+      REVIEWER_NAME: params.reviewerName,
+      INTERN_NAME: params.internName,
+      ADVISOR_NAME: params.advisorName,
+      FORMATTED_DATE: params.formattedDate,
+      FORMATTED_TIME: params.formattedTime,
+      STARTS_IN_TEXT: startsInText,
+      MEET_SECTION: buildMeetSection(params.meetLink),
+    },
+  };
+};
+
+export const sessionReminderTemplate = (params: SessionReminderParams) => {
+  const {
+    recipientName,
+    eventTypeName,
+    reviewerName,
+    internName,
+    advisorName,
+    formattedDate,
+    formattedTime,
+    meetLink,
+    startsInText = "in 1 hour",
+  } = params;
+
+  const subject = `Reminder: ${eventTypeName} starts ${startsInText}`;
+  const meetSection = buildMeetSection(meetLink);
 
   const html = `
     <!DOCTYPE html>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAdminStore } from "@/features/admin/store/adminStore";
+import AdminPagination from "@/components/admin/AdminPagination";
 import type { BookingStatus } from "@/features/admin/types";
 
 const STATUS_STYLES: Record<string, string> = {
@@ -40,7 +41,7 @@ export default function AdminBookingsPage() {
       fromDate: fromDate || undefined,
       toDate: toDate || undefined,
       page,
-      limit: 20,
+      limit: 5,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, fromDate, toDate, page]);
@@ -114,31 +115,16 @@ export default function AdminBookingsPage() {
             ))}
           </tbody>
         </table>
-      </div>
 
-      {bookingsPagination && bookingsPagination.totalPages > 1 && (
-        <div className="mt-4 flex items-center justify-between text-sm text-slate-500">
-          <span>
-            Page {bookingsPagination.page} of {bookingsPagination.totalPages} · {bookingsPagination.total} total
-          </span>
-          <div className="flex gap-2">
-            <button
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="rounded-lg border border-slate-200 px-3 py-1.5 font-medium disabled:opacity-40"
-            >
-              Prev
-            </button>
-            <button
-              disabled={page >= bookingsPagination.totalPages}
-              onClick={() => setPage((p) => p + 1)}
-              className="rounded-lg border border-slate-200 px-3 py-1.5 font-medium disabled:opacity-40"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
+        <AdminPagination
+          page={bookingsPagination?.page ?? page}
+          totalPages={bookingsPagination?.totalPages ?? 1}
+          total={bookingsPagination?.total ?? bookings.length}
+          limit={5}
+          onPageChange={setPage}
+          label="bookings"
+        />
+      </div>
     </div>
   );
 }
