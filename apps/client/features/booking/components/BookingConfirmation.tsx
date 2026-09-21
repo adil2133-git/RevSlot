@@ -58,9 +58,10 @@ export default function BookingConfirmation({
           const slotStart = heldSlot ? dayjs(`${heldSlot.date}T${heldSlot.startTime}`) : null;
           const slotEnd = heldSlot ? dayjs(`${heldSlot.date}T${heldSlot.endTime}`) : null;
           const now = dayjs();
+          // Meeting join window: set to 1 day (24h) for testing; revert to 15, "minute" for 15 minutes
           const canJoin =
             slotStart && slotEnd
-              ? now.isAfter(slotStart.subtract(15, "minute")) && now.isBefore(slotEnd)
+              ? now.isAfter(slotStart.subtract(1, "day")) && now.isBefore(slotEnd)
               : false;
 
           return canJoin ? (
@@ -78,7 +79,7 @@ export default function BookingConfirmation({
             <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-center text-xs text-slate-600">
               <span className="font-semibold text-slate-800">Meeting Room</span>
               <p className="mt-0.5 text-slate-500">
-                The join link will activate 15 minutes before your session begins. You can also join anytime from &ldquo;Check My Bookings&rdquo;.
+                The join link will activate 1 day before your session begins. You can also join anytime from &ldquo;Check My Bookings&rdquo;.
               </p>
             </div>
           );

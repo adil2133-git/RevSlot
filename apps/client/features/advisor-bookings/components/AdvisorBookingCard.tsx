@@ -64,7 +64,8 @@ export default function AdvisorBookingCard({
   const endTime = dayjs(booking.endTime);
 
   const isActive = booking.status === "confirmed" || booking.status === "rescheduled";
-  const isJoinWindow = now.isAfter(startTime.subtract(15, "minute")) && now.isBefore(endTime);
+  // Meeting join window: set to 1 day (24h) for testing; revert to 15, "minute" for 15 minutes
+  const isJoinWindow = now.isAfter(startTime.subtract(1, "day")) && now.isBefore(endTime);
   const isJoinAvailable = isActive && isJoinWindow && !!booking.meetLink; 
 
   const getPaymentBadge = () => {
@@ -273,15 +274,15 @@ export default function AdvisorBookingCard({
              <VideoIcon />
              <span>Join Meet</span>
              </a>
-          ) : isActive && now.isBefore(startTime.subtract(15, "minute")) ? (
+          ) : isActive && now.isBefore(startTime.subtract(1, "day")) ? (
              <button
                 type="button"
                 disabled
-                title="Meeting link will activate 15 minutes before the session starts"
+                title="Meeting link will activate 1 day before the session starts"
                 className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-slate-100 px-4 py-2.5 text-xs font-semibold text-slate-400 cursor-not-allowed"
               >
                 <VideoIcon />
-                <span>Join Meet (Opens 15m before)</span>
+                <span>Join Meet (Opens 1d before)</span>
               </button>
           ) : (
              <button

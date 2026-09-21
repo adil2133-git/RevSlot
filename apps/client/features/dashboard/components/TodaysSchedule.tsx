@@ -183,9 +183,10 @@ export const TodaysSchedule: React.FC<TodaysScheduleProps> = ({
             const isInProgress = isActive && now >= startTs && now < endTs;
             const isOutcomeRequired = isActive && now >= endTs;
             const canMarkNoShow = isActive && now >= graceEnd;
+            // Meeting join window: set to 1 day (24h) for testing; revert to 15 * 60 * 1000 for 15 minutes
             const isJoinAvailable =
                  isActive &&
-                 now >= startTs - 15 * 60 * 1000 &&
+                 now >= startTs - 24 * 60 * 60 * 1000 &&
                  now < endTs &&
                  !!item.meetLink;
 
