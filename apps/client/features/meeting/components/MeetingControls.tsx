@@ -104,7 +104,6 @@ export default function MeetingControls({
     )}
   </span>
 </ControlButton>
-
       {showQuestionBank && (
         <ControlButton
           active={!!questionBankOpen}
