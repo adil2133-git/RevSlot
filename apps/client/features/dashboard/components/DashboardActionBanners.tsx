@@ -67,7 +67,7 @@ export default function DashboardActionBanners() {
               <p className="text-[11px] text-slate-500 truncate mt-0.5">
                 {user?.whatsappNumber
                   ? `Connected: ${user.whatsappNumber}`
-                  : "Receive 15-minute alerts and instant defense notifications."}
+                  : "Receive instant notifications and session updates."}
               </p>
             </div>
           </div>
