@@ -1087,11 +1087,33 @@ const totalPages = Math.max(
 
           
        {/* ── Pending + Recent Feedback (right column) ────────────── */}
-            <div className="lg:col-span-2 space-y-6">
-              <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-surface">
-                <div className="mb-4 flex items-center justify-between">
-                  <h2 className="text-sm font-bold tracking-tight text-on-surface">Pending Feedback</h2>
-                </div>
+<div className="lg:col-span-2 rounded-2xl border border-slate-100 bg-white p-5 shadow-surface">
+  <div className="mb-4">
+
+{!isPendingLoading &&
+  pendingFeedback.length > 0 && (
+    <div className="mb-6 flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+        !
+      </div>
+
+      <div>
+        <p className="text-sm font-semibold text-amber-900">
+          You have pending feedback
+        </p>
+
+        <p className="text-xs text-amber-700">
+          Please submit feedback for your completed review sessions.
+        </p>
+      </div>
+    </div>
+  )}
+
+  <div className="flex items-center justify-between">
+    <h2 className="text-sm font-bold tracking-tight text-on-surface">
+      Pending Feedback
+    </h2>
+  </div>
 
                 {isPendingLoading ? (
                   <div className="space-y-3">
