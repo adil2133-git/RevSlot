@@ -30,15 +30,33 @@ export default function RemoteVideo({
 
     if (!video) return;
 
-    video.srcObject = stream;
+    const playStream = () => {
+      if (video.srcObject !== stream) {
+        video.srcObject = stream;
+      }
+      if (stream) {
+        video.play().catch(() => {
+          // Autoplay restriction fallback: if unmuted playback is blocked, mute and retry
+          if (!video.muted) {
+            video.muted = true;
+            void video.play().catch(() => undefined);
+          }
+        });
+      }
+    };
+
+    playStream();
 
     if (stream) {
-      void video.play().catch(() => {
-        // Browser autoplay restriction.
-      });
+      stream.addEventListener("addtrack", playStream);
+      stream.addEventListener("removetrack", playStream);
     }
 
     return () => {
+      if (stream) {
+        stream.removeEventListener("addtrack", playStream);
+        stream.removeEventListener("removetrack", playStream);
+      }
       if (video.srcObject === stream) {
         video.srcObject = null;
       }
