@@ -14,7 +14,7 @@ export const otpService = {
     });
 
     const key = `otp:${purpose}:${email}`;
-    await redis.set(key, code, { ex: OTP_TTL_SECONDS });
+    await redis.set(key, code, "EX", OTP_TTL_SECONDS);
 
     console.log(`\n========================================\n[OTP] Generated code: ${code}\n[OTP] For: ${email}\n[OTP] Purpose: ${purpose}\n========================================\n`);
 
@@ -23,9 +23,8 @@ export const otpService = {
 
   verifyOtp: async (email: string, purpose: string, code: string): Promise<boolean> => {
     const key = `otp:${purpose}:${email}`;
-    const stored = await redis.get<string | number>(key);
+    const stored = await redis.get(key);
 
-    // Upstash's client auto-JSON-parses values that look like valid JSON —
     // a pure-digit string like "176550" is valid JSON (a number literal),
     // so it comes back as the number 176550, not the string "176550".
     // Without String(...) here, `stored !== code` fails on every single
