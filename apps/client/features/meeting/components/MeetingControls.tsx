@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import {
   Camera,
   CameraOff,
+  ListChecks,
   LogOut,
   Mic,
   MicOff,
@@ -16,10 +17,14 @@ type MeetingControlsProps = {
   sharing: boolean;
   shareDisabled?: boolean;
   chatOpen: boolean;
+  chatUnreadCount?: number; 
+  showQuestionBank?: boolean;
+  questionBankOpen?: boolean;
   onToggleMic: () => void;
   onToggleCamera: () => void;
   onShareScreen: () => void;
   onToggleChat: () => void;
+  onToggleQuestionBank?: () => void;
   onLeave: () => void;
 };
 
@@ -29,10 +34,14 @@ export default function MeetingControls({
   sharing,
   shareDisabled,
   chatOpen,
+  chatUnreadCount = 0,
+  showQuestionBank,
+  questionBankOpen,
   onToggleMic,
   onToggleCamera,
   onShareScreen,
   onToggleChat,
+  onToggleQuestionBank,
   onLeave,
 }: MeetingControlsProps) {
   return (
@@ -76,15 +85,35 @@ export default function MeetingControls({
         <MonitorUp />
       </ControlButton>
 
-      <ControlButton
-        active={chatOpen}
-        onClick={onToggleChat}
-        label="Chat"
-      >
-        <span className="text-sm font-bold">
-          💬
-        </span>
-      </ControlButton>
+<ControlButton
+  active={chatOpen}
+  onClick={onToggleChat}
+  label={
+    chatUnreadCount > 0
+      ? `Chat (${chatUnreadCount} new message${chatUnreadCount > 1 ? "s" : ""})`
+      : "Chat"
+  }
+>
+  <span className="relative inline-flex">
+    <span className="text-sm font-bold">💬</span>
+
+    {!chatOpen && chatUnreadCount > 0 && (
+       <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full border-2 border-slate-900 bg-blue-500 px-1 text-[10px] font-bold leading-none text-white">
+        {chatUnreadCount > 9 ? "9+" : chatUnreadCount}
+      </span>
+    )}
+  </span>
+</ControlButton>
+
+      {showQuestionBank && (
+        <ControlButton
+          active={!!questionBankOpen}
+          onClick={onToggleQuestionBank ?? (() => {})}
+          label="Question bank"
+        >
+          <ListChecks />
+        </ControlButton>
+      )}
 
       <button
         type="button"

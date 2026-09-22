@@ -29,6 +29,7 @@ import MeetingChat from "./MeetingChat";
 import MeetingControls from "./MeetingControls";
 import MeetingGrid from "./MeetingGrid";
 import MeetingHeader from "./MeetingHeader";
+import QuestionBankPanel from "./QuestionBankPanel";
 
 type Props = {
   bookingId: number;
@@ -83,6 +84,13 @@ export default function MeetingRoom({
   const [chatOpen, setChatOpen] =
     useState(false);
 
+  const [questionBankOpen, setQuestionBankOpen] =
+    useState(false);
+
+  const isReviewer =
+    meetingSource === "reviewer" &&
+    user?.role === "reviewer";
+
   const [copied, setCopied] =
     useState(false);
 
@@ -117,20 +125,10 @@ export default function MeetingRoom({
       initialMessages:
         meeting.initialMessages,
       setError: meeting.setError,
+      participantId: meeting.participantIdRef.current ?? "",
+      chatOpen,  
     });
 
-  /*
-   * --------------------------------------------------
-   * PRE-JOIN IDENTITY
-   * --------------------------------------------------
-   *
-   * Reviewer / Advisor:
-   *   automatically use their existing name.
-   *
-   * Guest / Intern:
-   *   restore previously entered name
-   *   from this meeting's session.
-   */
   useEffect(() => {
     if (!meeting.info) {
       return;
@@ -189,19 +187,6 @@ export default function MeetingRoom({
     advisorToken,
   ]);
 
-  /*
-   * --------------------------------------------------
-   * PREPARE CAMERA + MICROPHONE
-   * --------------------------------------------------
-   *
-   * IMPORTANT:
-   *
-   * We do NOT join WebRTC here.
-   *
-   * We only prepare the local media so the user
-   * can see their camera and control mic/camera
-   * before clicking "Join Meeting".
-   */
   useEffect(() => {
     if (!meeting.info) {
       return;
@@ -253,9 +238,10 @@ export default function MeetingRoom({
     webRTC.getLocalMedia,
   ]);
 
-  useEffect(() => {
+     useEffect(() => {
   if (meeting.joined) {
     setChatOpen(false);
+    setQuestionBankOpen(false);
   }
 }, [meeting.joined]);
 
@@ -289,13 +275,6 @@ export default function MeetingRoom({
     manuallyLeftRef.current = false;
 
     try {
-      /*
-       * Media was already prepared on the
-       * Pre-Join screen.
-       *
-       * So we do NOT call getLocalMedia()
-       * again here.
-       */
 
       const result =
         await meeting.join();
@@ -518,6 +497,9 @@ export default function MeetingRoom({
                 (meeting.participantIdRef.current ?? "")
             }
             chatOpen={chatOpen}
+            chatUnreadCount={chat.unreadCount}
+            showQuestionBank={isReviewer}
+            questionBankOpen={questionBankOpen}
             onToggleMic={
               webRTC.toggleMic
             }
@@ -527,11 +509,18 @@ export default function MeetingRoom({
             onShareScreen={() =>
               void webRTC.shareScreen()
             }
-            onToggleChat={() =>
+            onToggleChat={() => {
+              setQuestionBankOpen(false);
               setChatOpen(
                 (value) => !value
-              )
-            }
+              );
+            }}
+            onToggleQuestionBank={() => {
+              setChatOpen(false);
+              setQuestionBankOpen(
+                (value) => !value
+              );
+            }}
             onLeave={() =>
               void leave()
             }
@@ -557,6 +546,17 @@ export default function MeetingRoom({
             }
             onClose={() =>
               setChatOpen(false)
+            }
+          />
+        )}
+
+        {questionBankOpen && isReviewer && (
+          <QuestionBankPanel
+            onClose={() =>
+              setQuestionBankOpen(false)
+            }
+            onAskInChat={(text) =>
+              void chat.sendMessageText(text)
             }
           />
         )}
