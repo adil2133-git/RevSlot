@@ -21,6 +21,23 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    container_name: revslot-redis
+    restart: unless-stopped
+
+    volumes:
+      - redis_data:/data
+
+    networks:
+      - revslot-network
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   server:
     build:
       context: .
@@ -44,6 +61,7 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:
 
 networks:
   revslot-network:
