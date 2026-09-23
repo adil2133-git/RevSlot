@@ -41,6 +41,12 @@ export async function deleteForm(req: Request, res: Response) {
   });
 }
 
+export async function setDefaultForm(req: Request, res: Response) {
+  const formId = Number(req.params.formId);
+  const form = await feedbackService.setDefaultForm(formId, reviewerId(req));
+  res.status(200).json({ success: true, data: { form } });
+}
+
 export async function reactivateForm(req: Request, res: Response) {
   const formId = Number(req.params.formId);
   const form = await feedbackService.reactivateForm(formId, reviewerId(req));

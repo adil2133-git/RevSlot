@@ -58,6 +58,13 @@ export async function deleteForm(formId: number): Promise<DeleteFormResult> {
   return data.data;
 }
 
+export async function setDefaultForm(formId: number) {
+  const { data } = await api.post<DataEnvelope<{ form: FeedbackFormWithFields }>>(
+    `/feedback-forms/${formId}/set-default`
+  );
+  return data.data.form;
+}
+
 export async function reactivateForm(formId: number) {
   const { data } = await api.post<DataEnvelope<{ form: FeedbackFormWithFields }>>(
     `/feedback-forms/${formId}/reactivate`

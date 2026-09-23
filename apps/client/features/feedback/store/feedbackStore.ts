@@ -39,6 +39,7 @@ type FeedbackFormState = {
   feedbackListPageSize: number;
   isFeedbackListLoading: boolean;
   fetchFeedbackList: (params?: ListFeedbackParams) => Promise<void>;
+  setDefaultForm: (formId: number) => Promise<void>;
   pendingFeedback: PendingFeedbackItem[];
   isPendingLoading: boolean;
   fetchPendingFeedback: () => Promise<void>;
@@ -179,6 +180,23 @@ export const useFeedbackStore = create<FeedbackFormState>((set) => ({
     }
   }, 
 
+
+  setDefaultForm: async (formId) => {
+    set({ error: null });
+    try {
+      const updated = await api.setDefaultForm(formId);
+      set((state) => ({
+        forms: state.forms.map((f) => ({
+          ...f,
+          isDefault: f.id === formId,
+        })),
+        selectedForm: state.selectedForm?.id === formId ? updated : state.selectedForm,
+      }));
+    } catch (err) {
+      set({ error: (err as Error).message });
+      throw err;
+    }
+  },
 
   duplicateForm: async (formId, name) => {
     set({ error: null });

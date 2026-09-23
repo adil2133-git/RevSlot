@@ -1,207 +1,35 @@
 "use client";
 
-import { useEffect, useState, useMemo, type ReactNode } from "react";
+import { useEffect, useState, useMemo } from "react";
 import dayjs from "dayjs";
+import {
+  FileText,
+  Plus,
+  Search,
+  Sliders,
+  MoreVertical,
+  CheckCircle2,
+  Clock,
+  ArrowRight,
+  ArrowLeft,
+  Copy,
+  Archive,
+  Trash2,
+  RefreshCw,
+  Sparkles,
+  Layers,
+  ChevronRight,
+  Star,
+} from "lucide-react";
 import { useFeedbackStore } from "@/features/feedback/store/feedbackStore";
 import FeedbackDetailsModal from "@/features/feedback/components/FeedbackDetailsModal";
-import type { FeedbackFieldType, FormFieldInput, FeedbackFormField } from "@/features/feedback/types";
 import SubmitFeedbackModal from "@/features/feedback/components/SubmitFeedbackModal";
-import FeedbackFormBuilder from "@/features/feedback/components/FeedbackFormBuilder";
+import FeedbackFormBuilder, {
+  type DraftField,
+  SYSTEM_FIELD_LABELS,
+} from "@/features/feedback/components/FeedbackFormBuilder";
+import type { FeedbackFormField } from "@/features/feedback/types";
 
-const FIELD_TYPES: { value: FeedbackFieldType; label: string }[] = [
-  { value: "text", label: "Short text" },
-  { value: "textarea", label: "Long text" },
-  { value: "number", label: "Number" },
-  { value: "select", label: "Dropdown" },
-];
-
-const PlusIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round">
-    <path d="M12 5v14M5 12h14" />
-  </svg>
-);
-
-const FormBubbleIcon = ({ className }: { className?: string }) => (
-  <svg className={className} width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-  </svg>
-);
-
-const SYSTEM_FIELDS = [
-  { label: "Review Mark", description: "Required · 1–10 in 0.5 steps" },
-  { label: "Understanding Level", description: "Required · Excellent to Needs Improvement" },
-  { label: "Communication Level", description: "Excellent · Good · Average · Needs Improvement" },
-  { label: "Overall Performance", description: "Excellent · Good · Average · Needs Improvement" },
-  { label: "Areas for Improvement", description: "Long text · Optional" },
-  { label: "Recommendations / Next Steps", description: "Long text · Optional" },
-] as const;
-
-const SYSTEM_FIELD_LABELS = new Set([
-  "Review Mark",
-  "Understanding Level",
-  "Communication Level",
-  "Overall Performance",
-  "Areas for Improvement",
-  "Recommendations / Next Steps",
-]);
-
-const SuggestionIcon = ({
-  path,
-  className = "h-4 w-4",
-}: {
-  path: ReactNode;
-  className?: string;
-}) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.9"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    {path}
-  </svg>
-);
-
-const SUGGESTED_CUSTOM_FIELDS: {
-  label: string;
-  description: string;
-  icon: ReactNode;
-}[] = [
-  {
-    label: "Code Quality",
-    description: "Quality, readability and best practices",
-    icon: <path d="M16 18l6-6-6-6M8 6l-6 6 6 6" />,
-  },
-  {
-    label: "Problem Solving",
-    description: "Approach to solving problems",
-    icon: <path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.3h6c0-1 .4-1.8 1-2.3A7 7 0 0 0 12 2z" />,
-  },
-  {
-    label: "Team Collaboration",
-    description: "Working with others and team mindset",
-    icon: (
-      <>
-        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-        <circle cx="9" cy="7" r="4" />
-        <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
-      </>
-    ),
-  },
-  {
-    label: "Time Management",
-    description: "Utilization of time and meeting deadlines",
-    icon: (
-      <>
-        <circle cx="12" cy="12" r="10" />
-        <path d="M12 6v6l4 2" />
-      </>
-    ),
-  },
-  {
-    label: "Learning Attitude",
-    description: "Willingness to learn and adapt",
-    icon: <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />,
-  },
-  {
-    label: "Initiative",
-    description: "Proactiveness and ownership",
-    icon: <path d="M12 2l2.9 6.9 7.1.6-5.4 4.6 1.6 6.9-6.2-3.7-6.2 3.7 1.6-6.9L2 9.5l7.1-.6z" />,
-  },
-  {
-    label: "Technical Knowledge",
-    description: "Depth of subject knowledge",
-    icon: (
-      <>
-        <circle cx="12" cy="12" r="3" />
-        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-      </>
-    ),
-  },
-];
-
-const TEMPLATES = [
-  {
-    name: "Technical Review",
-    description:
-      "Technical knowledge, problem solving and implementation.",
-    taskMarkEnabled: true,
-    fields: [
-      {
-        label: "Technical Depth",
-        fieldType: "text" as const,
-        optionsText: "",
-        required: false,
-      },
-      {
-        label: "Problem Solving Notes",
-        fieldType: "textarea" as const,
-        optionsText: "",
-        required: false,
-      },
-    ],
-  },
-  {
-    name: "Mock Interview",
-    description:
-      "A structured interview evaluation without a task score.",
-    taskMarkEnabled: false,
-    fields: [
-      {
-        label: "Communication",
-        fieldType: "select" as const,
-        optionsText: "Excellent, Good, Average, Needs Work",
-        required: false,
-      },
-      {
-        label: "Interview Notes",
-        fieldType: "textarea" as const,
-        optionsText: "",
-        required: false,
-      },
-    ],
-  },
-  {
-    name: "Resume Review",
-    description:
-      "Evaluate clarity, relevance and presentation of a resume.",
-    taskMarkEnabled: false,
-    fields: [
-      {
-        label: "Resume Quality",
-        fieldType: "select" as const,
-        optionsText: "Excellent, Good, Average, Needs Work",
-        required: false,
-      },
-      {
-        label: "Resume Notes",
-        fieldType: "textarea" as const,
-        optionsText: "",
-        required: false,
-      },
-    ],
-  },
-  {
-    name: "General Review",
-    description:
-      "A lightweight form for a broad review session.",
-    taskMarkEnabled: false,
-    fields: [],
-  },
-];
-
-// Draft field shape while editing — options kept as a single comma-
-// separated string in the UI, split into an array only on save.
-type DraftField = FormFieldInput & { optionsText: string };
-
-// Takes a field as fetched from the API (FeedbackFormField — has id,
-// formId, createdAt, and options as string[] | null) and converts it to
-// the editor's draft shape. Deliberately NOT typed as FormFieldInput
-// here: that type's `options` is `string[] | undefined`, which isn't
-// structurally compatible with the fetched field's `string[] | null`.
 function toDraftField(f: FeedbackFormField): DraftField {
   return {
     label: f.label,
@@ -211,176 +39,6 @@ function toDraftField(f: FeedbackFormField): DraftField {
     options: f.options ?? undefined,
     optionsText: (f.options ?? []).join(", "),
   };
-}
-
-function emptyDraftField(): DraftField {
-  return { label: "", fieldType: "text", required: false, optionsText: "" };
-}
-
-function Icon({
-  children,
-  className = "h-4 w-4",
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.9"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      {children}
-    </svg>
-  );
-}
-
-function PreviewField({
-  label,
-  required,
-  children,
-}: {
-  label: string;
-  required?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <div>
-      <label className="mb-1.5 block text-xs font-bold text-slate-600">
-        {label}{" "}
-        {required && <span className="text-error">*</span>}
-      </label>
-
-      <div className="rounded-lg border border-slate-200 bg-slate-50/50 px-3.5 py-2.5 text-xs text-slate-400">
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function PreviewModal({
-  name,
-  fields,
-  taskMarkEnabled,
-  questionCount,
-  onClose,
-}: {
-  name: string;
-  fields: DraftField[];
-  taskMarkEnabled: boolean;
-  questionCount: number;
-  onClose: () => void;
-}) {
-  return (
-    <div
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/35 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Feedback form preview"
-    >
-      <div className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-        <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-              Preview
-            </p>
-
-            <h2 className="mt-1 text-lg font-bold text-on-surface">
-              {name.trim() || "Untitled feedback form"}
-            </h2>
-
-            <p className="mt-1 text-xs text-slate-500">
-              This is how the reviewer will complete the form after a session.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-2 text-slate-400 hover:bg-surface-hover hover:text-on-surface"
-            aria-label="Close preview"
-          >
-            <Icon>
-              <path d="M6 6l12 12M18 6L6 18" />
-            </Icon>
-          </button>
-        </div>
-
-        <div className="space-y-5 overflow-y-auto p-6">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <PreviewField label="Review Mark" required>
-              Choose a score from 1 to 10
-            </PreviewField>
-
-            <PreviewField label="Understanding Level" required>
-              Excellent · Good · Average · Needs Improvement
-            </PreviewField>
-          </div>
-
-          {taskMarkEnabled && (
-            <PreviewField label="Task Mark" required>
-              Choose a score from 1 to 10
-            </PreviewField>
-          )}
-
-          <PreviewField label="Strengths">
-            What went well?
-          </PreviewField>
-
-          <PreviewField label="Areas for Improvement">
-            What could be improved?
-          </PreviewField>
-
-          <PreviewField label="Recommendations / Next Steps">
-            What should happen next?
-          </PreviewField>
-
-          {questionCount > 0 && (
-            <div className="rounded-xl border border-secondary bg-secondary/30 p-4">
-              <p className="text-xs font-bold text-on-surface">
-                Question Bank
-              </p>
-
-              <p className="mt-1 text-xs text-slate-500">
-                {questionCount} attached question
-                {questionCount === 1 ? "" : "s"} will appear here.
-              </p>
-            </div>
-          )}
-
-          {fields.map((field, index) => (
-            <PreviewField
-              key={`${field.label}-${index}`}
-              label={field.label || `Custom field ${index + 1}`}
-              required={field.required}
-            >
-              {field.fieldType === "select"
-                ? field.optionsText || "Select an option"
-                : field.fieldType === "number"
-                  ? "Enter a number"
-                  : field.fieldType === "textarea"
-                    ? "Long text response"
-                    : "Short text response"}
-            </PreviewField>
-          ))}
-        </div>
-
-        <div className="border-t border-slate-100 bg-slate-50/60 px-6 py-4 text-right">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-on-primary"
-          >
-            Close Preview
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 export default function FeedbackFormsPage() {
@@ -395,6 +53,7 @@ export default function FeedbackFormsPage() {
     updateForm,
     deleteForm,
     reactivateForm,
+    duplicateForm,
     clearSelectedForm,
     recentFeedback,
     isRecentLoading,
@@ -405,15 +64,11 @@ export default function FeedbackFormsPage() {
     feedbackListPageSize,
     isFeedbackListLoading,
     fetchFeedbackList,
+    setDefaultForm,
     pendingFeedback,
     isPendingLoading,
     fetchPendingFeedback,
   } = useFeedbackStore();
-
-const totalForms = forms.length;
-const customFormsCount = forms.filter(
-  (form) => !form.isDefault
-).length;
 
   const [editingId, setEditingId] = useState<number | "new" | null>(null);
   const [name, setName] = useState("");
@@ -423,12 +78,13 @@ const customFormsCount = forms.filter(
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<number[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
   const [showArchived, setShowArchived] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
   const [viewingAllFeedback, setViewingAllFeedback] = useState(false);
   const [feedbackSearch, setFeedbackSearch] = useState("");
   const [feedbackFormFilter, setFeedbackFormFilter] = useState<string>("");
+
   const [viewBookingId, setViewBookingId] = useState<number | null>(null);
   const [feedbackBooking, setFeedbackBooking] = useState<{
     id: number;
@@ -437,40 +93,116 @@ const customFormsCount = forms.filter(
     eventTypeName: string;
   } | null>(null);
 
+  // Initial load
   useEffect(() => {
     fetchForms(true);
     fetchRecentFeedback();
     fetchPendingFeedback();
   }, [fetchForms, fetchRecentFeedback, fetchPendingFeedback]);
 
+  // Sync selected form into editing state when editing an existing form
   useEffect(() => {
-  if (
-    editingId !== "new" &&
-    editingId !== null &&
-    selectedForm?.id === editingId
-  ) {
-    setName(selectedForm.name);
-    setDescription(selectedForm.description ?? "");
-    setTaskMarkEnabled(selectedForm.taskMarkEnabled);
+    if (
+      editingId !== "new" &&
+      editingId !== null &&
+      selectedForm?.id === editingId
+    ) {
+      setName(selectedForm.name);
+      setDescription(selectedForm.description ?? "");
+      setTaskMarkEnabled(selectedForm.taskMarkEnabled);
+      setSelectedQuestionIds(
+        selectedForm.questions?.map((q) => q.id) ?? []
+      );
+      setFields(
+        selectedForm.fields
+          .filter((field) => !SYSTEM_FIELD_LABELS.has(field.label))
+          .slice()
+          .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
+          .map(toDraftField)
+      );
+    }
+  }, [selectedForm, editingId]);
 
-    setSelectedQuestionIds(
-      selectedForm.questions.map((question) => question.id)
-    );
+  const activeForms = useMemo(() => forms.filter((f) => f.isActive), [forms]);
+  const archivedForms = useMemo(() => forms.filter((f) => !f.isActive), [forms]);
+  const visibleForms = showArchived ? archivedForms : activeForms;
+  const defaultForm = activeForms.find((f) => f.isDefault);
+  const customFormsCount = activeForms.filter((f) => !f.isDefault).length;
 
-    setFields(
-      selectedForm.fields
-        .filter((field) => !SYSTEM_FIELD_LABELS.has(field.label))
-        .slice()
-        .sort(
-          (a, b) =>
-            (a.displayOrder ?? 0) - (b.displayOrder ?? 0)
-        )
-        .map(toDraftField)
-    );
-  }
-}, [selectedForm, editingId]);
+  const totalPages = Math.max(
+    1,
+    Math.ceil(feedbackListTotal / feedbackListPageSize)
+  );
 
-    const openAllFeedback = () => {
+  const startCreate = () => {
+    setEditingId("new");
+    setName("");
+    setDescription("");
+    setFields([]);
+    setTaskMarkEnabled(false);
+    setSelectedQuestionIds([]);
+    setFormError(null);
+  };
+
+  const startEdit = (formId: number) => {
+    setEditingId(formId);
+    setFormError(null);
+    fetchForm(formId);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    clearSelectedForm();
+    setFormError(null);
+  };
+
+  const handleDelete = async (formId: number, formName: string, isDefault: boolean) => {
+    if (isDefault) {
+      alert("The default feedback form cannot be deleted.");
+      return;
+    }
+    if (!confirm(`Are you sure you want to remove "${formName}"?`)) return;
+    try {
+      const result = await deleteForm(formId);
+      if (result.archived) {
+        alert(result.message);
+      }
+      fetchForms(true);
+    } catch (err: unknown) {
+      if (err instanceof Error) alert(err.message);
+    }
+  };
+
+  const handleDuplicate = async (formId: number, formName: string) => {
+    const copyName = prompt("Enter a name for the duplicated form:", `${formName} (Copy)`);
+    if (!copyName || !copyName.trim()) return;
+    try {
+      await duplicateForm(formId, copyName.trim());
+      await fetchForms(true);
+    } catch (err: unknown) {
+      if (err instanceof Error) alert(err.message);
+    }
+  };
+
+  const handleSetDefault = async (formId: number) => {
+    try {
+      await setDefaultForm(formId);
+      await fetchForms(true);
+    } catch (err: unknown) {
+      if (err instanceof Error) alert(err.message);
+    }
+  };
+
+  const handleReactivate = async (formId: number) => {
+    try {
+      await reactivateForm(formId);
+      await fetchForms(true);
+    } catch (err: unknown) {
+      if (err instanceof Error) alert(err.message);
+    }
+  };
+
+  const openAllFeedback = () => {
     setViewingAllFeedback(true);
     setFeedbackSearch("");
     setFeedbackFormFilter("");
@@ -493,257 +225,14 @@ const customFormsCount = forms.filter(
     } else {
       fetchRecentFeedback();
     }
-     fetchPendingFeedback();
-  };
-
-  const startCreate = () => {
-  setEditingId("new");
-  setName("");
-  setDescription("");
-  setFields([]);
-  setTaskMarkEnabled(false);
-  setSelectedQuestionIds([]);
-  setFormError(null);
-};
-
-  const applyTemplate = (template: (typeof TEMPLATES)[number]) => {
-  setName(template.name);
-  setDescription(template.description ?? "");
-  setTaskMarkEnabled(template.taskMarkEnabled);
-  setFields(template.fields.map((field) => ({ ...field })));
-  setSelectedQuestionIds([]);
-  setFormError(null);
-};
-
-  const startEdit = (formId: number) => {
-    setEditingId(formId);
-    setFormError(null);
-    fetchForm(formId);
-  };
-
-  const cancelEdit = () => {
-  setEditingId(null);
-  clearSelectedForm();
-  setPreviewOpen(false);
-  setFormError(null);
-};
-
-  const addField = () => {
-  if (fields.length >= 20) {
-    setFormError("You can add up to 20 custom fields.");
-    return;
-  }
-  setFields((prev) => [...prev, emptyDraftField()]);
-};
-
-  const updateField = (index: number, patch: Partial<DraftField>) => {
-    setFields((prev) => prev.map((f, i) => (i === index ? { ...f, ...patch } : f)));
-  };
-
-  const removeField = (index: number) => {
-    setFields((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const toggleSuggestedField = (suggestion: (typeof SUGGESTED_CUSTOM_FIELDS)[number]) => {
-    setFields((prev) => {
-      const existingIndex = prev.findIndex(
-        (f) => f.label.trim().toLowerCase() === suggestion.label.toLowerCase()
-      );
-      if (existingIndex !== -1) {
-        return prev.filter((_, i) => i !== existingIndex);
-      }
-      if (prev.length >= 20) {
-        setFormError("You can add up to 20 custom fields.");
-        return prev;
-      }
-      return [
-        ...prev,
-        {
-          label: suggestion.label,
-          fieldType: "text",
-          required: false,
-          optionsText: "",
-        },
-      ];
-    });
-  };
-
-  const moveField = (
-  index: number,
-  direction: "up" | "down"
-) => {
-  const target =
-    direction === "up" ? index - 1 : index + 1;
-  if (
-    target < 0 ||
-    target >= fields.length
-  ) {
-    return;
-  }
-  setFields((prev) => {
-    const next = [...prev];
-
-    [next[index], next[target]] = [
-      next[target],
-      next[index],
-    ];
-    return next;
-  });
-};
-
-   const handleSave = async () => {
-  setFormError(null);
-
-  if (!name.trim()) {
-    setFormError("Form name is required.");
-    return;
-  }
-
-  const normalizedLabels = new Set<string>();
-
-  for (const field of fields) {
-    const label = field.label.trim();
-
-    if (!label) {
-      setFormError(
-        "Every custom field needs a label."
-      );
-      return;
-    }
-
-    const key = label.toLowerCase();
-
-    if (normalizedLabels.has(key)) {
-      setFormError(
-        `Duplicate custom field: "${label}".`
-      );
-      return;
-    }
-
-    if (
-      [...SYSTEM_FIELD_LABELS].some(
-        (systemLabel) =>
-          systemLabel.toLowerCase() === key
-      )
-    ) {
-      setFormError(
-        `"${label}" is a standard field and cannot be added as a custom field.`
-      );
-      return;
-    }
-
-    normalizedLabels.add(key);
-
-    if (field.fieldType === "select") {
-      const options = field.optionsText
-        .split(",")
-        .map((option) => option.trim())
-        .filter(Boolean);
-
-      if (!options.length) {
-        setFormError(
-          `"${label}" is a dropdown — add at least one option.`
-        );
-        return;
-      }
-
-      if (
-        new Set(
-          options.map((option) =>
-            option.toLowerCase()
-          )
-        ).size !== options.length
-      ) {
-        setFormError(
-          `Dropdown options for "${label}" must be unique.`
-        );
-        return;
-      }
-    }
-  }
-
-  const payloadFields: FormFieldInput[] =
-    fields.map((field, index) => ({
-      label: field.label.trim(),
-      fieldType: field.fieldType,
-      required: field.required,
-      displayOrder: index,
-      ...(field.fieldType === "select"
-        ? {
-            options: field.optionsText
-              .split(",")
-              .map((option) => option.trim())
-              .filter(Boolean),
-          }
-        : {}),
-    }));
-
-  setSubmitting(true);
-
-  try {
-    if (editingId === "new") {
-      await createForm({
-        name: name.trim(),
-        description: description.trim() || undefined,
-        fields: payloadFields,
-        taskMarkEnabled,
-        questionIds: selectedQuestionIds,
-      });
-    } else if (typeof editingId === "number") {
-      await updateForm(editingId, {
-        name: name.trim(),
-        description: description.trim(),
-        fields: payloadFields,
-        taskMarkEnabled,
-        questionIds: selectedQuestionIds,
-      });
-    }
-
-    await fetchForms(true);
-    cancelEdit();
-  } catch (err) {
-    setFormError(
-      err instanceof Error
-        ? err.message
-        : "Failed to save feedback form."
-    );
-  } finally {
-    setSubmitting(false);
-  }
-};
-
-    const handleDelete = async (formId: number, formName: string, isDefault: boolean) => {
-    if (isDefault) return;
-    if (!confirm(`Remove "${formName}"?`)) return;
-    try {
-      const result = await deleteForm(formId);
-      if (result.archived) {
-        alert(result.message);
-      }
-    } catch {}
+    fetchPendingFeedback();
   };
 
   const isEditorOpen = editingId !== null;
 
-  const activeForms = useMemo(
-  () => forms.filter((form) => form.isActive),
-  [forms]
-);
-const archivedForms = useMemo(
-  () => forms.filter((form) => !form.isActive),
-  [forms]
-);
-const visibleForms = showArchived ? forms : activeForms;
-const defaultForm = activeForms.find(
-  (form) => form.isDefault
-);
-const totalPages = Math.max(
-  1,
-  Math.ceil(feedbackListTotal / feedbackListPageSize)
-);
-
-    return (
-    <div className="mx-auto max-w-4xl py-2">
+  return (
+    <div className="mx-auto max-w-6xl py-2">
+      {/* ── BUILDER MODE ─────────────────────────────────────────── */}
       {isEditorOpen ? (
         <FeedbackFormBuilder
           key={editingId === "new" ? "new" : `edit-${editingId}`}
@@ -779,9 +268,7 @@ const totalPages = Math.max(
               cancelEdit();
             } catch (err) {
               const msg =
-                err instanceof Error
-                  ? err.message
-                  : "Failed to save feedback form.";
+                err instanceof Error ? err.message : "Failed to save feedback form.";
               setFormError(msg);
               throw new Error(msg);
             } finally {
@@ -793,413 +280,630 @@ const totalPages = Math.max(
           errorMessage={formError || error}
         />
       ) : (
-        <div className="mb-6 flex items-start justify-between">
-          <div>
-            <h1 className="mb-1 text-2xl font-bold tracking-tight text-on-surface sm:text-3xl">
-              Feedback &amp; Forms
-            </h1>
-            <p className="text-sm text-slate-500">
-              Create reusable feedback forms and review your recent submissions.
-            </p>
-          </div>
-          {!viewingAllFeedback && (
-            <button
-              onClick={startCreate}
-              className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary shadow-surface transition-all duration-200 hover:bg-primary/95 hover:shadow-raised hover:-translate-y-[1px] active:translate-y-0 cursor-pointer"
-            >
-              <PlusIcon />
-              New Form
-            </button>
-          )}
-        </div>
-      )}
-
-      {!isEditorOpen && viewingAllFeedback ? (
-        /* ── All Submitted Feedback (expanded "View all" view) ─────────── */
-        <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-surface">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setViewingAllFeedback(false)}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-surface-hover hover:text-on-surface"
-                aria-label="Back"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M19 12H5M12 19l-7-7 7-7" />
-                </svg>
-              </button>
-              <h2 className="text-base font-bold tracking-tight text-on-surface">All Submitted Feedback</h2>
-            </div>
-          </div>
-
-          {/* Filters */}
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <input
-              value={feedbackSearch}
-              onChange={(e) => setFeedbackSearch(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && applyFeedbackFilters(1)}
-              placeholder="Search by client name..."
-              className="min-w-[200px] flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400"
-            />
-            <select
-              value={feedbackFormFilter}
-              onChange={(e) => {
-                setFeedbackFormFilter(e.target.value);
-                fetchFeedbackList({
-                  page: 1,
-                  pageSize: feedbackListPageSize,
-                  search: feedbackSearch.trim() || undefined,
-                  formId: e.target.value ? Number(e.target.value) : undefined,
-                });
-              }}
-              className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400"
-            >
-              <option value="">All forms</option>
-              {forms.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name}
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={() => applyFeedbackFilters(1)}
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary/95"
-            >
-              Search
-            </button>
-          </div>
-
-          {/* Rows */}
-          {isFeedbackListLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map((n) => (
-                <div key={n} className="h-16 animate-pulse rounded-xl border border-slate-100 bg-surface-card" />
-              ))}
-            </div>
-          ) : feedbackList.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 p-10 text-center">
-              <p className="text-sm text-slate-500">No feedback matches these filters.</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {feedbackList.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 px-4 py-3 hover:bg-surface-hover"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-on-surface">{item.clientName}</p>
-                    <p className="truncate text-xs text-slate-500">
-                      {item.eventTypeName} · {dayjs(item.createdAt).format("MMM D, YYYY")}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-4">
-                    <div className="text-right">
-                      <p className="text-xs font-medium text-slate-500">
-                        Review <span className="font-bold text-on-surface">{item.reviewMark}/10</span>
-                        {item.taskMark && (
-                          <>
-                            {" "}
-                            · Task <span className="font-bold text-on-surface">{item.taskMark}/10</span>
-                          </>
-                        )}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setViewBookingId(item.bookingId)}
-                      className="text-xs font-semibold text-primary hover:underline"
-                    >
-                      View →
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Pagination */}
-          {feedbackListTotal > 0 && (
-            <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
-              <p className="text-xs text-slate-400">
-                Page {feedbackListPage} of {totalPages} · {feedbackListTotal} total
+        /* ── DASHBOARD OVERVIEW MODE ─────────────────────────────────── */
+        <>
+          {/* Header */}
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+                Feedback &amp; Forms
+              </h1>
+              <p className="mt-1 text-xs sm:text-sm text-slate-500">
+                Design custom evaluation forms, attach question bank criteria, and manage session feedback.
               </p>
-              <div className="flex gap-2">
+            </div>
+
+            {!viewingAllFeedback && (
+              <button
+                type="button"
+                onClick={startCreate}
+                className="inline-flex items-center gap-2 rounded-xl bg-primary hover:bg-primary/95 px-4 py-2.5 text-xs sm:text-sm font-semibold text-on-primary shadow-md transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Create New Form</span>
+              </button>
+            )}
+          </div>
+
+          {/* ── ALL SUBMITTED FEEDBACK EXPLORER VIEW ─────────────────── */}
+          {viewingAllFeedback ? (
+            <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xs">
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                <div className="flex items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setViewingAllFeedback(false)}
+                    className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
+                    aria-label="Back to overview"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                  </button>
+                  <h2 className="text-base font-bold text-slate-900">
+                    All Submitted Feedback Records
+                  </h2>
+                </div>
+                <span className="text-xs font-semibold text-slate-500">
+                  {feedbackListTotal} total submissions
+                </span>
+              </div>
+
+              {/* Filters */}
+              <div className="mb-5 flex flex-wrap items-center gap-3">
+                <div className="relative min-w-[240px] flex-1">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <input
+                    value={feedbackSearch}
+                    onChange={(e) => setFeedbackSearch(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && applyFeedbackFilters(1)}
+                    placeholder="Search by intern or advisor name..."
+                    className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3.5 py-2 text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                  />
+                </div>
+
+                <div className="relative min-w-[180px]">
+                  <select
+                    value={feedbackFormFilter}
+                    onChange={(e) => {
+                      setFeedbackFormFilter(e.target.value);
+                      fetchFeedbackList({
+                        page: 1,
+                        pageSize: feedbackListPageSize,
+                        search: feedbackSearch.trim() || undefined,
+                        formId: e.target.value ? Number(e.target.value) : undefined,
+                      });
+                    }}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs sm:text-sm font-medium text-slate-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all pr-8"
+                  >
+                    <option value="">All Form Types</option>
+                    {forms.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <button
-                  onClick={() => applyFeedbackFilters(feedbackListPage - 1)}
-                  disabled={feedbackListPage <= 1}
-                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
+                  type="button"
+                  onClick={() => applyFeedbackFilters(1)}
+                  className="rounded-xl bg-primary hover:bg-primary/95 px-4 py-2 text-xs font-semibold text-on-primary shadow-2xs transition-colors cursor-pointer"
                 >
-                  Previous
-                </button>
-                <button
-                  onClick={() => applyFeedbackFilters(feedbackListPage + 1)}
-                  disabled={feedbackListPage >= totalPages}
-                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  Next
+                  Apply Search
                 </button>
               </div>
-            </div>
-          )}
-        </div>
-      ) : (
-        !isEditorOpen && (
-          /* ── Default view: Forms (left) + Recent Feedback (right) ────── */
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
-            <div className="lg:col-span-3">
-              {/* Stats Row */}
-              {!isLoading && forms.length > 0 && (
-                <div className="mb-5 grid grid-cols-3 gap-4">
-                  <div className="bg-white border border-slate-100 rounded-2xl p-4.5 shadow-surface flex flex-col justify-center h-22">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Total Forms</span>
-                    <span className="text-2xl font-black text-on-surface leading-none">{totalForms}</span>
-                  </div>
-                  <div className="bg-white border border-slate-100 rounded-2xl p-4.5 shadow-surface flex flex-col justify-center h-22">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Default Form</span>
-                    <span className="truncate text-lg font-black text-on-surface leading-tight" title={defaultForm?.name}>
-                      {defaultForm?.name ?? "—"}
-                    </span>
-                  </div>
-                  <div className="bg-white border border-slate-100 rounded-2xl p-4.5 shadow-surface flex flex-col justify-center h-22">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Custom Forms</span>
-                    <span className="text-2xl font-black text-on-surface leading-none">{customFormsCount}</span>
-                  </div>
+
+              {/* Submissions Table / List */}
+              {isFeedbackListLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3, 4].map((n) => (
+                    <div
+                      key={n}
+                      className="h-16 animate-pulse rounded-xl border border-slate-100 bg-slate-50"
+                    />
+                  ))}
+                </div>
+              ) : feedbackList.length === 0 ? (
+                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 p-12 text-center bg-slate-50/50">
+                  <FileText className="h-8 w-8 text-slate-300 mb-2" />
+                  <p className="text-sm font-bold text-slate-700">No Feedback Records Found</p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    No submitted feedback matches your search criteria.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {feedbackList.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-white px-4 py-3.5 shadow-2xs hover:border-slate-300 transition-all"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-bold text-slate-900 truncate">
+                            {item.clientName}
+                          </p>
+                          {item.isNoShow && (
+                            <span className="rounded bg-rose-50 border border-rose-200 px-1.5 py-0.2 text-[10px] font-bold text-rose-700">
+                              NO SHOW
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {item.eventTypeName || "Evaluation Session"} · {dayjs(item.createdAt).format("MMM D, YYYY")}
+                          {item.formName && <> · <span className="font-medium text-slate-600">{item.formName}</span></>}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-4 shrink-0">
+                        {!item.isNoShow && (
+                          <div className="flex items-center gap-3 text-right">
+                            <div className="rounded-lg bg-slate-50 px-2.5 py-1 text-xs border border-slate-100">
+                              <span className="text-[10px] uppercase font-bold text-slate-400 block">Review</span>
+                              <span className="font-extrabold text-slate-900">{item.reviewMark}/10</span>
+                            </div>
+                            {item.taskMark && (
+                              <div className="rounded-lg bg-blue-50 px-2.5 py-1 text-xs border border-blue-100">
+                                <span className="text-[10px] uppercase font-bold text-primary block">Task</span>
+                                <span className="font-extrabold text-primary">{item.taskMark}/10</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => setViewBookingId(item.bookingId)}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline cursor-pointer"
+                        >
+                          <span>View Details</span>
+                          <ChevronRight className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
 
-              {/* List */}
-              {isLoading && forms.length === 0 ? (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  {[1, 2].map((n) => (
-                    <div key={n} className="h-32 animate-pulse rounded-2xl border border-slate-100 bg-surface-card" />
-                  ))}
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  {forms.map((form) => (
-                    <div
-                      key={form.id}
-                      className="group flex flex-col justify-between rounded-2xl border border-slate-100 bg-white p-5 shadow-surface transition-all duration-200 hover:shadow-raised"
+              {/* Pagination */}
+              {feedbackListTotal > 0 && (
+                <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4 text-xs text-slate-500">
+                  <p>
+                    Page {feedbackListPage} of {totalPages} ({feedbackListTotal} total records)
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => applyFeedbackFilters(feedbackListPage - 1)}
+                      disabled={feedbackListPage <= 1}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
                     >
-                      <div>
-                        {/* Card Header */}
-                        <div className="mb-3 flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-2.5">
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-secondary text-primary">
-                              <FormBubbleIcon />
+                      Previous
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => applyFeedbackFilters(feedbackListPage + 1)}
+                      disabled={feedbackListPage >= totalPages}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* ── MAIN DASHBOARD VIEW ─────────────────────────────────── */
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+              {/* LEFT COLUMN: STATS & FORM CARDS (3 COLS) */}
+              <div className="lg:col-span-3 space-y-6">
+                {/* Stats Row */}
+                <div className="grid grid-cols-3 gap-3.5">
+                  <div className="rounded-2xl border border-slate-200/80 bg-white p-4.5 shadow-xs">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                      Active Forms
+                    </span>
+                    <span className="text-2xl font-black text-slate-900 leading-none">
+                      {activeForms.length}
+                    </span>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200/80 bg-white p-4.5 shadow-xs">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                      Default Form
+                    </span>
+                    <span
+                      className="text-sm font-bold text-slate-900 truncate block leading-snug"
+                      title={defaultForm?.name || "None set"}
+                    >
+                      {defaultForm?.name || "None"}
+                    </span>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200/80 bg-white p-4.5 shadow-xs">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                      Custom Templates
+                    </span>
+                    <span className="text-2xl font-black text-slate-900 leading-none">
+                      {customFormsCount}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Form Tabs (Active vs Archived) */}
+                {archivedForms.length > 0 && (
+                  <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowArchived(false)}
+                      className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors cursor-pointer ${
+                        !showArchived
+                          ? "bg-slate-900 text-white"
+                          : "text-slate-500 hover:bg-slate-100"
+                      }`}
+                    >
+                      Active ({activeForms.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowArchived(true)}
+                      className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors cursor-pointer ${
+                        showArchived
+                          ? "bg-slate-900 text-white"
+                          : "text-slate-500 hover:bg-slate-100"
+                      }`}
+                    >
+                      Archived ({archivedForms.length})
+                    </button>
+                  </div>
+                )}
+
+                {/* Forms List Grid */}
+                {isLoading && forms.length === 0 ? (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    {[1, 2].map((n) => (
+                      <div
+                        key={n}
+                        className="h-44 animate-pulse rounded-2xl border border-slate-100 bg-slate-50"
+                      />
+                    ))}
+                  </div>
+                ) : visibleForms.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-xs">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary mb-3">
+                      <FileText className="h-6 w-6" />
+                    </div>
+                    <h3 className="text-base font-bold text-slate-900">
+                      {showArchived ? "No Archived Forms" : "No Feedback Forms Created"}
+                    </h3>
+                    <p className="mt-1 max-w-sm text-xs text-slate-500 leading-relaxed">
+                      {showArchived
+                        ? "Any feedback forms archived due to historical session references will show up here."
+                        : "Create your first custom feedback form to evaluate student reviews with specialized questions and optional task marks."}
+                    </p>
+                    {!showArchived && (
+                      <button
+                        type="button"
+                        onClick={startCreate}
+                        className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-on-primary shadow-sm hover:bg-primary/95 transition-all cursor-pointer"
+                      >
+                        <Plus className="h-4 w-4" />
+                        <span>Create Form</span>
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    {visibleForms.map((form) => (
+                      <div
+                        key={form.id}
+                        className="group relative flex flex-col justify-between rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs transition-all hover:border-slate-300 hover:shadow-md"
+                      >
+                        <div>
+                          {/* Card Header & Badges */}
+                          <div className="flex items-start justify-between gap-2 mb-3">
+                            <div className="flex items-center gap-2.5">
+                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                                <FileText className="h-4 w-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <h3 className="text-sm font-bold text-slate-900 truncate">
+                                    {form.name}
+                                  </h3>
+                                  {form.isDefault && (
+                                    <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 border border-blue-200/60 px-1.5 py-0.2 text-[9px] font-bold text-primary">
+                                      <Star className="h-2.5 w-2.5 fill-primary" />
+                                      <span>DEFAULT</span>
+                                    </span>
+                                  )}
+                                  {!form.isActive && (
+                                    <span className="rounded-md bg-slate-100 px-1.5 py-0.2 text-[9px] font-bold text-slate-500">
+                                      ARCHIVED
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="text-sm font-bold tracking-tight text-on-surface transition-colors group-hover:text-primary">
-                                {form.name}
-                              </h3>
-                              {form.isDefault && (
-                                <span className="rounded bg-[#e6eef5] px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-[#003366]">
-                                  DEFAULT
-                                </span>
+
+                            {/* Dropdown Menu */}
+                            <div className="relative shrink-0">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setMenuOpenId(menuOpenId === form.id ? null : form.id)
+                                }
+                                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 cursor-pointer"
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </button>
+
+                              {menuOpenId === form.id && (
+                                <>
+                                  <div
+                                    className="fixed inset-0 z-10"
+                                    onClick={() => setMenuOpenId(null)}
+                                  />
+                                  <div className="absolute right-0 top-7 z-20 w-40 rounded-xl border border-slate-200 bg-white py-1 shadow-lg animate-in fade-in zoom-in-95 duration-100 text-xs font-semibold text-slate-700">
+                                    {form.isActive ? (
+                                      <>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setMenuOpenId(null);
+                                            startEdit(form.id);
+                                          }}
+                                          className="flex w-full items-center gap-2 px-3.5 py-2 text-left hover:bg-slate-50 cursor-pointer"
+                                        >
+                                          <FileText className="h-3.5 w-3.5 text-slate-400" />
+                                          <span>Edit Form</span>
+                                        </button>
+
+                                        {!form.isDefault && (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setMenuOpenId(null);
+                                              handleSetDefault(form.id);
+                                            }}
+                                            className="flex w-full items-center gap-2 px-3.5 py-2 text-left hover:bg-slate-50 text-slate-700 cursor-pointer"
+                                          >
+                                            <Star className="h-3.5 w-3.5 text-amber-500" />
+                                            <span>Set as Default</span>
+                                          </button>
+                                        )}
+
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setMenuOpenId(null);
+                                            handleDuplicate(form.id, form.name);
+                                          }}
+                                          className="flex w-full items-center gap-2 px-3.5 py-2 text-left hover:bg-slate-50 cursor-pointer"
+                                        >
+                                          <Copy className="h-3.5 w-3.5 text-slate-400" />
+                                          <span>Duplicate</span>
+                                        </button>
+
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setMenuOpenId(null);
+                                            handleDelete(form.id, form.name, form.isDefault);
+                                          }}
+                                          disabled={form.isDefault}
+                                          title={
+                                            form.isDefault
+                                              ? "The default feedback form cannot be deleted. Set another form as default first to delete this."
+                                              : "Delete form"
+                                          }
+                                          className="flex w-full items-center gap-2 px-3.5 py-2 text-left text-rose-600 hover:bg-rose-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                                        >
+                                          <Trash2 className="h-3.5 w-3.5 text-rose-500" />
+                                          <span>{form.isDefault ? "Delete (Default)" : "Delete"}</span>
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setMenuOpenId(null);
+                                          handleReactivate(form.id);
+                                        }}
+                                        className="flex w-full items-center gap-2 px-3.5 py-2 text-left text-emerald-600 hover:bg-emerald-50 cursor-pointer"
+                                      >
+                                        <RefreshCw className="h-3.5 w-3.5" />
+                                        <span>Reactivate</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                </>
                               )}
                             </div>
                           </div>
 
-                          {/* Dropdown Menu */}
-                          <div className="relative shrink-0">
-                            <button
-                              onClick={() => setMenuOpenId(menuOpenId === form.id ? null : form.id)}
-                              className="cursor-pointer rounded-lg p-1 text-slate-400 transition-all hover:bg-surface-hover hover:text-on-surface"
-                              aria-label="More options"
-                            >
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                <circle cx="12" cy="12" r="1" />
-                                <circle cx="12" cy="5" r="1" />
-                                <circle cx="12" cy="19" r="1" />
-                              </svg>
-                            </button>
-                            {menuOpenId === form.id && (
-                              <>
-                                <div className="fixed inset-0 z-10" onClick={() => setMenuOpenId(null)} />
-                                <div className="absolute right-0 top-7 z-20 w-36 rounded-xl border border-slate-100 bg-white py-1 shadow-raised">
-                                  <button
-                                    onClick={() => {
-                                      setMenuOpenId(null);
-                                      startEdit(form.id);
-                                    }}
-                                    className="flex w-full items-center px-4 py-2 text-left text-xs font-semibold text-slate-600 hover:bg-surface-hover"
-                                  >
-                                    Edit
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      setMenuOpenId(null);
-                                      handleDelete(form.id, form.name, form.isDefault);
-                                    }}
-                                    disabled={form.isDefault}
-                                    title={form.isDefault ? "The default form can't be deleted" : "Delete form"}
-                                    className="flex w-full items-center px-4 py-2 text-left text-xs font-semibold text-error hover:bg-error-container/40 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
-                                  >
-                                    Delete
-                                  </button>
-                                </div>
-                              </>
+                          {/* Description */}
+                          <p className="text-xs text-slate-500 line-clamp-2 min-h-[32px] leading-relaxed">
+                            {form.description || "General session feedback template."}
+                          </p>
+
+                          {/* Badges / Features Info */}
+                          <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[10px] font-semibold text-slate-500">
+                            {form.taskMarkEnabled && (
+                              <span className="rounded-md bg-blue-50 border border-blue-100 text-primary px-2 py-0.5">
+                                Task Mark (1-10)
+                              </span>
                             )}
+                            <span className="rounded-md bg-slate-100 px-2 py-0.5 text-slate-600">
+                              Standard Rubric
+                            </span>
                           </div>
                         </div>
 
-                        {/* Meta */}
-                        <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-500">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-70">
-                            <circle cx="12" cy="12" r="10" />
-                            <polyline points="12 6 12 12 16 14" />
-                          </svg>
+                        {/* Card Footer */}
+                        <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
                           <span>Created {dayjs(form.createdAt).format("MMM D, YYYY")}</span>
+                          {form.isActive && (
+                            <button
+                              type="button"
+                              onClick={() => startEdit(form.id)}
+                              className="font-semibold text-primary hover:underline cursor-pointer"
+                            >
+                              Edit →
+                            </button>
+                          )}
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                )}
+              </div>
 
-                  {!isLoading && forms.length === 0 && (
-                    <div className="col-span-full flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-surface-card p-12 text-center">
-                      <div className="relative mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-secondary/50">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white shadow-[0_4px_12px_rgba(0,51,102,0.06)]">
-                          <FormBubbleIcon className="h-[26px] w-[26px] text-primary" />
-                        </div>
-                        <div className="absolute -top-0.5 -right-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-on-primary shadow-sm">
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-                          </svg>
-                        </div>
-                      </div>
-                      <h3 className="mb-2 text-lg font-bold tracking-tight text-on-surface">No feedback forms yet</h3>
-                      <p className="mb-5 max-w-sm text-[13px] leading-relaxed text-slate-500">
-                         Create your first form — it&apos;ll automatically become your default. Every form includes
-                          standard feedback fields, and you can add custom fields when needed.
+              {/* RIGHT COLUMN: PENDING & RECENT FEEDBACK (2 COLS) */}
+              <div className="lg:col-span-2 space-y-6">
+                {/* ── Pending Feedback Box ─────────────────────────── */}
+                <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
+                  <div className="mb-4 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-amber-500" />
+                      <h2 className="text-sm font-bold text-slate-900">
+                        Pending Feedback Queue
+                      </h2>
+                    </div>
+                    {pendingFeedback.length > 0 && (
+                      <span className="rounded-full bg-amber-50 border border-amber-200 px-2 py-0.2 text-[10px] font-bold text-amber-700">
+                        {pendingFeedback.length} Action Needed
+                      </span>
+                    )}
+                  </div>
+
+                  {isPendingLoading ? (
+                    <div className="space-y-2.5">
+                      {[1, 2].map((n) => (
+                        <div
+                          key={n}
+                          className="h-16 animate-pulse rounded-xl border border-slate-100 bg-slate-50"
+                        />
+                      ))}
+                    </div>
+                  ) : pendingFeedback.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 p-6 text-center bg-slate-50/50">
+                      <CheckCircle2 className="h-6 w-6 text-emerald-500 mb-1.5" />
+                      <p className="text-xs font-bold text-slate-700">You&apos;re All Caught Up</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        Completed sessions awaiting evaluation will appear here.
                       </p>
-                      <button
-                        onClick={startCreate}
-                        className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-on-primary shadow-surface transition-all duration-200 hover:bg-primary/95 hover:shadow-raised hover:-translate-y-[1px] active:translate-y-0"
-                      >
-                        <PlusIcon />
-                        New Form
-                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5 max-h-72 overflow-y-auto">
+                      {pendingFeedback.map((item) => (
+                        <div
+                          key={item.bookingId}
+                          className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-3.5 transition-all hover:bg-slate-50"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-slate-900 truncate">
+                                {item.clientName}
+                              </p>
+                              <p className="text-[11px] text-slate-500 mt-0.5 truncate">
+                                {item.eventTypeName || "Review Session"}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setFeedbackBooking({
+                                  id: item.bookingId,
+                                  internName: item.internName,
+                                  advisorName: item.advisorName,
+                                  eventTypeName: item.eventTypeName ?? "Session",
+                                })
+                              }
+                              className="shrink-0 rounded-lg bg-primary hover:bg-primary/95 px-2.5 py-1 text-[11px] font-bold text-on-primary shadow-2xs transition-colors cursor-pointer"
+                            >
+                              Leave Feedback →
+                            </button>
+                          </div>
+                          <p className="mt-2 text-[10px] text-slate-400">
+                            Completed {dayjs(item.completedAt).format("MMM D, YYYY · h:mm A")}
+                          </p>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
-              )}
-            </div>
 
-          
-       {/* ── Pending + Recent Feedback (right column) ────────────── */}
-            <div className="lg:col-span-2 space-y-6">
-              <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-surface">
-                <div className="mb-4 flex items-center justify-between">
-                  <h2 className="text-sm font-bold tracking-tight text-on-surface">Pending Feedback</h2>
-                </div>
+                {/* ── Recent Submitted Feedback Box ───────────────── */}
+                <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
+                  <div className="mb-4 flex items-center justify-between">
+                    <h2 className="text-sm font-bold text-slate-900">
+                      Recent Submissions
+                    </h2>
+                    <button
+                      type="button"
+                      onClick={openAllFeedback}
+                      className="text-xs font-semibold text-primary hover:underline cursor-pointer"
+                    >
+                      View all →
+                    </button>
+                  </div>
 
-                {isPendingLoading ? (
-                  <div className="space-y-3">
-                    {[1, 2].map((n) => (
-                      <div key={n} className="h-16 animate-pulse rounded-xl border border-slate-100 bg-surface-card" />
-                    ))}
-                  </div>
-                ) : pendingFeedback.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 p-6 text-center">
-                    <p className="text-sm font-semibold text-on-surface">You&apos;re all caught up!</p>
-                    <p className="mt-1 text-xs text-slate-500">Completed sessions needing feedback will show up here.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {pendingFeedback.map((item) => (
-                      <div key={item.bookingId} className="rounded-xl border border-slate-100 p-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-on-surface">{item.clientName}</p>
-                            <p className="truncate text-xs text-slate-500">{item.eventTypeName ?? "—"}</p>
+                  {isRecentLoading ? (
+                    <div className="space-y-2.5">
+                      {[1, 2, 3].map((n) => (
+                        <div
+                          key={n}
+                          className="h-16 animate-pulse rounded-xl border border-slate-100 bg-slate-50"
+                        />
+                      ))}
+                    </div>
+                  ) : recentFeedback.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 p-8 text-center bg-slate-50/50">
+                      <p className="text-xs font-bold text-slate-700">No Feedback Submitted Yet</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        Your completed session evaluations will show up here.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {recentFeedback.map((item) => (
+                        <div
+                          key={item.id}
+                          className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-2xs hover:border-slate-300 transition-all"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-slate-900 truncate">
+                                {item.clientName}
+                              </p>
+                              <p className="text-[11px] text-slate-500 truncate">
+                                {item.eventTypeName || "Session"}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setViewBookingId(item.bookingId)}
+                              className="text-[11px] font-semibold text-primary hover:underline shrink-0 cursor-pointer"
+                            >
+                              View →
+                            </button>
                           </div>
-                          <button
-                            onClick={() =>
-                              setFeedbackBooking({
-                                id: item.bookingId,
-                                internName: item.internName,
-                                advisorName: item.advisorName,
-                                eventTypeName: item.eventTypeName ?? "",
-                              })
-                            }
-                            className="shrink-0 text-xs font-semibold text-primary hover:underline"
-                          >
-                            Leave Feedback →
-                          </button>
-                        </div>
-                        <p className="mt-1 text-[11px] text-slate-400">
-                          Completed {dayjs(item.completedAt).format("MMM D, YYYY")}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
 
-              <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-surface">
-                <div className="mb-4 flex items-center justify-between">
-                  <h2 className="text-sm font-bold tracking-tight text-on-surface">Recent Feedback</h2>
-                  <button
-                    onClick={openAllFeedback}
-                    className="text-xs font-semibold text-primary hover:underline"
-                  >
-                    View all →
-                  </button>
-                </div>
-
-                {isRecentLoading ? (
-                  <div className="space-y-3">
-                    {[1, 2, 3].map((n) => (
-                      <div key={n} className="h-20 animate-pulse rounded-xl border border-slate-100 bg-surface-card" />
-                    ))}
-                  </div>
-                ) : recentFeedback.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 p-8 text-center">
-                    <p className="text-sm font-semibold text-on-surface">No feedback yet</p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Your submitted feedback will appear here after a completed session.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {recentFeedback.map((item) => (
-                      <div key={item.id} className="rounded-xl border border-slate-100 p-3">
-                        <p className="truncate text-sm font-semibold text-on-surface">{item.clientName}</p>
-                        <p className="truncate text-xs text-slate-500">{item.eventTypeName}</p>
-                        <div className="mt-2 flex items-center justify-between">
-                          <p className="text-xs font-medium text-slate-500">
-                            Review <span className="font-bold text-on-surface">{item.reviewMark}/10</span>
-                            {item.taskMark && (
-                              <>
-                                {" "}
-                                · Task <span className="font-bold text-on-surface">{item.taskMark}/10</span>
-                              </>
+                          <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
+                            {item.isNoShow ? (
+                              <span className="font-bold text-rose-600">No-Show</span>
+                            ) : (
+                              <span>
+                                Score: <b className="text-slate-900">{item.reviewMark}/10</b>
+                                {item.taskMark && (
+                                  <> · Task: <b className="text-primary">{item.taskMark}/10</b></>
+                                )}
+                              </span>
                             )}
-                          </p>
-                          <button
-                            onClick={() => setViewBookingId(item.bookingId)}
-                            className="text-xs font-semibold text-primary hover:underline"
-                          >
-                            View →
-                          </button>
+                            <span className="text-[10px] text-slate-400">
+                              {dayjs(item.createdAt).format("MMM D, YYYY")}
+                            </span>
+                          </div>
                         </div>
-                        <p className="mt-1 text-[11px] text-slate-400">
-                          {dayjs(item.createdAt).format("MMM D, YYYY")}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        )
+          )}
+        </>
       )}
 
-    {viewBookingId !== null && (
-        <FeedbackDetailsModal bookingId={viewBookingId} onClose={closeFeedbackModal} />
+      {/* ── View / Edit Submitted Feedback Modal ─────────────────── */}
+      {viewBookingId !== null && (
+        <FeedbackDetailsModal
+          bookingId={viewBookingId}
+          onClose={closeFeedbackModal}
+        />
       )}
 
+      {/* ── Submit Feedback Modal ─────────────────────────────────── */}
       {feedbackBooking && (
         <SubmitFeedbackModal
           booking={feedbackBooking}
@@ -1214,5 +918,3 @@ const totalPages = Math.max(
     </div>
   );
 }
-
-     

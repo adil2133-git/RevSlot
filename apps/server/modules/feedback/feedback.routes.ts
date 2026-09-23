@@ -13,6 +13,7 @@ formRouter.post("/", validate(CreateFormSchema), catchAsync(feedbackController.c
 formRouter.get("/:formId", catchAsync(feedbackController.getForm));
 formRouter.patch("/:formId", validate(UpdateFormSchema), catchAsync(feedbackController.updateForm));
 formRouter.delete("/:formId", catchAsync(feedbackController.deleteForm));
+formRouter.post("/:formId/set-default", catchAsync(feedbackController.setDefaultForm));
 formRouter.post("/:formId/reactivate", catchAsync(feedbackController.reactivateForm));
 
 const bookingFeedbackRouter = Router();

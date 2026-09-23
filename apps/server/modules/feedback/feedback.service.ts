@@ -231,6 +231,24 @@ export async function deleteForm(formId: number, reviewerId: number) {
   return { archived: false as const, message: "Feedback form deleted successfully.", };
 }
 
+export async function setDefaultForm(formId: number, reviewerId: number) {
+  const form = await getOwnedForm(formId, reviewerId);
+  if (!form.isActive) {
+    throw new AppError("Archived forms cannot be set as default", 400);
+  }
+  await db
+    .update(feedbackForms)
+    .set({ isDefault: false, updatedAt: new Date() })
+    .where(eq(feedbackForms.reviewerId, reviewerId));
+
+  await db
+    .update(feedbackForms)
+    .set({ isDefault: true, updatedAt: new Date() })
+    .where(eq(feedbackForms.id, formId));
+
+  return getFormWithFields(formId, reviewerId);
+}
+
 export async function reactivateForm(formId: number, reviewerId: number) {
   await getOwnedForm(formId, reviewerId);
   await db

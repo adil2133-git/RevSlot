@@ -1,37 +1,39 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
-  Check,
-  Lock,
   FileText,
   Plus,
   Trash2,
-  GripVertical,
-  ArrowRight,
   ChevronDown,
   ArrowLeft,
   Sparkles,
-  HelpCircle,
   MoveUp,
   MoveDown,
+  Eye,
+  CheckCircle2,
+  AlertCircle,
+  BookOpen,
+  Sliders,
+  Type,
+  AlignLeft,
+  Hash,
+  ListFilter,
+  X,
+  Search,
 } from "lucide-react";
-import type { FormFieldInput, FeedbackFormField, FeedbackFieldType } from "../types";
-import { useEventTypeStore } from "@/features/eventTypes/store/eventType.store";
+import type { FormFieldInput, FeedbackFieldType } from "../types";
 import { useQuestionBankStore } from "@/features/questionBanks/store/questionBankStore";
 
-export type CustomRubricField = FormFieldInput & {
+export type DraftField = FormFieldInput & {
   optionsText: string;
-  rubricType?: "rating" | "tristate" | "text" | "textarea" | "select" | "question";
-  anchorNote?: string;
-  questionId?: number;
 };
 
 interface FeedbackFormBuilderProps {
   initialName?: string;
   initialDescription?: string;
   initialTaskMarkEnabled?: boolean;
-  initialFields?: DraftFieldData[];
+  initialFields?: DraftField[];
   initialQuestionIds?: number[];
   isEditing?: boolean;
   formId?: number;
@@ -47,72 +49,164 @@ interface FeedbackFormBuilderProps {
   errorMessage?: string | null;
 }
 
-export type DraftFieldData = FormFieldInput & {
-  optionsText: string;
-  rubricType?: "rating" | "tristate" | "text" | "textarea" | "select" | "question";
-  anchorNote?: string;
-  questionId?: number;
-};
-
-// Recommended Academic Criteria templates for 1-click append
-const RECOMMENDED_ACADEMIC_CRITERIA: {
+const FIELD_TYPES: {
+  value: FeedbackFieldType;
   label: string;
-  rubricType: "rating" | "tristate";
-  fieldType: FeedbackFieldType;
-  optionsText: string;
-  anchorNote?: string;
+  icon: React.ComponentType<{ className?: string }>;
+  description: string;
 }[] = [
   {
-    label: "Git Commit Discipline",
-    rubricType: "rating",
-    fieldType: "select",
-    optionsText: "1 - Chaotic / Single commit, 2 - Inconsistent, 3 - Conventional commits, 4 - High quality commit log, 5 - Flawless atomic PR workflow",
-    anchorNote: "Rubric Anchor: 1= Chaotic/Single, 3= Conventional commits, 5= Flawless atomic PR workflow",
+    value: "text",
+    label: "Short Text",
+    icon: Type,
+    description: "Single-line text input",
   },
   {
-    label: "Communication Clarity",
-    rubricType: "tristate",
-    fieldType: "select",
-    optionsText: "Pass / Verified, Needs Revision, Not Applicable",
+    value: "textarea",
+    label: "Long Text",
+    icon: AlignLeft,
+    description: "Multi-line commentary and notes",
   },
   {
-    label: "System Design Rigor",
-    rubricType: "rating",
-    fieldType: "select",
-    optionsText: "1 - Monolithic / Unstructured, 2 - Basic modularity, 3 - Decoupled with good interfaces, 4 - Resilient & scalable, 5 - Enterprise idempotent architecture",
-    anchorNote: "Rubric Anchor: 1= Monolithic/Unstructured, 3= Decoupled & clean, 5= Enterprise idempotent design",
+    value: "number",
+    label: "Numeric Score",
+    icon: Hash,
+    description: "Specific numerical rating",
   },
   {
-    label: "Plagiarism & AI Verification",
-    rubricType: "tristate",
-    fieldType: "select",
-    optionsText: "Pass / Verified, Needs Revision, Not Applicable",
-  },
-  {
-    label: "Automated Test Coverage",
-    rubricType: "rating",
-    fieldType: "select",
-    optionsText: "1 - <20% / Broken, 2 - 20-50% Happy path, 3 - ~60% Unit tests, 4 - ~80% with Integration tests, 5 - Complete E2E & Mocking coverage",
-    anchorNote: "Rubric Anchor: 1= <20% Broken, 3= ~60% Unit tests, 5= Complete E2E & Mocking",
+    value: "select",
+    label: "Dropdown Select",
+    icon: ListFilter,
+    description: "Custom selectable options",
   },
 ];
 
-// Default initial fields when creating a new form if none provided
-const DEFAULT_INITIAL_RUBRICS: CustomRubricField[] = [
+export const SYSTEM_FIELD_LABELS = new Set([
+  "Review Mark",
+  "Understanding Level",
+  "Communication Level",
+  "Overall Performance",
+  "Areas for Improvement",
+  "Recommendations / Next Steps",
+]);
+
+const SUGGESTED_CUSTOM_FIELDS: {
+  label: string;
+  description: string;
+  fieldType: FeedbackFieldType;
+  optionsText?: string;
+}[] = [
   {
-    label: "Code Quality & Cleanliness",
+    label: "Code Quality",
+    description: "Readability, architecture, and linting standards",
     fieldType: "select",
-    required: true,
-    rubricType: "rating",
-    optionsText: "1 - Unformatted / Broken, 2 - Marginal, 3 - Compliant with Linting, 4 - Clean & Refactored, 5 - Flawless Idempotent Design",
-    anchorNote: "Rubric Anchor: 1= Unformatted/Broken, 3= Compliant with Linting, 5= Flawless Idempotent Design",
+    optionsText: "Exceptional, Meets Standard, Needs Improvement",
   },
   {
-    label: "Architecture Diagram Walkthrough",
+    label: "Problem Solving",
+    description: "Analytical reasoning and algorithmic thinking",
     fieldType: "select",
-    required: true,
-    rubricType: "tristate",
-    optionsText: "Pass / Verified, Needs Revision, Not Applicable",
+    optionsText: "Excellent, Good, Average, Struggling",
+  },
+  {
+    label: "Technical Depth",
+    description: "Depth of framework and foundational knowledge",
+    fieldType: "textarea",
+  },
+  {
+    label: "Communication & Clarity",
+    description: "Articulation of technical choices and ideas",
+    fieldType: "select",
+    optionsText: "Clear & Structured, Adequate, Needs Clarity",
+  },
+  {
+    label: "Time Management",
+    description: "Pacing during implementation and answers",
+    fieldType: "text",
+  },
+  {
+    label: "Learning Agility",
+    description: "Receptiveness to feedback and hints",
+    fieldType: "select",
+    optionsText: "Fast Learner, Receptive, Hesitant",
+  },
+];
+
+const FORM_STARTER_TEMPLATES = [
+  {
+    name: "Technical Review Form",
+    description: "Standard technical evaluation assessing code quality, architecture, and foundational depth.",
+    taskMarkEnabled: true,
+    fields: [
+      {
+        label: "Code Quality & Cleanliness",
+        fieldType: "select" as const,
+        optionsText: "Exceptional, Meets Standard, Needs Refactoring",
+        required: true,
+      },
+      {
+        label: "System Design & Architecture",
+        fieldType: "textarea" as const,
+        optionsText: "",
+        required: false,
+      },
+      {
+        label: "Technical Depth Observations",
+        fieldType: "textarea" as const,
+        optionsText: "",
+        required: false,
+      },
+    ],
+  },
+  {
+    name: "Mock Interview Form",
+    description: "Structured interview format evaluating behavioral responses, communication, and problem solving.",
+    taskMarkEnabled: false,
+    fields: [
+      {
+        label: "Problem Solving Approach",
+        fieldType: "select" as const,
+        optionsText: "Independent, Needed Minor Hints, Struggled",
+        required: true,
+      },
+      {
+        label: "Communication & Articulation",
+        fieldType: "select" as const,
+        optionsText: "Very Articulate, Clear, Needs Improvement",
+        required: true,
+      },
+      {
+        label: "Interview Observations",
+        fieldType: "textarea" as const,
+        optionsText: "",
+        required: false,
+      },
+    ],
+  },
+  {
+    name: "Resume & Portfolio Review",
+    description: "Evaluation form for project presentations, portfolio rigor, and resume clarity.",
+    taskMarkEnabled: false,
+    fields: [
+      {
+        label: "Portfolio Presentation Quality",
+        fieldType: "select" as const,
+        optionsText: "Outstanding, Standard, Incomplete",
+        required: true,
+      },
+      {
+        label: "Resume Impact & Metrics",
+        fieldType: "textarea" as const,
+        optionsText: "",
+        required: false,
+      },
+    ],
+  },
+  {
+    name: "General Session Review",
+    description: "Lightweight session form relying on standard evaluation dimensions with optional general notes.",
+    taskMarkEnabled: false,
+    fields: [],
   },
 ];
 
@@ -120,7 +214,7 @@ export default function FeedbackFormBuilder({
   initialName = "",
   initialDescription = "",
   initialTaskMarkEnabled = false,
-  initialFields,
+  initialFields = [],
   initialQuestionIds = [],
   isEditing = false,
   onSave,
@@ -128,158 +222,80 @@ export default function FeedbackFormBuilder({
   submitting = false,
   errorMessage = null,
 }: FeedbackFormBuilderProps) {
-  const { eventTypes, loadEventTypes } = useEventTypeStore();
-  const { banks, fetchBanks } = useQuestionBankStore();
+  const { banks, selectedBank, fetchBanks, fetchBank, clearSelectedBank } = useQuestionBankStore();
 
-  const [formName, setFormName] = useState(initialName || (isEditing ? "" : "Full Stack Capstone Defense Rubric"));
-  const [selectedEventType, setSelectedEventType] = useState("all");
-  const [academicCohort, setAcademicCohort] = useState("spring-2025");
-  const [instructions, setInstructions] = useState(
-    initialDescription ||
-      (isEditing
-        ? ""
-        : "Please evaluate both conceptual understanding and live repository demonstration. If giving a score below 7 in any rubric sector, articulate actionable milestones for secondary re-evaluation within 10 days.")
-  );
+  const [name, setName] = useState(initialName);
+  const [description, setDescription] = useState(initialDescription);
   const [taskMarkEnabled, setTaskMarkEnabled] = useState(initialTaskMarkEnabled);
-  const [fields, setFields] = useState<CustomRubricField[]>(() => {
-    if (initialFields && initialFields.length > 0) {
-      return initialFields.map((f) => {
-        let rubricType: CustomRubricField["rubricType"] = f.rubricType;
-        if (!rubricType) {
-          if (f.fieldType === "select") {
-            const opts = f.optionsText || "";
-            if (opts.includes("Pass") && opts.includes("Needs Revision")) {
-              rubricType = "tristate";
-            } else if (opts.includes("1") && opts.includes("5")) {
-              rubricType = "rating";
-            } else {
-              rubricType = "select";
-            }
-          } else if (f.fieldType === "textarea") {
-            rubricType = "textarea";
-          } else if (f.fieldType === "number") {
-            rubricType = "rating";
-          } else {
-            rubricType = "text";
-          }
-        }
-        return {
-          ...f,
-          rubricType,
-          anchorNote: f.anchorNote || (rubricType === "rating" ? "Rubric Anchor: 1= Unsatisfactory, 3= Standard, 5= Exemplary" : undefined),
-        };
-      });
-    }
-    return isEditing ? [] : DEFAULT_INITIAL_RUBRICS;
-  });
-
+  const [fields, setFields] = useState<DraftField[]>(initialFields);
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<number[]>(initialQuestionIds);
-  const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
-  const [editingFieldIndex, setEditingFieldIndex] = useState<number | null>(null);
-  const [localError, setLocalError] = useState<string | null>(null);
 
+  const [activeBankId, setActiveBankId] = useState<number | null>(null);
+  const [questionSearch, setQuestionSearch] = useState("");
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  // Load question banks on mount
   useEffect(() => {
-    loadEventTypes();
     fetchBanks();
-  }, [loadEventTypes, fetchBanks]);
+    return () => {
+      clearSelectedBank();
+    };
+  }, [fetchBanks, clearSelectedBank]);
 
-  // Append a quick-add recommendation
-  const handleQuickAdd = (rec: (typeof RECOMMENDED_ACADEMIC_CRITERIA)[number]) => {
-    setLocalError(null);
-    const existingIndex = fields.findIndex(
-      (f) => f.label.trim().toLowerCase() === rec.label.toLowerCase()
+  // Load specific bank questions when bank selected
+  useEffect(() => {
+    if (activeBankId !== null) {
+      fetchBank(activeBankId);
+    }
+  }, [activeBankId, fetchBank]);
+
+  // Apply template preset
+  const applyTemplate = (tpl: (typeof FORM_STARTER_TEMPLATES)[number]) => {
+    setName(tpl.name);
+    setDescription(tpl.description);
+    setTaskMarkEnabled(tpl.taskMarkEnabled);
+    setFields(
+      tpl.fields.map((f) => ({
+        label: f.label,
+        fieldType: f.fieldType,
+        optionsText: f.optionsText,
+        required: f.required,
+      }))
     );
-    if (existingIndex !== -1) {
-      // Toggle off if already present
-      setFields((prev) => prev.filter((_, i) => i !== existingIndex));
-      return;
-    }
+    setFormError(null);
+  };
+
+  // Add custom field
+  const addField = (fieldType: FeedbackFieldType = "text") => {
     if (fields.length >= 20) {
-      setLocalError("You can add up to 20 custom criteria.");
+      setFormError("You can add up to 20 custom fields.");
       return;
     }
+    setFormError(null);
     setFields((prev) => [
       ...prev,
       {
-        label: rec.label,
-        fieldType: rec.fieldType,
-        required: true,
-        rubricType: rec.rubricType,
-        optionsText: rec.optionsText,
-        anchorNote: rec.anchorNote,
+        label: "",
+        fieldType,
+        required: false,
+        optionsText: fieldType === "select" ? "Excellent, Good, Needs Work" : "",
       },
     ]);
   };
 
-  // Add custom new criteria
-  const handleAddCriterion = (
-    type: "rating" | "tristate" | "text" | "textarea" | "select"
-  ) => {
-    setLocalError(null);
-    setIsAddMenuOpen(false);
-    if (fields.length >= 20) {
-      setLocalError("You can add up to 20 custom criteria.");
-      return;
-    }
-
-    let newField: CustomRubricField;
-    if (type === "rating") {
-      newField = {
-        label: "Criterion Title (Rating 1-5)",
-        fieldType: "select",
-        required: true,
-        rubricType: "rating",
-        optionsText: "1 - Unsatisfactory, 2 - Marginal, 3 - Proficient, 4 - Advanced, 5 - Exemplary",
-        anchorNote: "Rubric Anchor: 1= Unsatisfactory, 3= Proficient, 5= Exemplary",
-      };
-    } else if (type === "tristate") {
-      newField = {
-        label: "Evaluation Checkpoint",
-        fieldType: "select",
-        required: true,
-        rubricType: "tristate",
-        optionsText: "Pass / Verified, Needs Revision, Not Applicable",
-      };
-    } else if (type === "textarea") {
-      newField = {
-        label: "Detailed Observations & Notes",
-        fieldType: "textarea",
-        required: false,
-        rubricType: "textarea",
-        optionsText: "",
-      };
-    } else if (type === "select") {
-      newField = {
-        label: "Evaluation Metric",
-        fieldType: "select",
-        required: true,
-        rubricType: "select",
-        optionsText: "Outstanding, Meets Expectations, Action Required",
-      };
-    } else {
-      newField = {
-        label: "Custom Field",
-        fieldType: "text",
-        required: false,
-        rubricType: "text",
-        optionsText: "",
-      };
-    }
-
-    setFields((prev) => [...prev, newField]);
-    setEditingFieldIndex(fields.length);
-  };
-
-  const handleRemoveField = (index: number) => {
-    setFields((prev) => prev.filter((_, i) => i !== index));
-    if (editingFieldIndex === index) setEditingFieldIndex(null);
-  };
-
-  const handleUpdateField = (index: number, patch: Partial<CustomRubricField>) => {
+  // Update a custom field
+  const updateField = (index: number, patch: Partial<DraftField>) => {
     setFields((prev) => prev.map((f, i) => (i === index ? { ...f, ...patch } : f)));
   };
 
-  const handleMoveField = (index: number, direction: "up" | "down") => {
+  // Remove a custom field
+  const removeField = (index: number) => {
+    setFields((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Move a custom field
+  const moveField = (index: number, direction: "up" | "down") => {
     const target = direction === "up" ? index - 1 : index + 1;
     if (target < 0 || target >= fields.length) return;
     setFields((prev) => {
@@ -289,66 +305,173 @@ export default function FeedbackFormBuilder({
     });
   };
 
+  // Toggle suggested field
+  const toggleSuggestedField = (suggestion: (typeof SUGGESTED_CUSTOM_FIELDS)[number]) => {
+    const existingIndex = fields.findIndex(
+      (f) => f.label.trim().toLowerCase() === suggestion.label.toLowerCase()
+    );
+    if (existingIndex !== -1) {
+      setFields((prev) => prev.filter((_, i) => i !== existingIndex));
+      return;
+    }
+    if (fields.length >= 20) {
+      setFormError("You can add up to 20 custom fields.");
+      return;
+    }
+    setFields((prev) => [
+      ...prev,
+      {
+        label: suggestion.label,
+        fieldType: suggestion.fieldType,
+        required: false,
+        optionsText: suggestion.optionsText ?? "",
+      },
+    ]);
+  };
+
+  // Toggle question attachment from bank
+  const toggleQuestionAttachment = (questionId: number) => {
+    setSelectedQuestionIds((prev) =>
+      prev.includes(questionId)
+        ? prev.filter((id) => id !== questionId)
+        : [...prev, questionId]
+    );
+  };
+
+  // Filter bank questions
+  const filteredBankQuestions = useMemo(() => {
+    if (!selectedBank?.questions) return [];
+    const term = questionSearch.trim().toLowerCase();
+    if (!term) return selectedBank.questions;
+    return selectedBank.questions.filter(
+      (q) =>
+        q.questionText.toLowerCase().includes(term) ||
+        (q.description && q.description.toLowerCase().includes(term))
+    );
+  }, [selectedBank, questionSearch]);
+
+  // Form submission validation & payload generation
   const handleSubmit = async () => {
-    setLocalError(null);
-    if (!formName.trim()) {
-      setLocalError("Form name is required.");
+    setFormError(null);
+
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      setFormError("Form name is required.");
       return;
     }
 
-    const payloadFields: FormFieldInput[] = fields.map((field, idx) => {
-      let options: string[] | undefined = undefined;
+    if (trimmedName.length > 150) {
+      setFormError("Form name must be 150 characters or less.");
+      return;
+    }
+
+    const normalizedLabels = new Set<string>();
+
+    for (let i = 0; i < fields.length; i++) {
+      const field = fields[i];
+      const label = field.label.trim();
+
+      if (!label) {
+        setFormError(`Custom field #${i + 1} needs a label.`);
+        return;
+      }
+
+      if (label.length > 150) {
+        setFormError(`Field label "${label}" exceeds the 150 character limit.`);
+        return;
+      }
+
+      const lower = label.toLowerCase();
+      if (normalizedLabels.has(lower)) {
+        setFormError(`Duplicate field label: "${label}". Labels must be unique.`);
+        return;
+      }
+
+      if (
+        [...SYSTEM_FIELD_LABELS].some(
+          (sys) => sys.toLowerCase() === lower
+        )
+      ) {
+        setFormError(
+          `"${label}" is already a built-in standard feedback field. Please choose another label.`
+        );
+        return;
+      }
+
+      normalizedLabels.add(lower);
+
       if (field.fieldType === "select") {
-        options = field.optionsText
+        const opts = field.optionsText
           .split(",")
           .map((o) => o.trim())
           .filter(Boolean);
-        if (options.length === 0) {
-          options = ["Pass / Verified", "Needs Revision", "Not Applicable"];
+
+        if (opts.length === 0) {
+          setFormError(`Dropdown field "${label}" requires at least one option.`);
+          return;
+        }
+
+        const uniqueOpts = new Set(opts.map((o) => o.toLowerCase()));
+        if (uniqueOpts.size !== opts.length) {
+          setFormError(`Dropdown options for "${label}" must be unique.`);
+          return;
         }
       }
-      return {
-        label: field.label.trim() || `Criterion ${idx + 1}`,
-        fieldType: field.fieldType,
-        required: Boolean(field.required),
-        displayOrder: idx,
-        options,
-      };
-    });
+    }
+
+    const payloadFields: FormFieldInput[] = fields.map((f, idx) => ({
+      label: f.label.trim(),
+      fieldType: f.fieldType,
+      required: Boolean(f.required),
+      displayOrder: idx,
+      options:
+        f.fieldType === "select"
+          ? f.optionsText
+              .split(",")
+              .map((o) => o.trim())
+              .filter(Boolean)
+          : undefined,
+    }));
 
     try {
       await onSave({
-        name: formName.trim(),
-        description: instructions.trim() || undefined,
+        name: trimmedName,
+        description: description.trim() || undefined,
         taskMarkEnabled,
         fields: payloadFields,
         questionIds: selectedQuestionIds,
       });
     } catch (err: unknown) {
       if (err instanceof Error) {
-        setLocalError(err.message);
+        setFormError(err.message);
       } else {
-        setLocalError("An unexpected error occurred while saving the form.");
+        setFormError("Failed to save feedback form.");
       }
     }
   };
 
   return (
-    <div className="mx-auto max-w-4xl pb-28 pt-2">
-      {/* ── Top Breadcrumbs & Builder Tag ──────────────────────────── */}
+    <div className="mx-auto max-w-4xl pb-24 pt-2">
+      {/* ── Top Bar / Breadcrumb ────────────────────────────────────── */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <button
           type="button"
           onClick={onCancel}
-          className="group inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 transition-colors hover:text-slate-900"
+          className="group inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 transition-colors hover:text-slate-900 cursor-pointer"
         >
-          <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" />
+          <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
           <span>Back to Feedback &amp; Forms</span>
         </button>
 
-        <div className="inline-flex items-center gap-2 rounded-full border border-blue-200/70 bg-blue-50/80 px-3 py-1 text-[10px] font-bold tracking-wider text-primary uppercase shadow-xs">
-          <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-          <span>TEMPLATE BUILDER</span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setPreviewOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 transition-colors cursor-pointer"
+          >
+            <Eye className="h-3.5 w-3.5 text-slate-500" />
+            <span>Live Preview</span>
+          </button>
         </div>
       </div>
 
@@ -357,15 +480,60 @@ export default function FeedbackFormBuilder({
         <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
           {isEditing ? "Edit Feedback Form" : "Create Feedback Form"}
         </h1>
-        <p className="mt-1.5 max-w-2xl text-xs sm:text-sm text-slate-500 leading-relaxed">
-          Configure the evaluation rubric, performance indicators, and custom assessment criteria reviewers complete following student viva defense sessions.
+        <p className="mt-1 text-xs sm:text-sm text-slate-500 leading-relaxed max-w-2xl">
+          Configure form properties, optional task scoring, attached question banks, and custom criteria for post-session evaluations.
         </p>
       </div>
 
       {/* ── Error Banner ──────────────────────────────────────────── */}
-      {(localError || errorMessage) && (
-        <div className="mb-6 rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs font-semibold text-rose-800 animate-in fade-in">
-          {localError || errorMessage}
+      {(formError || errorMessage) && (
+        <div className="mb-6 flex items-start gap-2.5 rounded-xl border border-rose-200 bg-rose-50/90 p-4 text-xs font-semibold text-rose-800 shadow-xs">
+          <AlertCircle className="h-4 w-4 shrink-0 text-rose-600 mt-0.5" />
+          <span>{formError || errorMessage}</span>
+        </div>
+      )}
+
+      {/* ── Starter Templates Tray ─────────────────────────────────── */}
+      {!isEditing && (
+        <div className="mb-6 rounded-2xl border border-slate-200/90 bg-slate-50/60 p-5">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-700">
+              <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+              Quick-Start Form Templates:
+            </span>
+            <span className="text-[11px] text-slate-400">Click to apply template</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+            {FORM_STARTER_TEMPLATES.map((tpl) => {
+              const isSelected = name === tpl.name;
+              return (
+                <button
+                  key={tpl.name}
+                  type="button"
+                  onClick={() => applyTemplate(tpl)}
+                  className={`flex flex-col items-start rounded-xl p-3 text-left transition-all border shadow-2xs cursor-pointer ${
+                    isSelected
+                      ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                      : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/80"
+                  }`}
+                >
+                  <p className="text-xs font-bold text-slate-900">{tpl.name}</p>
+                  <p className="mt-1 text-[11px] text-slate-500 line-clamp-2 leading-relaxed">
+                    {tpl.description}
+                  </p>
+                  <div className="mt-2.5 flex items-center gap-1.5 text-[10px] font-semibold text-slate-400">
+                    {tpl.taskMarkEnabled && (
+                      <span className="rounded bg-blue-50 px-1.5 py-0.5 text-primary border border-blue-100">
+                        Task Mark
+                      </span>
+                    )}
+                    <span>{tpl.fields.length} custom {tpl.fields.length === 1 ? "field" : "fields"}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -374,16 +542,15 @@ export default function FeedbackFormBuilder({
             SECTION 1: FORM DETAILS
            ═════════════════════════════════════════════════════════════ */}
         <section className="rounded-2xl border border-slate-200/90 bg-white p-6 sm:p-7 shadow-xs">
-          {/* Section Header */}
-          <div className="flex items-start justify-between gap-3 mb-6 pb-4 border-b border-slate-100">
+          <div className="flex items-start justify-between gap-3 mb-5 pb-4 border-b border-slate-100">
             <div className="flex items-center gap-3">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#002b5c] text-white text-xs font-bold shadow-xs">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-white text-xs font-bold shadow-xs">
                 1
               </div>
               <div>
                 <h2 className="text-base font-bold text-slate-900">Form Details</h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Name and context for when this feedback form is assigned to reviewers.
+                  Define the form name and optional instructions displayed on your reviewer interface.
                 </p>
               </div>
             </div>
@@ -392,233 +559,130 @@ export default function FeedbackFormBuilder({
             </span>
           </div>
 
-          {/* Fields */}
           <div className="space-y-5">
             {/* Form Name */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-xs font-semibold text-slate-800">
-                  Form Name
+                  Form Name <span className="text-rose-500">*</span>
                 </label>
                 <span className="text-[11px] text-slate-400">
-                  Displayed on reviewer dashboard
+                  {name.length}/150 chars
                 </span>
               </div>
               <input
                 type="text"
-                value={formName}
-                onChange={(e) => setFormName(e.target.value)}
-                placeholder="e.g. Full Stack Capstone Defense Rubric"
+                value={name}
+                maxLength={150}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Technical Interview Evaluation, Capstone Defense Rubric"
                 className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
               />
             </div>
 
-            {/* Target Event Type & Academic Cohort */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className="block text-xs font-semibold text-slate-800 mb-1.5">
-                  Target Event Type
-                </label>
-                <div className="relative">
-                  <select
-                    value={selectedEventType}
-                    onChange={(e) => setSelectedEventType(e.target.value)}
-                    className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm font-medium text-slate-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all pr-8"
-                  >
-                    <option value="all">Capstone Viva (45 min)</option>
-                    {eventTypes.map((et) => (
-                      <option key={et.id} value={String(et.id)}>
-                        {et.name} ({et.durationMinutes} min)
-                      </option>
-                    ))}
-                    <option value="milestone">Milestone Review (30 min)</option>
-                    <option value="advisory">Advisory Viva Committee</option>
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-800 mb-1.5">
-                  Academic Cohort
-                </label>
-                <div className="relative">
-                  <select
-                    value={academicCohort}
-                    onChange={(e) => setAcademicCohort(e.target.value)}
-                    className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm font-medium text-slate-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all pr-8"
-                  >
-                    <option value="spring-2025">Spring 2025 (Graduating Cohort)</option>
-                    <option value="fall-2025">Fall 2025 (Junior Cohort)</option>
-                    <option value="summer-2025">Summer 2025 (Internship Cohort)</option>
-                    <option value="all-cohorts">General / All Cohorts</option>
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                </div>
-              </div>
-            </div>
-
-            {/* Evaluator Instructions & Honor Code */}
+            {/* Description */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-xs font-semibold text-slate-800">
-                  Evaluator Instructions &amp; Honor Code
+                  Description / Evaluator Instructions
                 </label>
-                <span className="text-[11px] text-slate-400">Optional</span>
+                <span className="text-[11px] text-slate-400">
+                  Optional · {description.length}/200 chars
+                </span>
               </div>
               <textarea
-                value={instructions}
-                onChange={(e) => setInstructions(e.target.value)}
-                rows={3}
-                placeholder="Please evaluate both conceptual understanding and live repository demonstration. If giving a score below 7 in any rubric sector, articulate actionable milestones for secondary re-evaluation within 10 days."
-                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all leading-relaxed"
+                value={description}
+                maxLength={200}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={2}
+                placeholder="Brief guidelines or evaluation context for reviewers..."
+                className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all leading-relaxed"
               />
             </div>
           </div>
         </section>
 
         {/* ═════════════════════════════════════════════════════════════
-            SECTION 2: STANDARD FIELDS
+            SECTION 2: EVALUATION SETTINGS & CORE DIMENSIONS
            ═════════════════════════════════════════════════════════════ */}
         <section className="rounded-2xl border border-slate-200/90 bg-white p-6 sm:p-7 shadow-xs">
-          {/* Section Header */}
-          <div className="flex items-start justify-between gap-3 mb-6 pb-4 border-b border-slate-100">
+          <div className="flex items-start justify-between gap-3 mb-5 pb-4 border-b border-slate-100">
             <div className="flex items-center gap-3">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#002b5c] text-white text-xs font-bold shadow-xs">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-white text-xs font-bold shadow-xs">
                 2
               </div>
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <h2 className="text-base font-bold text-slate-900">Standard Fields</h2>
-                <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
-                  5 Built-in
-                </span>
+              <div>
+                <h2 className="text-base font-bold text-slate-900">Evaluation Settings &amp; Standard Fields</h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  RevSlot automatically handles core evaluation dimensions on all feedback submissions.
+                </p>
               </div>
             </div>
-            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium text-slate-600">
-              <Lock className="h-3 w-3 text-slate-500" />
-              <span>System Locked</span>
+            <span className="rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60 px-2.5 py-0.5 text-[11px] font-medium">
+              System Built-in
             </span>
           </div>
 
-          <p className="text-xs text-slate-500 -mt-2 mb-5">
-            Core academic criteria automatically tracked across all RevSlot institution sessions.
-          </p>
-
-          {/* 5 Built-in items list */}
-          <div className="space-y-2.5">
-            {/* 1 */}
-            <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/50 p-3.5 transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#002b5c] text-white">
-                  <Check className="h-3 w-3 stroke-[3]" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-900">
-                    Candidate Attendance &amp; ID Verification
-                  </h4>
-                  <p className="text-[11px] text-slate-500">
-                    Photo identity, institutional roll, and session timestamp check
-                  </p>
-                </div>
+          {/* Standard Fields Info Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
+            <div className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3.5">
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-primary mt-0.5" />
+              <div>
+                <h4 className="text-xs font-bold text-slate-900">Review Mark (1–10)</h4>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Required overall session score recorded in 0.5 decimal increments.
+                </p>
               </div>
-              <span className="rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-                Mandatory
-              </span>
             </div>
 
-            {/* 2 */}
-            <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/50 p-3.5 transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#002b5c] text-white">
-                  <Check className="h-3 w-3 stroke-[3]" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-900">
-                    Overall Review Mark (Score out of 10)
-                  </h4>
-                  <p className="text-[11px] text-slate-500">
-                    Composite numerical score calculated into graduation standing
-                  </p>
-                </div>
+            <div className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3.5">
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-primary mt-0.5" />
+              <div>
+                <h4 className="text-xs font-bold text-slate-900">Understanding Level</h4>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Categorized as Excellent, Good, Average, or Needs Improvement.
+                </p>
               </div>
-              <span className="rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-                Weighted 10pt
-              </span>
             </div>
 
-            {/* 3 */}
-            <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/50 p-3.5 transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#002b5c] text-white">
-                  <Check className="h-3 w-3 stroke-[3]" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-900">
-                    Key Strengths &amp; Technical Observations
-                  </h4>
-                  <p className="text-[11px] text-slate-500">
-                    Qualitative synthesis highlighting standout engineering decisions
-                  </p>
-                </div>
+            <div className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3.5">
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-primary mt-0.5" />
+              <div>
+                <h4 className="text-xs font-bold text-slate-900">Performance &amp; Communication</h4>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Standard dropdown ratings for overall performance and clarity.
+                </p>
               </div>
-              <span className="rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-                Long Text
-              </span>
             </div>
 
-            {/* 4 */}
-            <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/50 p-3.5 transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#002b5c] text-white">
-                  <Check className="h-3 w-3 stroke-[3]" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-900">
-                    Pending Topics &amp; Remediation Plan
-                  </h4>
-                  <p className="text-[11px] text-slate-500">
-                    Deficit identification with syllabus topic reference tags
-                  </p>
-                </div>
+            <div className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3.5">
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-primary mt-0.5" />
+              <div>
+                <h4 className="text-xs font-bold text-slate-900">Improvements &amp; Recommendations</h4>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Actionable long-text suggestions for the candidate transcript.
+                </p>
               </div>
-              <span className="rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-                Multi-Tag
-              </span>
-            </div>
-
-            {/* 5 */}
-            <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/50 p-3.5 transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#002b5c] text-white">
-                  <Check className="h-3 w-3 stroke-[3]" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-900">
-                    General Recommendations &amp; Action Items
-                  </h4>
-                  <p className="text-[11px] text-slate-500">
-                    Follow-up actions sent directly to candidate email transcript
-                  </p>
-                </div>
-              </div>
-              <span className="rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-                Student Visible
-              </span>
             </div>
           </div>
 
-          {/* Highlight Box: Dedicated Task Submission Score */}
-          <div className="mt-4 flex items-center justify-between gap-4 rounded-xl border border-blue-100 bg-blue-50/40 p-4 transition-all">
-            <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-primary">
-                <FileText className="h-4 w-4" />
+          {/* Task Mark Switch Box */}
+          <div className="flex items-center justify-between gap-4 rounded-xl border border-blue-200/80 bg-blue-50/40 p-4 transition-all">
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-primary">
+                <Sliders className="h-4 w-4" />
               </div>
               <div>
-                <h4 className="text-xs font-bold text-slate-900">
-                  Include Dedicated Task Submission Score (1-10)
-                </h4>
-                <p className="text-[11px] text-slate-500">
-                  Allow reviewers to separately grade pre-session PR submissions alongside the oral presentation.
+                <div className="flex items-center gap-2">
+                  <h4 className="text-xs sm:text-sm font-bold text-slate-900">
+                    Include Dedicated Task Mark (1–10)
+                  </h4>
+                  <span className="rounded bg-blue-100 px-1.5 py-0.2 text-[10px] font-bold text-primary">
+                    Optional Setting
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  When enabled, reviewers will be required to give a separate 1–10 score specifically for pre-assigned assignments or pull requests.
                 </p>
               </div>
             </div>
@@ -629,7 +693,7 @@ export default function FeedbackFormBuilder({
               aria-checked={taskMarkEnabled}
               onClick={() => setTaskMarkEnabled((prev) => !prev)}
               className={`relative h-6 w-11 shrink-0 rounded-full transition-colors cursor-pointer ${
-                taskMarkEnabled ? "bg-[#002b5c]" : "bg-slate-300"
+                taskMarkEnabled ? "bg-primary" : "bg-slate-300"
               }`}
             >
               <span
@@ -642,144 +706,254 @@ export default function FeedbackFormBuilder({
         </section>
 
         {/* ═════════════════════════════════════════════════════════════
-            SECTION 3: CUSTOM CRITERIA & RUBRICS
+            SECTION 3: ATTACH QUESTION BANK QUESTIONS
            ═════════════════════════════════════════════════════════════ */}
         <section className="rounded-2xl border border-slate-200/90 bg-white p-6 sm:p-7 shadow-xs">
-          {/* Section Header */}
           <div className="flex items-start justify-between gap-3 mb-5 pb-4 border-b border-slate-100">
             <div className="flex items-center gap-3">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#002b5c] text-white text-xs font-bold shadow-xs">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-white text-xs font-bold shadow-xs">
                 3
               </div>
               <div>
-                <h2 className="text-base font-bold text-slate-900">Custom Criteria &amp; Rubrics</h2>
+                <h2 className="text-base font-bold text-slate-900">Attach Question Bank Questions</h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Define specialized grading scales, viva questions, and targeted milestones.
+                  Select questions from your question bank to embed into this evaluation form.
                 </p>
               </div>
             </div>
-            <span className="rounded-md bg-blue-50 border border-blue-100 px-2.5 py-1 text-[11px] font-bold text-primary">
-              {fields.length} Active Criteria
+            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600">
+              {selectedQuestionIds.length} Attached
             </span>
           </div>
 
-          {/* Quick Add Academic Criteria Box */}
+          {banks.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 p-8 text-center bg-slate-50/50">
+              <BookOpen className="h-8 w-8 text-slate-300 mb-2" />
+              <p className="text-xs font-bold text-slate-700">No Question Banks Created</p>
+              <p className="text-[11px] text-slate-500 mt-0.5 max-w-sm">
+                You can create question banks under the Question Banks menu to organize and attach reusable evaluation questions.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Bank Select */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-800 mb-1.5">
+                    Select Question Bank
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={activeBankId ?? ""}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setActiveBankId(val ? Number(val) : null);
+                        setQuestionSearch("");
+                      }}
+                      className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm font-medium text-slate-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all pr-8"
+                    >
+                      <option value="">Choose a question bank...</option>
+                      {banks.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  </div>
+                </div>
+
+                {/* Search in bank */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-800 mb-1.5">
+                    Search Questions
+                  </label>
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <input
+                      type="text"
+                      disabled={!activeBankId}
+                      value={questionSearch}
+                      onChange={(e) => setQuestionSearch(e.target.value)}
+                      placeholder="Search questions in bank..."
+                      className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3.5 py-2.5 text-xs sm:text-sm font-medium text-slate-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all disabled:bg-slate-50 disabled:text-slate-400"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Bank Questions Selector List */}
+              {activeBankId && selectedBank && (
+                <div className="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 max-h-60 overflow-y-auto space-y-2">
+                  {filteredBankQuestions.length === 0 ? (
+                    <p className="text-xs text-slate-400 text-center py-4">
+                      No questions found in this question bank.
+                    </p>
+                  ) : (
+                    filteredBankQuestions.map((q) => {
+                      const isChecked = selectedQuestionIds.includes(q.id);
+                      return (
+                        <label
+                          key={q.id}
+                          className={`flex items-start gap-3 rounded-lg border p-3 transition-all cursor-pointer ${
+                            isChecked
+                              ? "border-primary/40 bg-primary/5 text-slate-900"
+                              : "border-slate-200 bg-white hover:bg-slate-100/70 text-slate-700"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => toggleQuestionAttachment(q.id)}
+                            className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold leading-snug">{q.questionText}</p>
+                            {q.description && (
+                              <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">
+                                {q.description}
+                              </p>
+                            )}
+                          </div>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+
+        {/* ═════════════════════════════════════════════════════════════
+            SECTION 4: CUSTOM ASSESSMENT FIELDS
+           ═════════════════════════════════════════════════════════════ */}
+        <section className="rounded-2xl border border-slate-200/90 bg-white p-6 sm:p-7 shadow-xs">
+          <div className="flex items-start justify-between gap-3 mb-5 pb-4 border-b border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-white text-xs font-bold shadow-xs">
+                4
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-slate-900">Custom Assessment Fields</h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Add custom short text, long text, numerical, or dropdown fields. Up to 20 custom fields allowed.
+                </p>
+              </div>
+            </div>
+            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600">
+              {fields.length} / 20 Fields
+            </span>
+          </div>
+
+          {/* Suggested Quick-Add Pill Tray */}
           <div className="mb-6 rounded-xl border border-slate-200/70 bg-slate-50/80 p-4">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">
-                QUICK-ADD RECOMMENDED ACADEMIC CRITERIA:
+            <div className="flex items-center justify-between mb-2.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-700">
+                SUGGESTED ASSESSMENT CRITERIA:
               </span>
-              <span className="text-[11px] text-slate-400">Click to append</span>
+              <span className="text-[11px] text-slate-400">Click to toggle</span>
             </div>
 
             <div className="flex flex-wrap gap-2">
-              {RECOMMENDED_ACADEMIC_CRITERIA.map((rec) => {
+              {SUGGESTED_CUSTOM_FIELDS.map((sug) => {
                 const isAdded = fields.some(
-                  (f) => f.label.trim().toLowerCase() === rec.label.toLowerCase()
+                  (f) => f.label.trim().toLowerCase() === sug.label.toLowerCase()
                 );
                 return (
                   <button
-                    key={rec.label}
+                    key={sug.label}
                     type="button"
-                    onClick={() => handleQuickAdd(rec)}
-                    className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all shadow-2xs ${
+                    onClick={() => toggleSuggestedField(sug)}
+                    className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all shadow-2xs cursor-pointer ${
                       isAdded
                         ? "bg-primary text-white border border-primary"
-                        : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 hover:border-slate-300"
+                        : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-100"
                     }`}
                   >
                     <Plus className={`h-3 w-3 ${isAdded ? "rotate-45" : ""}`} />
-                    <span>{rec.label}</span>
+                    <span>{sug.label}</span>
                   </button>
                 );
               })}
             </div>
           </div>
 
-          {/* Active Criteria Cards */}
+          {/* Custom Fields List */}
           <div className="space-y-3.5 mb-5">
             {fields.map((field, idx) => {
-              const isEditingThis = editingFieldIndex === idx;
+              const currentType = FIELD_TYPES.find((t) => t.value === field.fieldType) ?? FIELD_TYPES[0];
+              const TypeIcon = currentType.icon;
+
               return (
                 <div
                   key={idx}
                   className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-2xs transition-all hover:border-slate-300"
                 >
-                  {/* Top Card Bar */}
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                      <div className="text-slate-400 cursor-grab active:cursor-grabbing hover:text-slate-600">
-                        <GripVertical className="h-4 w-4" />
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex items-center gap-2 flex-1 min-w-[240px]">
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+                        <TypeIcon className="h-3.5 w-3.5" />
                       </div>
-
-                      {isEditingThis ? (
-                        <input
-                          type="text"
-                          value={field.label}
-                          onChange={(e) => handleUpdateField(idx, { label: e.target.value })}
-                          className="flex-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs sm:text-sm font-bold text-slate-900 focus:border-primary focus:outline-none"
-                        />
-                      ) : (
-                        <h4
-                          onClick={() => setEditingFieldIndex(idx)}
-                          className="text-xs sm:text-sm font-bold text-slate-900 truncate cursor-pointer hover:text-primary"
-                          title="Click to rename"
-                        >
-                          {field.label || `Criterion ${idx + 1}`}
-                        </h4>
-                      )}
-
-                      <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] sm:text-[11px] font-semibold text-slate-600 shrink-0">
-                        {field.rubricType === "rating"
-                          ? "Rating (1 to 5)"
-                          : field.rubricType === "tristate"
-                          ? "Tri-State Choice"
-                          : field.fieldType === "textarea"
-                          ? "Long Text"
-                          : field.fieldType === "select"
-                          ? "Dropdown Choice"
-                          : "Short Text"}
-                      </span>
+                      <input
+                        type="text"
+                        value={field.label}
+                        onChange={(e) => updateField(idx, { label: e.target.value })}
+                        placeholder={`Field Label (e.g. Code Cleanliness)`}
+                        className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs sm:text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none"
+                      />
                     </div>
 
-                    {/* Right Controls */}
                     <div className="flex items-center gap-3 shrink-0">
-                      <div className="flex items-center gap-1.5 text-xs text-slate-600">
-                        <span className="text-[11px] font-medium text-slate-500">Mandatory</span>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={field.required}
-                          onClick={() => handleUpdateField(idx, { required: !field.required })}
-                          className={`relative h-5 w-9 shrink-0 rounded-full transition-colors cursor-pointer ${
-                            field.required ? "bg-[#002b5c]" : "bg-slate-300"
-                          }`}
-                        >
-                          <span
-                            className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow-xs transition-transform duration-200 ${
-                              field.required ? "translate-x-4" : "translate-x-0"
-                            }`}
-                          />
-                        </button>
-                      </div>
+                      {/* Field Type Select */}
+                      <select
+                        value={field.fieldType}
+                        onChange={(e) =>
+                          updateField(idx, {
+                            fieldType: e.target.value as FeedbackFieldType,
+                            optionsText:
+                              e.target.value === "select" && !field.optionsText
+                                ? "Excellent, Good, Needs Improvement"
+                                : field.optionsText,
+                          })
+                        }
+                        className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 focus:border-primary focus:outline-none cursor-pointer"
+                      >
+                        {FIELD_TYPES.map((t) => (
+                          <option key={t.value} value={t.value}>
+                            {t.label}
+                          </option>
+                        ))}
+                      </select>
 
-                      {/* Reorder up/down */}
+                      {/* Required Toggle */}
+                      <label className="flex items-center gap-1.5 text-xs font-medium text-slate-600 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={field.required ?? false}
+                          onChange={(e) => updateField(idx, { required: e.target.checked })}
+                          className="h-3.5 w-3.5 rounded border-slate-300 text-primary focus:ring-primary"
+                        />
+                        <span>Required</span>
+                      </label>
+
+                      {/* Reorder Buttons */}
                       <div className="flex items-center gap-0.5 text-slate-400">
                         <button
                           type="button"
-                          onClick={() => handleMoveField(idx, "up")}
+                          onClick={() => moveField(idx, "up")}
                           disabled={idx === 0}
-                          className="p-1 hover:text-slate-700 disabled:opacity-20"
-                          title="Move Up"
+                          className="p-1 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
+                          title="Move up"
                         >
                           <MoveUp className="h-3.5 w-3.5" />
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleMoveField(idx, "down")}
+                          onClick={() => moveField(idx, "down")}
                           disabled={idx === fields.length - 1}
-                          className="p-1 hover:text-slate-700 disabled:opacity-20"
-                          title="Move Down"
+                          className="p-1 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
+                          title="Move down"
                         >
                           <MoveDown className="h-3.5 w-3.5" />
                         </button>
@@ -788,168 +962,103 @@ export default function FeedbackFormBuilder({
                       {/* Delete */}
                       <button
                         type="button"
-                        onClick={() => handleRemoveField(idx)}
-                        className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
-                        title="Delete Criterion"
+                        onClick={() => removeField(idx)}
+                        className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors cursor-pointer"
+                        title="Delete field"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
                   </div>
 
-                  {/* Rubric Details Row */}
-                  <div className="mt-2.5 pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-                    {field.rubricType === "rating" ? (
-                      <>
-                        <span className="text-[11px] text-slate-600 font-medium truncate max-w-md">
-                          {field.anchorNote || "Rubric Anchor: 1= Unformatted/Broken, 3= Compliant with Linting, 5= Flawless Idempotent Design"}
-                        </span>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">
-                          Steps: 1, 2, 3, 4, 5
-                        </span>
-                      </>
-                    ) : field.rubricType === "tristate" ? (
-                      <div className="flex flex-wrap gap-1.5">
-                        <span className="rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/60 px-2 py-0.5 text-[10px] font-semibold">
-                          Pass / Verified
-                        </span>
-                        <span className="rounded-md bg-amber-50 text-amber-700 border border-amber-200/60 px-2 py-0.5 text-[10px] font-semibold">
-                          Needs Revision
-                        </span>
-                        <span className="rounded-md bg-slate-100 text-slate-600 px-2 py-0.5 text-[10px] font-semibold">
-                          Not Applicable
+                  {/* Dropdown Options Row */}
+                  {field.fieldType === "select" && (
+                    <div className="mt-3 pt-3 border-t border-slate-100">
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[11px] font-semibold text-slate-600">
+                          Dropdown Options (comma-separated):
+                        </label>
+                        <span className="text-[10px] text-slate-400">
+                          e.g. Excellent, Good, Average, Needs Work
                         </span>
                       </div>
-                    ) : (
-                      <div className="flex items-center gap-2 w-full">
-                        {isEditingThis ? (
-                          <input
-                            type="text"
-                            value={field.optionsText}
-                            onChange={(e) => handleUpdateField(idx, { optionsText: e.target.value })}
-                            placeholder="Options separated by commas"
-                            className="w-full rounded-lg border border-slate-200 px-2 py-1 text-xs"
-                          />
-                        ) : (
-                          <span className="text-[11px] text-slate-500 italic">
-                            {field.optionsText || "Text input feedback field"}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                      <input
+                        type="text"
+                        value={field.optionsText}
+                        onChange={(e) => updateField(idx, { optionsText: e.target.value })}
+                        placeholder="Option 1, Option 2, Option 3"
+                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-primary focus:outline-none"
+                      />
+                      {field.optionsText && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {field.optionsText
+                            .split(",")
+                            .map((o) => o.trim())
+                            .filter(Boolean)
+                            .map((opt, i) => (
+                              <span
+                                key={i}
+                                className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600"
+                              >
+                                {opt}
+                              </span>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
 
             {fields.length === 0 && (
               <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 py-8 text-center bg-slate-50/50">
-                <Sparkles className="h-6 w-6 text-slate-400 mb-1.5" />
-                <p className="text-xs font-bold text-slate-700">No custom criteria added</p>
+                <FileText className="h-6 w-6 text-slate-300 mb-1.5" />
+                <p className="text-xs font-bold text-slate-700">No Custom Fields Added</p>
                 <p className="text-[11px] text-slate-400 mt-0.5">
-                  Pick from recommended criteria above or click the button below.
+                  Use the quick-add buttons above or the menu below to add evaluation fields.
                 </p>
               </div>
             )}
           </div>
 
-          {/* Add Custom Field or Question Button */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setIsAddMenuOpen((prev) => !prev)}
-              className="w-full flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50/80 hover:bg-slate-100 py-3 text-xs font-bold text-slate-700 transition-colors shadow-2xs cursor-pointer"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Add Custom Field or Question</span>
-              <ChevronDown className="h-3.5 w-3.5 text-slate-500 ml-0.5" />
-            </button>
-
-            {isAddMenuOpen && (
-              <>
-                <div
-                  className="fixed inset-0 z-20"
-                  onClick={() => setIsAddMenuOpen(false)}
-                />
-                <div className="absolute left-0 right-0 top-full mt-2 z-30 rounded-xl border border-slate-200 bg-white p-2 shadow-xl animate-in fade-in slide-in-from-top-2 duration-150">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => handleAddCriterion("rating")}
-                      className="flex items-start gap-2.5 rounded-lg p-2.5 text-left hover:bg-slate-50 transition-colors"
-                    >
-                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-primary text-xs font-bold">
-                        1-5
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-slate-900">Rating Scale (1 to 5)</p>
-                        <p className="text-[10px] text-slate-500">Graded rubric with step definitions</p>
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleAddCriterion("tristate")}
-                      className="flex items-start gap-2.5 rounded-lg p-2.5 text-left hover:bg-slate-50 transition-colors"
-                    >
-                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 text-xs font-bold">
-                        ✓/✕
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-slate-900">Tri-State Choice</p>
-                        <p className="text-[10px] text-slate-500">Pass / Needs Revision / N/A</p>
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleAddCriterion("select")}
-                      className="flex items-start gap-2.5 rounded-lg p-2.5 text-left hover:bg-slate-50 transition-colors"
-                    >
-                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-700 text-xs font-bold">
-                        ☰
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-slate-900">Dropdown / Select</p>
-                        <p className="text-[10px] text-slate-500">Custom multiple choice options</p>
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleAddCriterion("textarea")}
-                      className="flex items-start gap-2.5 rounded-lg p-2.5 text-left hover:bg-slate-50 transition-colors"
-                    >
-                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-purple-50 text-purple-700 text-xs font-bold">
-                        ¶
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-slate-900">Long Text (Observations)</p>
-                        <p className="text-[10px] text-slate-500">Open-ended essay commentary</p>
-                      </div>
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
+          {/* Add Field Button Row */}
+          <div className="flex flex-wrap items-center gap-2">
+            {FIELD_TYPES.map((t) => {
+              const Icon = t.icon;
+              return (
+                <button
+                  key={t.value}
+                  type="button"
+                  onClick={() => addField(t.value)}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 hover:border-slate-300 transition-all cursor-pointer"
+                >
+                  <Icon className="h-3.5 w-3.5 text-primary" />
+                  <span>+ Add {t.label}</span>
+                </button>
+              );
+            })}
           </div>
         </section>
       </div>
 
-      {/* ═════════════════════════════════════════════════════════════
-          STICKY BOTTOM ACTION BAR
-         ═════════════════════════════════════════════════════════════ */}
+      {/* ── Sticky Action Bar ───────────────────────────────────────── */}
       <div className="fixed bottom-4 left-4 right-4 z-40 max-w-4xl mx-auto">
-        <div className="rounded-2xl border border-slate-200/90 bg-white/95 backdrop-blur-md px-5 py-3 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-3">
-          {/* Left Auto-save Status */}
-          <div className="flex items-center gap-2 text-xs font-medium text-slate-600">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>All changes auto-saved to drafts</span>
-            <span className="text-slate-300">•</span>
-            <span className="text-[11px] text-slate-400">Version 1.0</span>
+        <div className="rounded-2xl border border-slate-200/90 bg-white/95 backdrop-blur-md px-5 py-3.5 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-xs text-slate-500">
+            <span className="font-semibold text-slate-900">
+              {fields.length} custom {fields.length === 1 ? "field" : "fields"}
+            </span>
+            <span>·</span>
+            <span>{selectedQuestionIds.length} attached questions</span>
+            {taskMarkEnabled && (
+              <>
+                <span>·</span>
+                <span className="text-primary font-medium">Task score active</span>
+              </>
+            )}
           </div>
 
-          {/* Right Action Buttons */}
           <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
             <button
               type="button"
@@ -963,14 +1072,126 @@ export default function FeedbackFormBuilder({
               type="button"
               onClick={handleSubmit}
               disabled={submitting}
-              className="inline-flex items-center gap-2 rounded-xl bg-[#002b5c] hover:bg-[#001f42] px-5 py-2 text-xs font-bold text-white shadow-md shadow-slate-900/10 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60 cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-primary hover:bg-primary/95 px-5 py-2 text-xs font-bold text-on-primary shadow-md transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60 cursor-pointer"
             >
-              <span>{submitting ? "Saving Form..." : isEditing ? "Save Feedback Form" : "Create Feedback Form"}</span>
-              <ArrowRight className="h-3.5 w-3.5" />
+              <span>{submitting ? "Saving..." : isEditing ? "Save Changes" : "Create Feedback Form"}</span>
             </button>
           </div>
         </div>
       </div>
+
+      {/* ── Live Preview Modal ──────────────────────────────────────── */}
+      {previewOpen && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/40 backdrop-blur-xs p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-start justify-between border-b border-slate-100 px-6 py-4">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-primary">
+                  FORM PREVIEW
+                </span>
+                <h2 className="text-base font-bold text-slate-900 mt-0.5">
+                  {name.trim() || "Untitled Feedback Form"}
+                </h2>
+                {description && (
+                  <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">{description}</p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewOpen(false)}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4 overflow-y-auto p-6 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3">
+                  <label className="font-bold text-slate-700 block mb-1">
+                    Review Mark <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="h-8 rounded-lg border border-slate-200 bg-white px-3 flex items-center text-slate-400">
+                    Select score (1.0 to 10.0)
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3">
+                  <label className="font-bold text-slate-700 block mb-1">
+                    Understanding Level <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="h-8 rounded-lg border border-slate-200 bg-white px-3 flex items-center text-slate-400">
+                    Excellent · Good · Average · Needs Improvement
+                  </div>
+                </div>
+              </div>
+
+              {taskMarkEnabled && (
+                <div className="rounded-xl border border-blue-200/80 bg-blue-50/40 p-3">
+                  <label className="font-bold text-primary block mb-1">
+                    Task Mark (1–10) <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="h-8 rounded-lg border border-blue-200 bg-white px-3 flex items-center text-slate-400">
+                    Select task score (1.0 to 10.0)
+                  </div>
+                </div>
+              )}
+
+              {selectedQuestionIds.length > 0 && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3.5">
+                  <span className="font-bold text-slate-800 block mb-2">
+                    Attached Question Bank Questions ({selectedQuestionIds.length})
+                  </span>
+                  <p className="text-slate-500">
+                    Review questions configured in your question bank will appear here for live reference during submission.
+                  </p>
+                </div>
+              )}
+
+              {fields.map((f, i) => (
+                <div key={i} className="rounded-xl border border-slate-200 bg-slate-50/50 p-3">
+                  <label className="font-bold text-slate-700 block mb-1">
+                    {f.label || `Custom Field ${i + 1}`}
+                    {f.required && <span className="text-rose-500 ml-1">*</span>}
+                  </label>
+                  <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-400">
+                    {f.fieldType === "select"
+                      ? f.optionsText || "Dropdown options"
+                      : f.fieldType === "textarea"
+                      ? "Long text commentary area"
+                      : f.fieldType === "number"
+                      ? "Numeric input"
+                      : "Short text input"}
+                  </div>
+                </div>
+              ))}
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3">
+                <label className="font-bold text-slate-700 block mb-1">
+                  Comments / Session Transcript Notes
+                </label>
+                <div className="h-16 rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-400">
+                  Detailed qualitative feedback notes...
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-100 bg-slate-50/60 px-6 py-3.5 text-right">
+              <button
+                type="button"
+                onClick={() => setPreviewOpen(false)}
+                className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-on-primary cursor-pointer"
+              >
+                Close Preview
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
