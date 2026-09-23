@@ -15,6 +15,8 @@ type UseMeetingChatProps = {
   socket: MeetingSocket | null;
   initialMessages: MeetingMessage[];
   setError: (message: string | null) => void;
+  participantId?: string;
+  chatOpen?: boolean; 
 };
 
 export function useMeetingChat({
@@ -22,9 +24,12 @@ export function useMeetingChat({
   socket,
   initialMessages,
   setError,
+  participantId,
+  chatOpen = false,  
 }: UseMeetingChatProps) {
   const [messages, setMessages] = useState<MeetingMessage[]>([]);
   const [message, setMessage] = useState("");
+  const [unreadCount, setUnreadCount] = useState(0); 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -42,6 +47,13 @@ export function useMeetingChat({
 
         return [...current, incoming];
       });
+      const isOwnMessage =
+        !!participantId &&
+        incoming.participantId === participantId;
+
+      if (!isOwnMessage && !chatOpen) {
+          setUnreadCount((count) => count + 1);
+       }
     };
 
     socket.on("chat:message", onMessage);
@@ -49,35 +61,56 @@ export function useMeetingChat({
     return () => {
       socket.off("chat:message", onMessage);
     };
-  }, [joined, socket]);
+  }, [joined, socket, participantId, chatOpen]);
+
+  useEffect(() => {
+  if (chatOpen) {
+    setUnreadCount(0);
+  }
+}, [chatOpen]);
+
+  const sendMessageText = useCallback(
+    async (text: string) => {
+      const clean = text.trim();
+
+      if (!clean || !socket?.connected) return;
+
+      try {
+        await new Promise<void>((resolve, reject) => {
+          socket.emit("chat:send", { message: clean }, (response) => {
+            if (response.ok) {
+              resolve();
+              return;
+            }
+
+            reject(new Error(response.error ?? "Unable to send message."));
+          });
+        });
+      } catch (err: unknown) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Unable to send message."
+        );
+
+        throw err;
+      }
+    },
+    [socket, setError]
+  );
 
   const sendChat = useCallback(async () => {
     const clean = message.trim();
 
-    if (!clean || !socket?.connected) return;
+    if (!clean) return;
 
     try {
-      await new Promise<void>((resolve, reject) => {
-        socket.emit("chat:send", { message: clean }, (response) => {
-          if (response.ok) {
-            resolve();
-            return;
-          }
-
-          reject(new Error(response.error ?? "Unable to send message."));
-        });
-      });
-
+      await sendMessageText(clean);
       setMessage("");
-    } catch (err: unknown) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to send message."
-      );
+    } catch {
+      // sendMessageText already reported the error via setError.
     }
-  }, [message, socket, setError]);
-
+  }, [message, sendMessageText]);
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -88,5 +121,7 @@ export function useMeetingChat({
     setMessage,
     messagesEndRef,
     sendChat,
+    sendMessageText,
+    unreadCount,
   };
 }

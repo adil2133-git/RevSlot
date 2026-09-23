@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuthStore } from "@/features/auth/store/authStore";
+import { useFeedbackStore } from "@/features/feedback/store/feedbackStore";
 import {
   LayoutGrid,
   Calendar,
@@ -89,6 +90,14 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuthStore();
+  const pendingFeedbackCount =
+  useFeedbackStore(
+    (state) => state.pendingFeedback.length
+  );
+const fetchPendingFeedback =
+  useFeedbackStore(
+    (state) => state.fetchPendingFeedback
+  );
   const [popoverOpen, setPopoverOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -116,6 +125,10 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
+
+  useEffect(() => {
+  void fetchPendingFeedback();
+}, [fetchPendingFeedback, pathname]);
 
   const handleLogout = async () => {
     await logout();
@@ -245,16 +258,26 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
                     : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <Icon
-                    className={`h-4 w-4 ${
-                      active
-                        ? "text-white"
-                        : "text-slate-400 group-hover:text-primary"
-                    }`}
-                  />
-                  <span>{item.label}</span>
-                </div>
+                <div className="flex min-w-0 items-center gap-3">
+         <Icon
+          className={`h-4 w-4 shrink-0 ${
+             active
+              ? "text-white"
+              : "text-slate-400 group-hover:text-primary"
+            }`}
+          />
+
+       <span>{item.label}</span>
+    </div>
+      {item.label === "Feedback & Forms" &&
+          pendingFeedbackCount > 0 && (
+       <span
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-500 text-[11px] font-bold leading-none text-white shadow-sm"
+          title="Pending feedback available"
+       >
+      !
+    </span>
+  )}
 
                 {/* Right Badges / Indicators */}
                 {item.hasDot && !item.badge && (
