@@ -183,13 +183,7 @@
       "when": 1789900000000,
       "tag": "0038_notification_enhancements",
       "breakpoints": true
-    },
-    {
-      "idx": 39,
-      "version": "7",
-      "when": 1789969605261,
-      "tag": "0039_organic_shinobi_shaw",
-      "breakpoints": true
     }
+    
   ]
 }
