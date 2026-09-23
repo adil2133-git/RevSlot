@@ -18,15 +18,16 @@ import { useAuthStore } from "@/features/auth/store/authStore";
 import { guessTimezone } from "../utils/timezones";
 import { normalizeTime } from "../utils/time";
 import WhatsappRequiredModal from "@/components/common/WhatsappRequiredModal";
+import { CheckIcon, XIcon } from "./icons";
 
 const DAYS_ORDER = [
-    { dayOfWeek: 1, label: "Mon" },
-    { dayOfWeek: 2, label: "Tue" },
-    { dayOfWeek: 3, label: "Wed" },
-    { dayOfWeek: 4, label: "Thu" },
-    { dayOfWeek: 5, label: "Fri" },
-    { dayOfWeek: 6, label: "Sat" },
-    { dayOfWeek: 0, label: "Sun" },
+    { dayOfWeek: 1, label: "Monday", shortLabel: "Mon" },
+    { dayOfWeek: 2, label: "Tuesday", shortLabel: "Tue" },
+    { dayOfWeek: 3, label: "Wednesday", shortLabel: "Wed" },
+    { dayOfWeek: 4, label: "Thursday", shortLabel: "Thu" },
+    { dayOfWeek: 5, label: "Friday", shortLabel: "Fri" },
+    { dayOfWeek: 6, label: "Saturday", shortLabel: "Sat" },
+    { dayOfWeek: 0, label: "Sunday", shortLabel: "Sun" },
 ];
 
 type DaysState = Record<number, { enabled: boolean; blocks: DayBlock[] }>;
@@ -62,6 +63,9 @@ export default function ScheduleForm({ mode, templateId }: ScheduleFormProps) {
     const [days, setDays] = useState<DaysState>(defaultDaysState());
     const [overrides, setOverrides] = useState<DateOverride[]>([]);
     const [savedTemplateId, setSavedTemplateId] = useState<number | null>(templateId ?? null);
+
+    const [activeCopyDay, setActiveCopyDay] = useState<number | null>(null);
+    const [copiedFeedback, setCopiedFeedback] = useState<string | null>(null);
 
     const [loading, setLoading] = useState(mode === "edit");
     const [saving, setSaving] = useState(false);
@@ -179,6 +183,47 @@ export default function ScheduleForm({ mode, templateId }: ScheduleFormProps) {
                 ),
             },
         }));
+    }
+
+    function handleCopySchedule(sourceDayOfWeek: number, targetDaysOfWeek: number[]) {
+        const source = days[sourceDayOfWeek];
+        if (!source) return;
+
+        setDays((prev) => {
+            const next = { ...prev };
+            for (const targetDay of targetDaysOfWeek) {
+                const clonedBlocks: DayBlock[] = source.blocks.map((b) => ({
+                    localId: crypto.randomUUID(),
+                    startTime: b.startTime,
+                    endTime: b.endTime,
+                }));
+
+                next[targetDay] = {
+                    enabled: source.enabled,
+                    blocks: clonedBlocks,
+                };
+            }
+            return next;
+        });
+
+        setActiveCopyDay(null);
+
+        const sourceLabel = DAYS_ORDER.find((d) => d.dayOfWeek === sourceDayOfWeek)?.label || "Day";
+        const targetLabels = targetDaysOfWeek
+            .map((d) => DAYS_ORDER.find((item) => item.dayOfWeek === d)?.label)
+            .filter(Boolean);
+
+        let feedbackMsg = "";
+        if (targetLabels.length <= 3) {
+            feedbackMsg = `Copied ${sourceLabel}'s hours to ${targetLabels.join(", ")}`;
+        } else {
+            feedbackMsg = `Copied ${sourceLabel}'s hours to ${targetLabels.length} days`;
+        }
+
+        setCopiedFeedback(feedbackMsg);
+        setTimeout(() => {
+            setCopiedFeedback((current) => (current === feedbackMsg ? null : current));
+        }, 4000);
     }
 
     async function handleSave() {
@@ -303,14 +348,43 @@ export default function ScheduleForm({ mode, templateId }: ScheduleFormProps) {
                 </div>
             </div>
 
-            <h2 className="mb-3 mt-8 text-base font-semibold text-on-surface">Weekly hours</h2>
+            <div className="mb-3 mt-8 flex items-center justify-between">
+                <div>
+                    <h2 className="text-base font-semibold text-on-surface">Weekly hours</h2>
+                    <p className="text-xs text-slate-400">Set the times you are available each day</p>
+                </div>
+            </div>
+
+            {copiedFeedback && (
+                <div className="mb-3 flex items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-800 animate-in fade-in duration-200">
+                    <div className="flex items-center gap-2">
+                        <CheckIcon size={16} strokeWidth={2.5} />
+                        <span>{copiedFeedback}</span>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setCopiedFeedback(null)}
+                        className="text-emerald-500 hover:text-emerald-800 transition-colors cursor-pointer"
+                        aria-label="Dismiss message"
+                    >
+                        <XIcon />
+                    </button>
+                </div>
+            )}
+
             <div className="rounded-xl border border-slate-100 bg-surface-card shadow-surface">
                 {DAYS_ORDER.map(({ dayOfWeek, label }) => (
                     <DayRow
                         key={dayOfWeek}
+                        dayOfWeek={dayOfWeek}
                         label={label}
                         enabled={days[dayOfWeek].enabled}
                         blocks={days[dayOfWeek].blocks}
+                        allDays={DAYS_ORDER}
+                        isCopyOpen={activeCopyDay === dayOfWeek}
+                        onToggleCopy={() => setActiveCopyDay((cur) => (cur === dayOfWeek ? null : dayOfWeek))}
+                        onCloseCopy={() => setActiveCopyDay(null)}
+                        onCopyTimes={(targets) => handleCopySchedule(dayOfWeek, targets)}
                         onToggle={() => toggleDay(dayOfWeek)}
                         onAddBlock={() => addBlock(dayOfWeek)}
                         onRemoveBlock={(localId) => removeBlock(dayOfWeek, localId)}
