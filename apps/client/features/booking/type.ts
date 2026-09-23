@@ -154,6 +154,8 @@ export type GetMyBookingsParams = {
   status?: ("confirmed" | "completed" | "rescheduled" | "cancelled" | "no_show" | "reschedule_requested")[];
   scope?: "upcoming" | "past" | "ongoing";
   search?: string;
+  sortBy?: "startTime" | "createdAt";
+  sortOrder?: "asc" | "desc";
 };
 
 export type BookingDetail = MyBooking & {
