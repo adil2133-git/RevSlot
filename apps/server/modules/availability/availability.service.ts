@@ -308,37 +308,66 @@ export const availabilityService = {
 
   // Deletes a template owned by the reviewer (time blocks cascade-delete via FK)
   deleteTemplate: async (reviewerId: number, templateId: number) => {
-    await getOwnedTemplateOrThrow(reviewerId, templateId);
+    const templateToDelete = await getOwnedTemplateOrThrow(reviewerId, templateId);
 
-    await db
-      .delete(availabilityTemplates)
-      .where(eq(availabilityTemplates.id, templateId));
-
-    const remaining = await db
+    const allTemplates = await db
       .select()
       .from(availabilityTemplates)
       .where(eq(availabilityTemplates.reviewerId, reviewerId))
       .orderBy(asc(availabilityTemplates.createdAt));
 
-    const firstRemaining = remaining[0];
-    if (remaining.length === 1 && firstRemaining) {
-      if (!firstRemaining.isDefault) {
-        await db
-          .update(availabilityTemplates)
-          .set({ isDefault: true, updatedAt: new Date() })
-          .where(eq(availabilityTemplates.id, firstRemaining.id));
-      }
-    } else if (remaining.length > 1 && firstRemaining) {
-      const hasDefault = remaining.some((t) => t.isDefault);
-      if (!hasDefault) {
-        await db
-          .update(availabilityTemplates)
-          .set({ isDefault: true, updatedAt: new Date() })
-          .where(eq(availabilityTemplates.id, firstRemaining.id));
-      }
+    if (allTemplates.length <= 1) {
+      throw new AppError(
+        "You cannot delete your only availability schedule. Create another schedule before deleting this one.",
+        400
+      );
     }
 
-    return { id: templateId };
+    const otherTemplates = allTemplates.filter((t) => t.id !== templateId);
+    let fallbackTemplate = otherTemplates.find((t) => t.isDefault) || otherTemplates[0];
+    if (!fallbackTemplate) {
+      throw new AppError("No fallback availability schedule found", 400);
+    }
+
+    const targetFallback = fallbackTemplate;
+
+    const result = await db.transaction(async (tx) => {
+      if (templateToDelete.isDefault) {
+        await tx
+          .update(availabilityTemplates)
+          .set({ isDefault: true, updatedAt: new Date() })
+          .where(eq(availabilityTemplates.id, targetFallback.id));
+      }
+
+      // Reassign all event types attached to this template to the fallback template
+      const remappedEvents = await tx
+        .update(eventTypes)
+        .set({
+          availabilityTemplateId: targetFallback.id,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(eventTypes.reviewerId, reviewerId),
+            eq(eventTypes.availabilityTemplateId, templateId)
+          )
+        )
+        .returning({ id: eventTypes.id, name: eventTypes.name });
+
+      // Delete the template (safe now since no event types reference it)
+      await tx
+        .delete(availabilityTemplates)
+        .where(eq(availabilityTemplates.id, templateId));
+
+      return {
+        id: templateId,
+        remappedCount: remappedEvents.length,
+        remappedEventNames: remappedEvents.map((e) => e.name),
+        fallbackTemplateName: targetFallback.name,
+      };
+    });
+
+    return result;
   },
 
   // Atomically replaces all time blocks for a template with the given list

@@ -59,3 +59,10 @@ export interface TemplatePayload {
   timezone: string;
   isDefault: boolean;
 }
+
+export interface DeleteTemplateResult {
+  id: number;
+  remappedCount: number;
+  remappedEventNames: string[];
+  fallbackTemplateName: string;
+}

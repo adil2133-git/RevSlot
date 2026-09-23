@@ -1,13 +1,16 @@
 import api from "@/lib/axios";
-import type { ListTemplatesResponse, TemplatePayload, TimeBlockPayload, AvailabilityTemplate } from "../types";
+import type { ListTemplatesResponse, TemplatePayload, TimeBlockPayload, AvailabilityTemplate, DeleteTemplateResult } from "../types";
 
 export async function fetchTemplates() {
   const { data } = await api.get<ListTemplatesResponse>("/availability-templates");
   return data.data.templates;
 }
 
-export async function deleteTemplateRequest(id: number) {
-  await api.delete(`/availability-templates/${id}`);
+export async function deleteTemplateRequest(id: number): Promise<DeleteTemplateResult> {
+  const { data } = await api.delete<{ success: boolean; message: string; data: DeleteTemplateResult }>(
+    `/availability-templates/${id}`
+  );
+  return data.data;
 }
 
 export async function createTemplateRequest(payload: TemplatePayload) {
