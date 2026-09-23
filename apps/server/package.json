@@ -14,7 +14,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx db/seed.ts",
     "db:reset": "drizzle-kit drop",
-    "resend:provision-templates": "tsx scripts/provisionResendTemplates.ts"
+    "resend:provision-templates": "tsx scripts/provisionResendTemplates.ts",
+    "email:test": "tsx scripts/testEmailQueue.ts"
   },
   "keywords": [],
   "author": "",
@@ -27,8 +28,8 @@
     }
   },
   "dependencies": {
-    "@upstash/redis": "^1.38.2",
     "bcryptjs": "^3.0.3",
+    "bullmq": "^6.3.8",
     "cloudinary": "^2.x.x",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
@@ -40,6 +41,7 @@
     "google-auth-library": "^11.0.2",
     "googleapis": "^163.0.0",
     "helmet": "^8.3.0",
+    "ioredis": "^6.0.0",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.0.0",
     "node-cron": "^4.6.0",

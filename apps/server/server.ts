@@ -28,6 +28,7 @@ import { registerNotificationSocket } from "./modules/notification/notification.
 import { startNotificationCron } from "./modules/notification/notification.cron.js";
 import { bookingReminderService } from "./modules/booking/bookingReminder.service.js";
 import disputeRoutes from "./modules/dispute/dispute.routes.js";
+import { startEmailWorker } from "./queues/email.worker.js";
 
 import { notFound, errorMiddleware } from './core/middlewares/error.middleware.js';
 import { pool } from "./config/db.js";
@@ -107,6 +108,9 @@ const serverConnect = async () => {
   }
   httpServer.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
+
+    // Start BullMQ background email worker
+    startEmailWorker();
 
     // Initial check and periodic background escrow release (every 30 mins)
     walletService.matureEscrowTransactions().catch((err) => {

@@ -362,24 +362,36 @@ export function useMeetingWebRTC({
    * --------------------------------------------------
    *
    * Picks the stream that the server says is the
-   * presenter's screen, if it has arrived over WebRTC.
+   * presenter's screen. If the receiver's browser assigned
+   * a different streamId than the sender's, fall back to
+   * finding the stream by presenter participantId.
    */
   const syncRemoteScreenStream =
     useCallback(() => {
       const info =
         screenInfoRef.current;
 
-      const entry = info
-        ? extraStreamsRef.current.get(
-            info.streamId
-          )
-        : undefined;
+      if (!info) {
+        setRemoteScreenStream(null);
+        return;
+      }
+
+      // 1. Direct match by streamId
+      let entry = extraStreamsRef.current.get(info.streamId);
+
+      // 2. Fallback: search by presenter participantId
+      if (!entry || entry.remoteId !== info.participantId) {
+        for (const streamEntry of extraStreamsRef.current.values()) {
+          if (streamEntry.remoteId === info.participantId) {
+            entry = streamEntry;
+            break;
+          }
+        }
+      }
 
       const next =
-        info &&
         entry &&
-        entry.remoteId ===
-          info.participantId
+        entry.remoteId === info.participantId
           ? entry.stream
           : null;
 
@@ -750,9 +762,27 @@ if (existing) {
             connection.connectionState;
 
           if (
-            state === "failed" ||
-            state === "closed"
+            state === "failed"
           ) {
+            try {
+              if (typeof connection.restartIce === "function") {
+                connection.restartIce();
+                if (participantId && participantId < remoteId) {
+                  void renegotiate(remoteId).catch(() => undefined);
+                }
+                return;
+              }
+            } catch {
+              // Fallback to removePeer
+            }
+            removePeer(
+              remoteId,
+              connection
+            );
+            return;
+          }
+
+          if (state === "closed") {
             removePeer(
               remoteId,
               connection
@@ -1211,11 +1241,11 @@ if (existing) {
         continue;
       }
 
+      // Confirmed room members are ready to negotiate
+      readyPeersRef.current.add(participant.id);
+
       if (
         !peersRef.current.has(
-          participant.id
-        ) &&
-        readyPeersRef.current.has(
           participant.id
         )
       ) {
