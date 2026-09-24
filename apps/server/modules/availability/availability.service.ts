@@ -81,7 +81,7 @@ const bookingFitsInBlocks = (
   bookingStart: Date,
   bookingEnd: Date,
   blocks: { startTime: string; endTime: string }[],
-  overrideDate: string
+  _overrideDate: string
 ) => {
   if (blocks.length === 0) return false;
 
@@ -324,7 +324,7 @@ export const availabilityService = {
     }
 
     const otherTemplates = allTemplates.filter((t) => t.id !== templateId);
-    let fallbackTemplate = otherTemplates.find((t) => t.isDefault) || otherTemplates[0];
+    const fallbackTemplate = otherTemplates.find((t) => t.isDefault) || otherTemplates[0];
     if (!fallbackTemplate) {
       throw new AppError("No fallback availability schedule found", 400);
     }

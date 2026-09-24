@@ -605,14 +605,12 @@ for (const [key, value] of Object.entries(formData)) {
       );
     }
 
-    let orderBy = sql`${bookings.startTime} DESC`;
-    if (scope === "upcoming" || scope === "ongoing") {
-      orderBy = sql`${bookings.startTime} ASC`;
-    } else if (sortBy === "createdAt") {
-      orderBy = sortOrder === "asc" ? sql`${bookings.createdAt} ASC` : sql`${bookings.createdAt} DESC`;
-    } else {
-      orderBy = sortOrder === "asc" ? sql`${bookings.startTime} ASC` : sql`${bookings.startTime} DESC`;
-    }
+    const orderBy =
+      scope === "upcoming" || scope === "ongoing"
+        ? sql`${bookings.startTime} ASC`
+        : sortBy === "createdAt"
+        ? (sortOrder === "asc" ? sql`${bookings.createdAt} ASC` : sql`${bookings.createdAt} DESC`)
+        : (sortOrder === "asc" ? sql`${bookings.startTime} ASC` : sql`${bookings.startTime} DESC`);
 
     const reviewerCondition = eq(bookings.reviewerId, reviewerId);
 
