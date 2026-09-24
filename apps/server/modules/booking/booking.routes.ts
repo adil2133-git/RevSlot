@@ -5,7 +5,6 @@ import {
   CreateBookingSchema,
   GetMyBookingsQuerySchema,
   CancelBookingSchema,
-  RescheduleBookingSchema,
   RequestRescheduleSchema,
   RespondRescheduleSchema,
   MarkOutcomeSchema,

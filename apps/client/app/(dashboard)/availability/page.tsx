@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import dayjs from "dayjs";
 import { useAvailabilityStore } from "@/features/availability/store/availability.store";
 import { useAuthStore } from "@/features/auth/store/authStore";
+import { useEventTypeStore } from "@/features/eventTypes/store/eventType.store";
 import WhatsappRequiredModal from "@/components/common/WhatsappRequiredModal";
+import DeleteAvailabilityModal from "@/features/availability/components/DeleteAvailabilityModal";
+import type { AvailabilityTemplate } from "@/features/availability/types";
 
 const PlusIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round">
@@ -27,9 +30,12 @@ function formatTime12(timeStr: string) {
 export default function AvailabilityPage() {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
-  const { templates, isLoading, error, loadTemplates, removeTemplate } = useAvailabilityStore();
+  const { templates, isLoading, error, loadTemplates, removeTemplate, clearError } = useAvailabilityStore();
+  const { eventTypes, loadEventTypes } = useEventTypeStore();
   const [usernameError, setUsernameError] = useState<string | null>(null);
   const [whatsappModalOpen, setWhatsappModalOpen] = useState(false);
+  const [templateToDelete, setTemplateToDelete] = useState<AvailabilityTemplate | null>(null);
+  const [successToast, setSuccessToast] = useState<string | null>(null);
 
   // UI Interactive States
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
@@ -48,12 +54,34 @@ export default function AvailabilityPage() {
 
   useEffect(() => {
     loadTemplates();
-  }, [loadTemplates]);
+    loadEventTypes();
+  }, [loadTemplates, loadEventTypes]);
 
-  const handleDelete = (id: number) => {
-    if (window.confirm("Delete this availability template? This can't be undone.")) {
-      removeTemplate(id);
+  // Derived state for the delete modal
+  const linkedEventTypes = templateToDelete
+    ? eventTypes.filter((et) => et.availabilityTemplateId === templateToDelete.id)
+    : [];
+
+  const fallbackTemplate =
+    templates.find((t) => t.isDefault && t.id !== templateToDelete?.id) ||
+    templates.find((t) => t.id !== templateToDelete?.id) ||
+    null;
+
+  const isOnlyTemplate = templates.length <= 1;
+
+  const handleConfirmDelete = async () => {
+    if (!templateToDelete) return;
+    const res = await removeTemplate(templateToDelete.id);
+    await loadEventTypes();
+    if (res?.remappedCount > 0) {
+      const names = res.remappedEventNames.map((n) => `"${n}"`).join(", ");
+      setSuccessToast(
+        `Schedule deleted. ${res.remappedCount} event type${res.remappedCount === 1 ? "" : "s"} (${names}) moved to your default schedule "${res.fallbackTemplateName}".`
+      );
+    } else {
+      setSuccessToast(`Schedule "${templateToDelete.name}" deleted successfully.`);
     }
+    setTimeout(() => setSuccessToast(null), 6000);
   };
 
   const handleNewAvailability = () => {
@@ -157,11 +185,45 @@ export default function AvailabilityPage() {
         <p className="text-slate-400">Loading availability…</p>
       )}
 
-      {error && (
-        <p className="mb-4 rounded-lg bg-error-container px-4 py-2 text-sm text-error shrink-0">{error}</p>
+      {/* Success Notification */}
+      {successToast && (
+        <div className="mb-4 flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 p-3.5 text-xs text-emerald-800 shrink-0">
+          <div className="flex items-center gap-2 font-medium">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-600">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            <span>{successToast}</span>
+          </div>
+          <button
+            onClick={() => setSuccessToast(null)}
+            className="text-emerald-600/70 hover:text-emerald-800 text-xs font-bold px-1"
+          >
+            ✕
+          </button>
+        </div>
       )}
 
-      {!isLoading && !error && (
+      {/* Error Notification */}
+      {error && (
+        <div className="mb-4 flex items-center justify-between rounded-xl border border-error-container bg-error-container/40 p-3.5 text-xs text-error shrink-0">
+          <div className="flex items-center gap-2 font-medium">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            <span>{error}</span>
+          </div>
+          <button
+            onClick={clearError}
+            className="text-error/80 hover:text-error text-xs font-semibold underline ml-2 cursor-pointer"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {!isLoading && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 flex-1 overflow-hidden">
           
           {/* Left Column: Stats & Templates Grid */}
@@ -210,7 +272,7 @@ export default function AvailabilityPage() {
                           <div>
                             {/* Card Header */}
                             <div className="flex items-start justify-between mb-3 gap-2">
-                              <div className="flex items-center gap-2.5 flex-wrap">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <h3 className="text-sm font-bold text-on-surface tracking-tight group-hover:text-primary transition-colors">
                                   {template.name}
                                 </h3>
@@ -219,6 +281,17 @@ export default function AvailabilityPage() {
                                     DEFAULT
                                   </span>
                                 )}
+                                {(() => {
+                                  const count = eventTypes.filter((et) => et.availabilityTemplateId === template.id).length;
+                                  return count > 0 ? (
+                                    <span
+                                      className="rounded bg-slate-100 text-slate-600 px-1.5 py-0.5 text-[9px] font-semibold"
+                                      title={`${count} event type(s) currently linked to this schedule`}
+                                    >
+                                      {count} {count === 1 ? "event" : "events"}
+                                    </span>
+                                  ) : null;
+                                })()}
                               </div>
 
                               {/* Dropdown Menu */}
@@ -259,9 +332,9 @@ export default function AvailabilityPage() {
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           setMenuOpenId(null);
-                                          handleDelete(template.id);
+                                          setTemplateToDelete(template);
                                         }}
-                                        className="flex w-full items-center px-4 py-2 text-left text-xs font-semibold text-error hover:bg-error-container/40"
+                                        className="flex w-full items-center px-4 py-2 text-left text-xs font-semibold text-error hover:bg-error-container/40 cursor-pointer"
                                       >
                                         Delete
                                       </button>
@@ -424,6 +497,16 @@ export default function AvailabilityPage() {
 
         </div>
       )}
+
+      <DeleteAvailabilityModal
+        isOpen={Boolean(templateToDelete)}
+        onClose={() => setTemplateToDelete(null)}
+        onConfirm={handleConfirmDelete}
+        template={templateToDelete}
+        linkedEventTypes={linkedEventTypes}
+        fallbackTemplate={fallbackTemplate}
+        isOnlyTemplate={isOnlyTemplate}
+      />
     </div>
   );
 }

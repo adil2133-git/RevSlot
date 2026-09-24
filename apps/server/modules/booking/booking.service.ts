@@ -32,6 +32,8 @@ export interface GetMyBookingsOptions {
   status?: ("confirmed" | "completed" | "rescheduled" | "cancelled" | "no_show" | "reschedule_requested")[] | undefined;
   scope?: "upcoming" | "past" | "ongoing" | undefined;
   search?: string | undefined;
+  sortBy?: "startTime" | "createdAt" | undefined;
+  sortOrder?: "asc" | "desc" | undefined;
 }
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -569,7 +571,7 @@ for (const [key, value] of Object.entries(formData)) {
     reviewerId: number,
     options: GetMyBookingsOptions
   ) => {
-    const { page, limit, status, scope, search } = options;
+    const { page, limit, status, scope, search, sortBy, sortOrder } = options;
     const offset = (page - 1) * limit;
     const now = new Date();
 
@@ -581,11 +583,13 @@ for (const [key, value] of Object.entries(formData)) {
 
     if (scope === "upcoming") {
       conditions.push(gte(bookings.startTime, now));
+      conditions.push(ne(bookings.status, "cancelled"));
     } else if (scope === "past") {
       conditions.push(lt(bookings.startTime, now));
     } else if (scope === "ongoing") {
       conditions.push(lte(bookings.startTime, now));
       conditions.push(gte(bookings.endTime, now));
+      conditions.push(ne(bookings.status, "cancelled"));
     }
 
     if (search && search.trim() !== "") {
@@ -601,9 +605,12 @@ for (const [key, value] of Object.entries(formData)) {
       );
     }
 
-    const orderBy = scope === "upcoming" || scope === "ongoing"
-      ? sql`${bookings.startTime} ASC`
-      : sql`${bookings.createdAt} DESC`;
+    const orderBy =
+      scope === "upcoming" || scope === "ongoing"
+        ? sql`${bookings.startTime} ASC`
+        : sortBy === "createdAt"
+        ? (sortOrder === "asc" ? sql`${bookings.createdAt} ASC` : sql`${bookings.createdAt} DESC`)
+        : (sortOrder === "asc" ? sql`${bookings.startTime} ASC` : sql`${bookings.startTime} DESC`);
 
     const reviewerCondition = eq(bookings.reviewerId, reviewerId);
 
