@@ -1,11 +1,6 @@
 import crypto from "crypto";
-import { eq } from "drizzle-orm";
-
-import { db } from "../../config/db.js";
 import { AppError } from "../../core/errors/AppError.js";
-import { bookings } from "../booking/bookings.schema.js";
-import { eventTypes } from "../eventType/eventTypes.schema.js";
-import { reviewers } from "../auth/reviewers.schema.js";
+import { findMeetingBookingByIdRepo } from "./meeting.repository.js";
 
 const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:3000";
 const MEETING_ROOM_SECRET =
@@ -90,31 +85,7 @@ export const meetingService = {
       throw new AppError("Invalid meeting link", 403);
     }
 
-    const [booking] = await db
-      .select({
-        id: bookings.id,
-        reviewerId: bookings.reviewerId,
-        internName: bookings.internName,
-        advisorName: bookings.advisorName,
-        advisorEmail: bookings.advisorEmail,
-        internEmails: bookings.internEmails,
-        startTime: bookings.startTime,
-        endTime: bookings.endTime,
-        status: bookings.status,
-        eventTypeName: eventTypes.name,
-        reviewerName: reviewers.name,
-      })
-      .from(bookings)
-      .innerJoin(
-        eventTypes,
-        eq(bookings.eventTypeId, eventTypes.id)
-      )
-      .innerJoin(
-        reviewers,
-        eq(bookings.reviewerId, reviewers.id)
-      )
-      .where(eq(bookings.id, bookingId))
-      .limit(1);
+    const booking = await findMeetingBookingByIdRepo(bookingId);
 
     if (!booking) {
       throw new AppError("Meeting not found", 404);
