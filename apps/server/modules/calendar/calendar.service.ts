@@ -1,9 +1,12 @@
 import { google } from "googleapis";
-import { eq } from "drizzle-orm";
-import { db } from "../../config/db.js";
-import { reviewers } from "../auth/reviewers.schema.js";
 import { AppError } from "../../core/errors/AppError.js";
 import { signCalendarState, verifyCalendarState } from "../../core/utils/jwt.js";
+import {
+  connectGoogleCalendarRepo,
+  disconnectGoogleCalendarRepo,
+  getGoogleCalendarStatusRepo,
+  getReviewerGoogleCalendarAuthRepo,
+} from "./calendar.repository.js";
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID as string;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET as string;
@@ -32,7 +35,7 @@ export const calendarService = {
   // so Google actually issues a refresh_token (it won't on repeat
   // consents otherwise). `state` carries the reviewerId, signed so it
   // can't be tampered with on the redirect back.
-    getConnectUrl: (reviewerId: number) => {
+  getConnectUrl: (reviewerId: number) => {
     const client = createOAuthClient();
     const state = signCalendarState({ reviewerId });
 
@@ -74,40 +77,21 @@ export const calendarService = {
 
     const { data: googleProfile } = await oauth2.userinfo.get();
 
-    await db
-      .update(reviewers)
-      .set({
-        googleCalendarRefreshToken: tokens.refresh_token,
-        googleCalendarEmail: googleProfile.email ?? null,
-        googleCalendarConnected: true,
-        updatedAt: new Date(),
-      })
-      .where(eq(reviewers.id, reviewerId));
+    await connectGoogleCalendarRepo(
+      reviewerId,
+      tokens.refresh_token,
+      googleProfile.email ?? null
+    );
 
     return { reviewerId };
   },
 
   disconnect: async (reviewerId: number) => {
-    await db
-      .update(reviewers)
-      .set({
-        googleCalendarRefreshToken: null,
-        googleCalendarEmail: null,
-        googleCalendarConnected: false,
-        updatedAt: new Date(),
-      })
-      .where(eq(reviewers.id, reviewerId));
+    await disconnectGoogleCalendarRepo(reviewerId);
   },
 
   getStatus: async (reviewerId: number) => {
-    const [reviewer] = await db
-      .select({
-        googleCalendarConnected: reviewers.googleCalendarConnected,
-        googleCalendarEmail: reviewers.googleCalendarEmail,
-      })
-      .from(reviewers)
-      .where(eq(reviewers.id, reviewerId))
-      .limit(1);
+    const reviewer = await getGoogleCalendarStatusRepo(reviewerId);
 
     if (!reviewer) {
       throw new AppError("Reviewer not found", 404);
@@ -117,8 +101,8 @@ export const calendarService = {
   },
 
   // Called from booking.service.ts right after a booking is confirmed.
-// Creates a Google Calendar event on the reviewer's calendar.
-// RevSlot WebRTC is used as the meeting platform.
+  // Creates a Google Calendar event on the reviewer's calendar.
+  // RevSlot WebRTC is used as the meeting platform.
   createMeetEvent: async (params: {
     reviewerId: number;
     summary: string;
@@ -129,14 +113,7 @@ export const calendarService = {
     attendeeEmails: string[];
     meetingLink: string;
   }): Promise<{ meetLink: string; googleEventId: string } | null> => {
-    const [reviewer] = await db
-      .select({
-        refreshToken: reviewers.googleCalendarRefreshToken,
-        connected: reviewers.googleCalendarConnected,
-      })
-      .from(reviewers)
-      .where(eq(reviewers.id, params.reviewerId))
-      .limit(1);
+    const reviewer = await getReviewerGoogleCalendarAuthRepo(params.reviewerId);
 
     if (!reviewer?.connected || !reviewer.refreshToken) {
       return null;
@@ -162,11 +139,11 @@ export const calendarService = {
             summary: params.summary,
 
             description: [
-                 params.description,
-               `Join RevSlot meeting: ${params.meetingLink}`,
-              ]
-            .filter(Boolean)
-            .join("\n\n"),
+              params.description,
+              `Join RevSlot meeting: ${params.meetingLink}`,
+            ]
+              .filter(Boolean)
+              .join("\n\n"),
 
             start: {
               dateTime: params.startTime.toISOString(),
@@ -181,20 +158,19 @@ export const calendarService = {
             attendees: params.attendeeEmails
               .filter(Boolean)
               .map((email) => ({ email })),
-
           },
         },
         {}
       );
 
       if (!event.id) {
-  return null;
-}
+        return null;
+      }
 
-return {
-  meetLink: params.meetingLink,
-  googleEventId: event.id,
-};
+      return {
+        meetLink: params.meetingLink,
+        googleEventId: event.id,
+      };
     } catch (err: any) {
       console.error(
         `[Calendar Service] Failed to create Meet event for reviewer ${params.reviewerId}:`,
@@ -210,14 +186,7 @@ return {
   // reviewer isn't connected, or the event was already removed on
   // Google's side, this just no-ops rather than throwing.
   cancelMeetEvent: async (reviewerId: number, googleEventId: string): Promise<void> => {
-    const [reviewer] = await db
-      .select({
-        refreshToken: reviewers.googleCalendarRefreshToken,
-        connected: reviewers.googleCalendarConnected,
-      })
-      .from(reviewers)
-      .where(eq(reviewers.id, reviewerId))
-      .limit(1);
+    const reviewer = await getReviewerGoogleCalendarAuthRepo(reviewerId);
 
     if (!reviewer?.connected || !reviewer.refreshToken) {
       return;
