@@ -1,12 +1,11 @@
 import dayjs from "dayjs";
-import { and, inArray, isNull, lte, gt, eq } from "drizzle-orm";
-import { db } from "../../config/db.js";
-import { bookings } from "./bookings.schema.js";
-import { eventTypes } from "../eventType/eventTypes.schema.js";
-import { reviewers } from "../auth/reviewers.schema.js";
 import { emailService } from "../../services/email.service.js";
 import { sessionReminderTemplate, sessionReminderTemplateData } from "../../emails/templates/sessionReminder.js";
 import { notificationService } from "../notification/notification.service.js";
+import {
+  findUpcomingBookingsNeedingRemindersRepo,
+  markBookingReminderSentRepo,
+} from "./booking.repository.js";
 
 export const bookingReminderService = {
   checkAndSendReminders: async () => {
@@ -16,33 +15,7 @@ export const bookingReminderService = {
 
       // Find upcoming confirmed or rescheduled bookings starting within 60 minutes
       // that haven't had a reminder sent yet
-      const upcoming = await db
-        .select({
-          id: bookings.id,
-          reviewerId: bookings.reviewerId,
-          eventTypeId: bookings.eventTypeId,
-          internName: bookings.internName,
-          advisorName: bookings.advisorName,
-          advisorEmail: bookings.advisorEmail,
-          internEmails: bookings.internEmails,
-          startTime: bookings.startTime,
-          endTime: bookings.endTime,
-          meetLink: bookings.meetLink,
-          eventTypeName: eventTypes.name,
-          reviewerName: reviewers.name,
-          reviewerEmail: reviewers.email,
-        })
-        .from(bookings)
-        .innerJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
-        .innerJoin(reviewers, eq(bookings.reviewerId, reviewers.id))
-        .where(
-          and(
-            inArray(bookings.status, ["confirmed", "rescheduled"]),
-            gt(bookings.startTime, now),
-            lte(bookings.startTime, inOneHour),
-            isNull(bookings.reminderSentAt)
-          )
-        );
+      const upcoming = await findUpcomingBookingsNeedingRemindersRepo(now, inOneHour);
 
       if (upcoming.length === 0) return;
 
@@ -54,10 +27,7 @@ export const bookingReminderService = {
           const formattedTime = `${dayjs(booking.startTime).format("h:mm A")} – ${dayjs(booking.endTime).format("h:mm A")}`;
 
           // 1. Mark as sent FIRST so concurrent executions cannot double-send
-          await db
-            .update(bookings)
-            .set({ reminderSentAt: new Date() })
-            .where(eq(bookings.id, booking.id));
+          await markBookingReminderSentRepo(booking.id);
 
           // 2. Send in-app notification to reviewer (emits real-time socket alert)
           await notificationService.createNotification({
