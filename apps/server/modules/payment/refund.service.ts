@@ -1,11 +1,15 @@
 import dayjs from "dayjs";
-import { eq, sql } from "drizzle-orm";
 import { db } from "../../config/db.js";
-import { payments } from "./payments.schema.js";
-import { bookings } from "../booking/bookings.schema.js";
-import { reviewerWallets, walletTransactions } from "../wallet/wallet.schema.js";
 import { razorpay } from "../../config/razorpay.js";
 import { AppError } from "../../core/errors/AppError.js";
+import {
+  findPaymentByBookingIdRepo,
+  findBookingForRefundRepo,
+  updatePaymentRefundRepo,
+  findReviewerWalletForRefundRepo,
+  updateWalletForRefundRepo,
+  insertRefundWalletTransactionsRepo,
+} from "./payment.repository.js";
 
 export const CANCELLATION_FEE_PERCENT = 15; // 15% cancellation fee when client cancels between 3 and 8 hours
 
@@ -17,22 +21,14 @@ export interface ProcessRefundParams {
 
 export const refundService = {
   processBookingRefund: async (params: ProcessRefundParams) => {
-    const [payment] = await db
-      .select()
-      .from(payments)
-      .where(eq(payments.bookingId, params.bookingId))
-      .limit(1);
+    const payment = await findPaymentByBookingIdRepo(params.bookingId);
 
     // If no payment record exists or payment was not captured (e.g. free session), nothing to refund
     if (!payment || payment.status !== "captured" || !payment.razorpayPaymentId) {
       return null;
     }
 
-    const [booking] = await db
-      .select()
-      .from(bookings)
-      .where(eq(bookings.id, params.bookingId))
-      .limit(1);
+    const booking = await findBookingForRefundRepo(params.bookingId);
 
     if (!booking) {
       throw new AppError("Booking not found for refund", 404);
@@ -90,63 +86,58 @@ export const refundService = {
 
     // Update database in transaction
     await db.transaction(async (tx) => {
-      await tx
-        .update(payments)
-        .set({
+      await updatePaymentRefundRepo(
+        payment.id,
+        {
           status: cancellationFee > 0 ? "partially_refunded" : "refunded",
           refundId,
           refundAmount,
           cancellationFee,
           refundReason: params.reason || `Cancelled by ${params.initiatedBy}`,
-          updatedAt: new Date(),
-        })
-        .where(eq(payments.id, payment.id));
+        },
+        tx
+      );
 
       // Reviewer wallet updates
-      const [wallet] = await tx
-        .select()
-        .from(reviewerWallets)
-        .where(eq(reviewerWallets.reviewerId, payment.reviewerId))
-        .limit(1);
+      const wallet = await findReviewerWalletForRefundRepo(payment.reviewerId, tx);
 
       if (wallet) {
         // Decrement old session escrow, but retain cancellation compensation in pending balance for 24h clearance
         const newPending = Math.max(0, wallet.pendingBalance - payment.amount) + cancellationFee;
         const newAvailable = wallet.availableBalance; // Unchanged until cleared
 
-        await tx
-          .update(reviewerWallets)
-          .set({
-            pendingBalance: newPending,
-            availableBalance: newAvailable,
-            updatedAt: new Date(),
-          })
-          .where(eq(reviewerWallets.id, wallet.id));
+        await updateWalletForRefundRepo(wallet.id, newPending, newAvailable, tx);
+
+        const newTxList = [];
 
         // Record refund transaction if client was refunded
         if (refundAmount > 0) {
-          await tx.insert(walletTransactions).values({
+          newTxList.push({
             reviewerId: payment.reviewerId,
             bookingId: params.bookingId,
-            type: "escrow_cancelled",
+            type: "escrow_cancelled" as const,
             amount: refundAmount,
-            status: "completed",
+            status: "completed" as const,
             description: `Refund processed: ₹${(refundAmount / 100).toFixed(2)} refunded to client (${params.initiatedBy} cancellation)`,
           });
         }
 
         if (cancellationFee > 0) {
-          await tx.insert(walletTransactions).values({
+          newTxList.push({
             reviewerId: payment.reviewerId,
             bookingId: params.bookingId,
-            type: "cancellation_compensation",
+            type: "cancellation_compensation" as const,
             amount: cancellationFee,
-            status: "completed",
+            status: "completed" as const,
             availableAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24-hour security hold
             description: booking.rescheduleCount > 0
               ? `Cancellation compensation (24h clearance): ₹${(cancellationFee / 100).toFixed(2)} full compensation from cancelled rescheduled session`
               : `Cancellation fee credited (24h clearance): ₹${(cancellationFee / 100).toFixed(2)} compensation from late cancellation`,
           });
+        }
+
+        if (newTxList.length > 0) {
+          await insertRefundWalletTransactionsRepo(newTxList, tx);
         }
       }
     });
