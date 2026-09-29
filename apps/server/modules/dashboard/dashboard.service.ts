@@ -1,32 +1,28 @@
-import { eq, and, gte, lte, desc, count, inArray, sql } from "drizzle-orm";
-import { db } from "../../config/db.js";
-import { reviewers } from "../auth/reviewers.schema.js";
-import { bookings } from "../booking/bookings.schema.js";
-import { eventTypes } from "../eventType/eventTypes.schema.js";
-import { vacationBlocks } from "../vacation/vacation.schema.js";
-import { availabilityTemplates } from "../availability/schema/availabilityTemplates.schema.js";
-import { templateTimeBlocks } from "../availability/schema/templateTimeBlocks.schema.js";
-import { questionBanks } from "../questionBank/questionBanks.schema.js";
-import { questions } from "../questionBank/questions.schema.js";
 import { AppError } from "../../core/errors/AppError.js";
-import { feedbackForms, feedbackFormQuestions, feedback } from "../feedback/feedback.schema.js";
 import type { GetDashboardSummaryQueryInput } from "./dashboard.validation.js";
+import {
+  findActiveReviewerByIdRepo,
+  countUpcomingReviewsRepo,
+  countCompletedReviewsRepo,
+  countActiveEventTypesRepo,
+  findCompletedOrPastBookingDurationsRepo,
+  findImminentBookingRepo,
+  findPendingEvalBookingsRepo,
+  findActiveVacationBlockForDateRepo,
+  findTodaysScheduleRepo,
+  findNextReviewRepo,
+  findRecentBookingsForActivityFeedRepo,
+  findQuickShareEventTypesRepo,
+  findDefaultAvailabilityTemplateWithBlocksRepo,
+  findBookingForReferenceQuestionsRepo,
+  findReviewerQuestionBanksWithQuestionsRepo,
+  findFeedbackFormWithQuestionsRepo,
+} from "./dashboard.repository.js";
 
 export const dashboardService = {
   getReviewerSummary: async (reviewerId: number, query: GetDashboardSummaryQueryInput) => {
     // 1. Get reviewer profile info
-    const [reviewer] = await db
-      .select({
-        id: reviewers.id,
-        name: reviewers.name,
-        username: reviewers.username,
-        email: reviewers.email,
-        avatarUrl: reviewers.avatarUrl,
-        bio: reviewers.bio,
-      })
-      .from(reviewers)
-      .where(and(eq(reviewers.id, reviewerId), eq(reviewers.isActive, true)))
-      .limit(1);
+    const reviewer = await findActiveReviewerByIdRepo(reviewerId);
 
     if (!reviewer) {
       throw new AppError("Reviewer not found", 404);
@@ -55,55 +51,23 @@ export const dashboardService = {
       timeframeEnd = endOfToday;
     }
 
-    const upcomingConditions = [
-      eq(bookings.reviewerId, reviewerId),
-      eq(bookings.status, 'confirmed'),
-      gte(bookings.startTime, timeframeStart),
-    ];
-    if (timeframeEnd) {
-      upcomingConditions.push(lte(bookings.startTime, timeframeEnd));
-    }
-
-    const upcomingRes = await db
-      .select({ upcomingCount: count(bookings.id) })
-      .from(bookings)
-      .where(and(...upcomingConditions));
-    const upcomingCount = upcomingRes[0]?.upcomingCount ?? 0;
+    const upcomingCount = await countUpcomingReviewsRepo(
+      reviewerId,
+      timeframeStart,
+      timeframeEnd
+    );
 
     // 3. Compute Metric 2: Completed Reviews count
-    const completedRes = await db
-      .select({ completedCount: count(bookings.id) })
-      .from(bookings)
-      .where(
-        and(
-          eq(bookings.reviewerId, reviewerId),
-          inArray(bookings.status, ['completed', 'confirmed']),
-          lte(bookings.endTime, now)
-        )
-      );
-    const completedCount = completedRes[0]?.completedCount ?? 0;
+    const completedCount = await countCompletedReviewsRepo(reviewerId, now);
 
     // 4. Compute Metric 3: Active Event Types Count
-    const activeEventTypesRes = await db
-      .select({ activeEventTypesCount: count(eventTypes.id) })
-      .from(eventTypes)
-      .where(and(eq(eventTypes.reviewerId, reviewerId), eq(eventTypes.isActive, true)));
-    const activeEventTypesCount = activeEventTypesRes[0]?.activeEventTypesCount ?? 0;
+    const activeEventTypesCount = await countActiveEventTypesRepo(reviewerId);
 
     // 5. Compute Metric 4: Total Review Hours Logged
-    const completedOrPastBookings = await db
-      .select({
-        startTime: bookings.startTime,
-        endTime: bookings.endTime,
-      })
-      .from(bookings)
-      .where(
-        and(
-          eq(bookings.reviewerId, reviewerId),
-          inArray(bookings.status, ['completed', 'confirmed']),
-          lte(bookings.endTime, now)
-        )
-      );
+    const completedOrPastBookings = await findCompletedOrPastBookingDurationsRepo(
+      reviewerId,
+      now
+    );
 
     let totalMinutes = 0;
     for (const b of completedOrPastBookings) {
@@ -115,27 +79,11 @@ export const dashboardService = {
     // 6. Banners & Alerts
     // Alert A: Imminent Session starting within 30 minutes
     const thirtyMinsLater = new Date(now.getTime() + 30 * 60 * 1000);
-    const [imminentBooking] = await db
-      .select({
-        id: bookings.id,
-        internName: bookings.internName,
-        batch: bookings.batch,
-        weekStage: bookings.weekStage,
-        startTime: bookings.startTime,
-        eventTypeName: eventTypes.name,
-      })
-      .from(bookings)
-      .innerJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
-      .where(
-        and(
-          eq(bookings.reviewerId, reviewerId),
-          eq(bookings.status, 'confirmed'),
-          gte(bookings.startTime, now),
-          lte(bookings.startTime, thirtyMinsLater)
-        )
-      )
-      .orderBy(bookings.startTime)
-      .limit(1);
+    const imminentBooking = await findImminentBookingRepo(
+      reviewerId,
+      now,
+      thirtyMinsLater
+    );
 
     let imminentAlert = null;
     if (imminentBooking) {
@@ -152,23 +100,7 @@ export const dashboardService = {
     }
 
     // Alert B: Pending Evaluations from past sessions
-    const pendingEvalBookings = await db
-      .select({
-        id: bookings.id,
-        internName: bookings.internName,
-        weekStage: bookings.weekStage,
-        status: bookings.status,
-      })
-      .from(bookings)
-      .leftJoin(feedback, eq(feedback.bookingId, bookings.id))
-      .where(
-        and(
-          eq(bookings.reviewerId, reviewerId),
-          lte(bookings.endTime, now),
-          sql`(${bookings.status} = 'confirmed' OR (${bookings.status} = 'completed' AND ${feedback.id} IS NULL))`
-        )
-      )
-      .orderBy(desc(bookings.endTime));
+    const pendingEvalBookings = await findPendingEvalBookingsRepo(reviewerId, now);
 
     let pendingEvalAlert = null;
     if (pendingEvalBookings.length > 0) {
@@ -181,19 +113,8 @@ export const dashboardService = {
     }
 
     // Alert C: Vacation notice alert
-    const dateStrToday = startOfToday.toISOString().split('T')[0];
-    const [activeVacation] = await db
-      .select()
-      .from(vacationBlocks)
-      .where(
-        and(
-          eq(vacationBlocks.reviewerId, reviewerId),
-          eq(vacationBlocks.isActive, true),
-          sql`${vacationBlocks.startDate} <= ${dateStrToday}`,
-          sql`${vacationBlocks.endDate} >= ${dateStrToday}`
-        )
-      )
-      .limit(1);
+    const dateStrToday = startOfToday.toISOString().split('T')[0]!;
+    const activeVacation = await findActiveVacationBlockForDateRepo(reviewerId, dateStrToday);
 
     let vacationAlert = null;
     if (activeVacation) {
@@ -210,77 +131,17 @@ export const dashboardService = {
     }
 
     // 7. Today's Schedule
-    const todaysSchedule = await db
-      .select({
-        id: bookings.id,
-        eventTypeId: bookings.eventTypeId,
-        eventTypeName: eventTypes.name,
-        internName: bookings.internName,
-        batch: bookings.batch,
-        advisorName: bookings.advisorName,
-        advisorEmail: bookings.advisorEmail,
-        weekStage: bookings.weekStage,
-        startTime: bookings.startTime,
-        endTime: bookings.endTime,
-        status: bookings.status,
-        meetLink: bookings.meetLink,
-      })
-      .from(bookings)
-      .innerJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
-      .where(
-        and(
-          eq(bookings.reviewerId, reviewerId),
-          gte(bookings.startTime, startOfToday),
-          lte(bookings.startTime, endOfToday)
-        )
-      )
-      .orderBy(bookings.startTime);
+    const todaysSchedule = await findTodaysScheduleRepo(
+      reviewerId,
+      startOfToday,
+      endOfToday
+    );
 
-      // 8. Next Review — nearest active booking from now
-const [nextReview] = await db
-  .select({
-    id: bookings.id,
-    eventTypeId: bookings.eventTypeId,
-    eventTypeName: eventTypes.name,
-    internName: bookings.internName,
-    batch: bookings.batch,
-    advisorName: bookings.advisorName,
-    advisorEmail: bookings.advisorEmail,
-    weekStage: bookings.weekStage,
-    startTime: bookings.startTime,
-    endTime: bookings.endTime,
-    status: bookings.status,
-    meetLink: bookings.meetLink,
-  })
-  .from(bookings)
-  .innerJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
-  .where(
-    and(
-      eq(bookings.reviewerId, reviewerId),
-      inArray(bookings.status, ["confirmed", "rescheduled"]),
-      sql`${bookings.endTime} > ${now}`
-    )
-  )
-  .orderBy(bookings.startTime)
-  .limit(1);
+    // 8. Next Review — nearest active booking from now
+    const nextReview = await findNextReviewRepo(reviewerId, now);
 
-    // 8. Dynamic Activity Feed from bookings table
-    const recentBookings = await db
-      .select({
-        id: bookings.id,
-        internName: bookings.internName,
-        status: bookings.status,
-        rescheduledFromBookingId: bookings.rescheduledFromBookingId,
-        eventTypeName: eventTypes.name,
-        createdAt: bookings.createdAt,
-        cancelledAt: bookings.cancelledAt,
-        cancelledReason: bookings.cancelledReason,
-      })
-      .from(bookings)
-      .innerJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
-      .where(eq(bookings.reviewerId, reviewerId))
-      .orderBy(desc(bookings.createdAt))
-      .limit(10);
+    // 9. Dynamic Activity Feed from bookings table
+    const recentBookings = await findRecentBookingsForActivityFeedRepo(reviewerId, 10);
 
     const activityFeed = recentBookings.map((b) => {
       let type: 'new_booking' | 'rescheduled' | 'cancellation';
@@ -307,42 +168,16 @@ const [nextReview] = await db
       };
     });
 
-    // 9. Quick Share Event Types
-    const quickShareEventTypes = await db
-      .select({
-        id: eventTypes.id,
-        name: eventTypes.name,
-        slug: eventTypes.slug,
-        durationMinutes: eventTypes.durationMinutes,
-        bookingUrl: sql<string>`'/' || ${reviewer.username} || '/' || ${eventTypes.slug}`,
-      })
-      .from(eventTypes)
-      .where(and(eq(eventTypes.reviewerId, reviewerId), eq(eventTypes.isActive, true), eq(eventTypes.isPublic, true)))
-      .orderBy(desc(eventTypes.createdAt));
+    // 10. Quick Share Event Types
+    const quickShareEventTypes = await findQuickShareEventTypesRepo(
+      reviewerId,
+      reviewer.username
+    );
 
-    // 10. Availability Overview
-    const [defaultTemplate] = await db
-      .select({
-        id: availabilityTemplates.id,
-        name: availabilityTemplates.name,
-        timezone: availabilityTemplates.timezone,
-      })
-      .from(availabilityTemplates)
-      .where(and(eq(availabilityTemplates.reviewerId, reviewerId), eq(availabilityTemplates.isDefault, true)))
-      .limit(1);
-
-    let timeBlocks: Array<{ dayOfWeek: number; startTime: string; endTime: string }> = [];
-    if (defaultTemplate) {
-      timeBlocks = await db
-        .select({
-          dayOfWeek: templateTimeBlocks.dayOfWeek,
-          startTime: templateTimeBlocks.startTime,
-          endTime: templateTimeBlocks.endTime,
-        })
-        .from(templateTimeBlocks)
-        .where(eq(templateTimeBlocks.templateId, defaultTemplate.id))
-        .orderBy(templateTimeBlocks.dayOfWeek);
-    }
+    // 11. Availability Overview
+    const { defaultTemplate, timeBlocks } = await findDefaultAvailabilityTemplateWithBlocksRepo(
+      reviewerId
+    );
 
     return {
       reviewer: {
@@ -379,82 +214,23 @@ const [nextReview] = await db
 
   getBookingReferenceQuestions: async (reviewerId: number, bookingId: number, formId?: number) => {
     // 1. Get booking and check reviewer ownership
-    const [booking] = await db
-      .select({
-        id: bookings.id,
-        eventTypeId: bookings.eventTypeId,
-        internName: bookings.internName,
-        weekStage: bookings.weekStage,
-        eventTypeName: eventTypes.name,
-      })
-      .from(bookings)
-      .innerJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
-      .where(and(eq(bookings.id, bookingId), eq(bookings.reviewerId, reviewerId)))
-      .limit(1);
+    const booking = await findBookingForReferenceQuestionsRepo(reviewerId, bookingId);
 
     if (!booking) {
       throw new AppError("Booking not found", 404);
     }
 
     // 2. Retrieve reviewer's question bank
-    const banks = await db
-      .select({
-        id: questionBanks.id,
-        name: questionBanks.name,
-        description: questionBanks.description,
-      })
-      .from(questionBanks)
-      .where(eq(questionBanks.reviewerId, reviewerId))
-      .orderBy(questionBanks.id);
-
-    let questionBanksWithQuestions: Array<{
-      id: number;
-      name: string;
-      description: string | null;
-       questions: Array<{ id: number; questionText: string; description: string | null; displayOrder: number | null }>;
-    }> = [];
-
-    if (banks.length) {
-      const allQuestions = await db
-        .select({
-          id: questions.id,
-          bankId: questions.bankId,
-          questionText: questions.questionText,
-          description: questions.description,
-          displayOrder: questions.displayOrder,
-        })
-        .from(questions)
-        .where(inArray(questions.bankId, banks.map((b) => b.id)))
-        .orderBy(questions.displayOrder, questions.id);
-
-        questionBanksWithQuestions = banks.map((bank) => ({
-        ...bank,
-        questions: allQuestions.filter((q) => q.bankId === bank.id),
-      }));
-    }
+    const questionBanksWithQuestions = await findReviewerQuestionBanksWithQuestionsRepo(reviewerId);
 
     let formQuestions: Array<{ id: number; questionText: string; description: string | null; displayOrder: number | null }> = [];
     let formName: string | null = null;
 
     if (formId) {
-      const [form] = await db
-        .select({ id: feedbackForms.id, name: feedbackForms.name })
-        .from(feedbackForms)
-        .where(and(eq(feedbackForms.id, formId), eq(feedbackForms.reviewerId, reviewerId)));
-
-      if (form) {
-        formName = form.name;
-        formQuestions = await db
-          .select({
-            id: questions.id,
-            questionText: questions.questionText,
-            description: questions.description,
-            displayOrder: feedbackFormQuestions.displayOrder,
-          })
-          .from(feedbackFormQuestions)
-          .innerJoin(questions, eq(feedbackFormQuestions.questionId, questions.id))
-          .where(eq(feedbackFormQuestions.formId, form.id))
-          .orderBy(feedbackFormQuestions.displayOrder);
+      const formData = await findFeedbackFormWithQuestionsRepo(reviewerId, formId);
+      if (formData) {
+        formName = formData.formName;
+        formQuestions = formData.questions;
       }
     }
 
@@ -465,7 +241,7 @@ const [nextReview] = await db
         weekStage: booking.weekStage,
         eventTypeName: booking.eventTypeName,
       },
-     questionBanks: questionBanksWithQuestions,
+      questionBanks: questionBanksWithQuestions,
       formChecklist: formId ? { formId, formName, questions: formQuestions } : null,
     };
   },

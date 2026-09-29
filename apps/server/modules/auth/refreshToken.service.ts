@@ -1,8 +1,5 @@
 import crypto from "crypto";
-import { eq, and, isNull } from "drizzle-orm";
 
-import { db } from "../../config/db.js";
-import { refreshTokens } from "./refreshTokens.schema.js";
 import { AppError } from "../../core/errors/AppError.js";
 import {
   generateAccessToken,
@@ -10,6 +7,13 @@ import {
   verifyRefreshToken,
   type TokenPayload,
 } from "../../core/utils/jwt.js";
+import {
+  insertRefreshTokenRepo,
+  findRefreshTokenByHashRepo,
+  revokeRefreshTokenByIdRepo,
+  revokeRefreshTokenByHashRepo,
+  revokeActiveRefreshTokensForUserRepo,
+} from "./auth.repository.js";
 
 const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
@@ -37,7 +41,7 @@ export const refreshTokenService = {
     const refreshToken = generateRefreshToken(payload);
     const tokenHash = hashToken(refreshToken);
 
-    await db.insert(refreshTokens).values({
+    await insertRefreshTokenRepo({
       userId: payload.userId,
       role: payload.role,
       tokenHash,
@@ -65,35 +69,22 @@ export const refreshTokenService = {
 
     const tokenHash = hashToken(rawRefreshToken);
 
-    const [row] = await db
-      .select()
-      .from(refreshTokens)
-      .where(eq(refreshTokens.tokenHash, tokenHash))
-      .limit(1);
+    const row = await findRefreshTokenByHashRepo(tokenHash);
 
     if (!row) {
       throw new AppError("Invalid or expired refresh token", 401);
     }
 
     if (row.revokedAt) {
-       const revokedMsAgo = Date.now() - row.revokedAt.getTime();
+      const revokedMsAgo = Date.now() - row.revokedAt.getTime();
 
-       if(revokedMsAgo <= REUSE_GRACE_PERIOD_MS){
-          return refreshTokenService.issueTokenPair({
+      if (revokedMsAgo <= REUSE_GRACE_PERIOD_MS) {
+        return refreshTokenService.issueTokenPair({
           userId: row.userId,
           role: row.role,
         });
-       }
-      await db
-        .update(refreshTokens)
-        .set({ revokedAt: new Date() })
-        .where(
-          and(
-            eq(refreshTokens.userId, row.userId),
-            eq(refreshTokens.role, row.role),
-            isNull(refreshTokens.revokedAt),
-          ),
-        );
+      }
+      await revokeActiveRefreshTokensForUserRepo(row.userId, row.role);
       throw new AppError("Session invalidated — please log in again", 401);
     }
 
@@ -101,10 +92,7 @@ export const refreshTokenService = {
       throw new AppError("Invalid or expired refresh token", 401);
     }
 
-    await db
-      .update(refreshTokens)
-      .set({ revokedAt: new Date() })
-      .where(eq(refreshTokens.id, row.id));
+    await revokeRefreshTokenByIdRepo(row.id);
 
     return refreshTokenService.issueTokenPair({
       userId: row.userId,
@@ -112,20 +100,11 @@ export const refreshTokenService = {
     });
   },
 
-    // Called when a password changes — revokes every active session for
+  // Called when a password changes — revokes every active session for
   // this user+role so a leaked/old access token can't survive a
   // password change. Forces re-login on all devices.
   revokeAllForUser: async (userId: number, role: "reviewer" | "admin") => {
-    await db
-      .update(refreshTokens)
-      .set({ revokedAt: new Date() })
-      .where(
-        and(
-          eq(refreshTokens.userId, userId),
-          eq(refreshTokens.role, role),
-          isNull(refreshTokens.revokedAt),
-        ),
-      );
+    await revokeActiveRefreshTokensForUserRepo(userId, role);
   },
 
   // Called on logout — revokes just this one session's refresh token.
@@ -142,9 +121,6 @@ export const refreshTokenService = {
 
     const tokenHash = hashToken(rawRefreshToken);
 
-    await db
-      .update(refreshTokens)
-      .set({ revokedAt: new Date() })
-      .where(eq(refreshTokens.tokenHash, tokenHash));
+    await revokeRefreshTokenByHashRepo(tokenHash);
   },
 };

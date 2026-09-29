@@ -1,52 +1,34 @@
 import dayjs from "../../config/dayjs.js";
 import { randomUUID } from "crypto";
-import { eq, and, gte, lte, inArray, sql, or } from "drizzle-orm";
 import { db } from "../../config/db.js";
-import { eventTypes } from "../eventType/eventTypes.schema.js";
-import { templateTimeBlocks } from "../availability/schema/templateTimeBlocks.schema.js";
-import { vacationBlocks } from "../vacation/vacation.schema.js";
-import { slots } from "./slots.schema.js";
-import { bookings } from "../booking/bookings.schema.js";
 import { AppError } from "../../core/errors/AppError.js";
 import type { HoldSlotInput, ReleaseSlotInput } from "./slot.validation.js";
-import { templateDateOverrides } from "../availability/schema/templateDateOverrides.schema.js";
-import { templateOverrideBlocks } from "../availability/schema/templateDateOverrideBlocks.schema.js";
-import { availabilityTemplates } from "../availability/schema/availabilityTemplates.schema.js";
+import {
+  findEventTypeWithTemplateTimezoneRepo,
+  findTemplateTimeBlocksForSlotRepo,
+  findTemplateDateOverridesInRangeRepo,
+  findTemplateOverrideBlocksByOverrideIdsRepo,
+  findActiveVacationBlocksRepo,
+  findReservedSlotRangesRepo,
+  findReservedBookingRangesRepo,
+  reclaimExpiredHoldSlotRepo,
+  insertHeldSlotRepo,
+  releaseHeldSlotByTokenRepo,
+} from "./slot.repository.js";
 
-type TimeBlockLike = { startTime: string, endTime: string };
-type Candidate = { slotDate: string; startTime: string; endTime: string};
+type TimeBlockLike = { startTime: string; endTime: string };
+type Candidate = { slotDate: string; startTime: string; endTime: string };
 
-  
 // Fetches everything needed to compute availability for one event type
 // over a date range: the event type itself, its weekly template blocks,
 // any date overrides inside the range, and the reviewer's vacation blocks.
 async function loadAvailabilityInputs(eventTypeId: number, dateFrom: string, dateTo: string) {
-  const [eventType] = await db
-    .select({
-      id: eventTypes.id,
-      reviewerId: eventTypes.reviewerId,
-      availabilityTemplateId: eventTypes.availabilityTemplateId,
-      name: eventTypes.name,
-      slug: eventTypes.slug,
-      durationMinutes: eventTypes.durationMinutes,
-      bufferBeforeMinutes: eventTypes.bufferBeforeMinutes,
-      bufferAfterMinutes: eventTypes.bufferAfterMinutes,
-      bookingWindowDays: eventTypes.bookingWindowDays,
-      isActive: eventTypes.isActive,
-      timezone: availabilityTemplates.timezone,
-    })
-    .from(eventTypes)
-    .innerJoin(
-      availabilityTemplates,
-      eq(eventTypes.availabilityTemplateId, availabilityTemplates.id)
-    )
-    .where(eq(eventTypes.id, eventTypeId))
-    .limit(1);
- 
+  const eventType = await findEventTypeWithTemplateTimezoneRepo(eventTypeId);
+
   if (!eventType) {
     throw new AppError("Event type not found", 404);
   }
- 
+
   if (!eventType.isActive) {
     throw new AppError("This event type is not currently accepting bookings", 400);
   }
@@ -54,37 +36,26 @@ async function loadAvailabilityInputs(eventTypeId: number, dateFrom: string, dat
   const timezone = eventType.timezone || "Asia/Kolkata";
   const windowEnd = dayjs().tz(timezone).add(eventType.bookingWindowDays, "day").format("YYYY-MM-DD");
   const effectiveDateTo = dateTo < windowEnd ? dateTo : windowEnd;
- 
-  const timeBlocks = await db
-    .select()
-    .from(templateTimeBlocks)
-    .where(eq(templateTimeBlocks.templateId, eventType.availabilityTemplateId));
- 
-  const overrides = await db
-    .select()
-    .from(templateDateOverrides)
-    .where(
-      and(
-        eq(templateDateOverrides.templateId, eventType.availabilityTemplateId),
-        gte(templateDateOverrides.date, dateFrom),
-        lte(templateDateOverrides.date, dateTo)
-      )
-    );
- 
+
+  const timeBlocks = await findTemplateTimeBlocksForSlotRepo(eventType.availabilityTemplateId);
+
+  const overrides = await findTemplateDateOverridesInRangeRepo(
+    eventType.availabilityTemplateId,
+    dateFrom,
+    dateTo
+  );
+
   const overrideBlocksByOverrideId = new Map<number, TimeBlockLike[]>();
   if (overrides.length > 0) {
-    const overrideBlocks = await db
-      .select()
-      .from(templateOverrideBlocks)
-      .where(inArray(templateOverrideBlocks.overrideId, overrides.map((o) => o.id)));
- 
+    const overrideBlocks = await findTemplateOverrideBlocksByOverrideIdsRepo(overrides.map((o) => o.id));
+
     for (const block of overrideBlocks) {
       const list = overrideBlocksByOverrideId.get(block.overrideId) ?? [];
       list.push({ startTime: block.startTime, endTime: block.endTime });
       overrideBlocksByOverrideId.set(block.overrideId, list);
     }
   }
- 
+
   // date -> { isUnavailable, blocks } for O(1) lookup while looping days
   const overridesByDate = new Map<string, { isUnavailable: boolean; blocks: TimeBlockLike[] }>();
   for (const override of overrides) {
@@ -93,74 +64,41 @@ async function loadAvailabilityInputs(eventTypeId: number, dateFrom: string, dat
       blocks: overrideBlocksByOverrideId.get(override.id) ?? [],
     });
   }
- 
-  const vacations = await db
-    .select()
-    .from(vacationBlocks)
-    .where(and(eq(vacationBlocks.reviewerId, eventType.reviewerId), eq(vacationBlocks.isActive, true)));
- 
-  return { eventType: { ...eventType, timezone }, timeBlocks, overridesByDate, vacations, effectiveDateTo, timezone };
-};
 
+  const vacations = await findActiveVacationBlocksRepo(eventType.reviewerId);
+
+  return { eventType: { ...eventType, timezone }, timeBlocks, overridesByDate, vacations, effectiveDateTo, timezone };
+}
 
 // Rows that currently occupy real time on the reviewer's calendar — across
 // ALL of the reviewer's event types, since "all booking links for a
 // reviewer share the same calendar" (booking.service.ts checkCrossEventConflict).
 // A `held` row only counts if its hold hasn't expired yet.
 async function loadReservedRanges(reviewerId: number, dateFrom: string, dateTo: string, timezone: string = "Asia/Kolkata") {
-    const slotRows = await db
-      .select({
-        slotDate: slots.slotDate,
-        startTime: slots.startTime,
-        endTime: slots.endTime,
-      })
-      .from(slots)
-      .where(
-        and(
-          eq(slots.reviewerId, reviewerId),
-          gte(slots.slotDate, dateFrom),
-          lte(slots.slotDate, dateTo),
-          sql`(
-            ${slots.status} = 'booked'
-            OR (${slots.status} = 'held' AND ${slots.holdExpiresAt} > now())
-          )`
-        )
-      );
+  const slotRows = await findReservedSlotRangesRepo(reviewerId, dateFrom, dateTo);
 
-    // Also block times for confirmed/rescheduled bookings in bookings table
-    const rangeStartUtc = dayjs.tz(`${dateFrom} 00:00:00`, timezone).toDate();
-    const rangeEndUtc = dayjs.tz(`${dateTo} 23:59:59`, timezone).toDate();
+  // Also block times for confirmed/rescheduled bookings in bookings table
+  const rangeStartUtc = dayjs.tz(`${dateFrom} 00:00:00`, timezone).toDate();
+  const rangeEndUtc = dayjs.tz(`${dateTo} 23:59:59`, timezone).toDate();
 
-    const bookingRows = await db
-      .select({
-        startTime: bookings.startTime,
-        endTime: bookings.endTime,
-      })
-      .from(bookings)
-      .where(
-        and(
-          eq(bookings.reviewerId, reviewerId),
-          sql`${bookings.status} IN ('confirmed', 'rescheduled')`,
-          sql`(${bookings.startTime} <= ${rangeEndUtc} AND ${bookings.endTime} >= ${rangeStartUtc})`
-        )
-      );
+  const bookingRows = await findReservedBookingRangesRepo(reviewerId, rangeStartUtc, rangeEndUtc);
 
-    const bookingRanges = bookingRows.map((b) => {
-      const startTz = dayjs(b.startTime).tz(timezone);
-      const endTz = dayjs(b.endTime).tz(timezone);
-      return {
-        slotDate: startTz.format("YYYY-MM-DD"),
-        startTime: startTz.format("HH:mm:ss"),
-        endTime: endTz.format("HH:mm:ss"),
-      };
-    });
+  const bookingRanges = bookingRows.map((b) => {
+    const startTz = dayjs(b.startTime).tz(timezone);
+    const endTz = dayjs(b.endTime).tz(timezone);
+    return {
+      slotDate: startTz.format("YYYY-MM-DD"),
+      startTime: startTz.format("HH:mm:ss"),
+      endTime: endTz.format("HH:mm:ss"),
+    };
+  });
 
-    return [...slotRows, ...bookingRanges];
-};
+  return [...slotRows, ...bookingRanges];
+}
 
 function timeRangesOverlap(aStart: string, aEnd: string, bStart: string, bEnd: string) {
   return aStart < bEnd && bStart < aEnd;
-};
+}
 
 export const MINIMUM_BOOKING_NOTICE_HOURS = 3;
 
@@ -240,7 +178,7 @@ function computeCandidates(
 export const slotService = {
   // Public — the booking calendar. Pure read + calculation, no writes.
   getAvailableSlots: async (eventTypeId: number, dateFrom: string, dateTo: string) => {
-       const { eventType, timeBlocks, overridesByDate, vacations, effectiveDateTo } = await loadAvailabilityInputs(
+    const { eventType, timeBlocks, overridesByDate, vacations, effectiveDateTo } = await loadAvailabilityInputs(
       eventTypeId,
       dateFrom,
       dateTo
@@ -251,22 +189,22 @@ export const slotService = {
     if (dateFrom > effectiveDateTo) {
       return [];
     }
- 
+
     const candidates = computeCandidates(dateFrom, effectiveDateTo, eventType, timeBlocks, overridesByDate, vacations, timezone);
- 
+
     if (candidates.length === 0) {
       return [];
     }
- 
+
     const reserved = await loadReservedRanges(eventType.reviewerId, dateFrom, effectiveDateTo, timezone);
- 
+
     const available = candidates.filter(
       (c) =>
         !reserved.some(
           (r) => r.slotDate === c.slotDate && timeRangesOverlap(c.startTime, c.endTime, r.startTime, r.endTime)
         )
     );
- 
+
     return available.map((c) => ({
       eventTypeId,
       date: c.slotDate,
@@ -275,8 +213,7 @@ export const slotService = {
     }));
   },
 
-
-    // Called when an advisor picks a slot on the booking page. Nothing is
+  // Called when an advisor picks a slot on the booking page. Nothing is
   // materialized until this call — this is the ONE place a `slots` row
   // gets written for a not-yet-booked time. Two steps:
   //   1. Re-validate the exact slot against the live availability rules
@@ -302,57 +239,46 @@ export const slotService = {
     if (slotStartTime.isBefore(dayjs().add(MINIMUM_BOOKING_NOTICE_HOURS, "hour"))) {
       throw new AppError(`Bookings must be scheduled at least ${MINIMUM_BOOKING_NOTICE_HOURS} hours in advance`, 400);
     }
- 
+
     const candidates = computeCandidates(data.date, data.date, eventType, timeBlocks, overridesByDate, vacations, timezone);
- 
+
     const isValid = candidates.some((c) => c.startTime === data.startTime && c.endTime === data.endTime);
- 
+
     if (!isValid) {
       throw new AppError("This slot is not part of the reviewer's current availability", 400);
     }
- 
+
     const reserved = await loadReservedRanges(eventType.reviewerId, data.date, data.date, timezone);
     const alreadyTaken = reserved.some(
       (r) => r.slotDate === data.date && timeRangesOverlap(data.startTime, data.endTime, r.startTime, r.endTime)
     );
- 
+
     if (alreadyTaken) {
       throw new AppError("Slot is no longer available", 409);
     }
- 
+
     const holdToken = randomUUID();
     const holdExpiresAt = dayjs().add(5, "minute").toDate();
- 
+
     return db.transaction(async (tx) => {
       // Reclaim an expired hold row for this exact slot, if one exists.
-      const [reclaimed] = await tx
-        .update(slots)
-        .set({ status: "held", holdToken, holdExpiresAt, updatedAt: new Date() })
-        .where(
-          and(
-            eq(slots.eventTypeId, data.eventTypeId),
-            eq(slots.slotDate, data.date),
-            eq(slots.startTime, data.startTime),
-            or(
-             eq(slots.status, "available"),
-             and(
-                eq(slots.status, "held"),
-                sql`${slots.holdExpiresAt} < now()`
-              )
-           )
-        )
-     )
-      .returning();
- 
+      const reclaimed = await reclaimExpiredHoldSlotRepo(
+        data.eventTypeId,
+        data.date,
+        data.startTime,
+        holdToken,
+        holdExpiresAt,
+        tx
+      );
+
       if (reclaimed) {
         return { slotId: reclaimed.id, holdToken, holdExpiresAt };
       }
- 
+
       // No existing row (the common case) — insert fresh. onConflictDoNothing
       // covers the race where two people hold the same slot at once.
-      const [inserted] = await tx
-        .insert(slots)
-        .values({
+      const inserted = await insertHeldSlotRepo(
+        {
           eventTypeId: eventType.id,
           reviewerId: eventType.reviewerId,
           slotDate: data.date,
@@ -361,41 +287,32 @@ export const slotService = {
           status: "held",
           holdToken,
           holdExpiresAt,
-        })
-        .onConflictDoNothing()
-        .returning();
- 
+        },
+        tx
+      );
+
       if (!inserted) {
         throw new AppError("Slot is no longer available", 409);
       }
- 
+
       return { slotId: inserted.id, holdToken, holdExpiresAt };
     });
   },
 
-   // Called when an advisor backs out of a hold (picks a different slot,
-// hits "Change", closes the tab). Deletes the row outright rather than
-// just flipping status, so it stops being "permanent" DB clutter and
-// frees up the slot for someone else immediately instead of waiting out
-// the 5-minute holdExpiresAt. Only ever touches rows that are still
-// `held` under this exact token — a `booked` row (or someone else's
-// hold) is never affected, so this can't be used to cancel a real
-// booking.
-releaseSlot: async (data: ReleaseSlotInput) => {
-  const [released] = await db
-    .delete(slots)
-    .where(
-      and(
-        eq(slots.holdToken, data.holdToken),
-        eq(slots.status, "held")
-      )
-    )
-    .returning({ id: slots.id });
+  // Called when an advisor backs out of a hold (picks a different slot,
+  // hits "Change", closes the tab). Deletes the row outright rather than
+  // just flipping status, so it stops being "permanent" DB clutter and
+  // frees up the slot for someone else immediately instead of waiting out
+  // the 5-minute holdExpiresAt. Only ever touches rows that are still
+  // `held` under this exact token — a `booked` row (or someone else's
+  // hold) is never affected, so this can't be used to cancel a real
+  // booking.
+  releaseSlot: async (data: ReleaseSlotInput) => {
+    const released = await releaseHeldSlotByTokenRepo(data.holdToken);
 
-  return { released: Boolean(released) };
-},
+    return { released: Boolean(released) };
+  },
 };
- 
 
 // Helper — splits a time block (e.g. 09:00-17:00) into smaller slots based on duration
 function generateSlotsForBlock(

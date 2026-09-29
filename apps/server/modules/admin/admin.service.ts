@@ -1,14 +1,8 @@
 import dayjs from "dayjs";
 import bcrypt from "bcryptjs";
-import { eq, and, or, ilike, sql, gte, lte, desc, count } from "drizzle-orm";
-import { db } from "../../config/db.js";
-import { reviewers } from "../auth/reviewers.schema.js";
-import { bookings } from "../booking/bookings.schema.js";
-import { eventTypes } from "../eventType/eventTypes.schema.js";
-import { feedback, feedbackForms } from "../feedback/feedback.schema.js";
-import { admins } from "./admins.schema.js";
 import { auditLogService } from "../auditLog/auditLog.service.js";
 import { AppError } from "../../core/errors/AppError.js";
+import type { admins } from "./admins.schema.js";
 import type {
   ListReviewersQuery,
   UpdateReviewerStatusInput,
@@ -16,128 +10,34 @@ import type {
   UpdateAdminProfileInput,
   ListFeedbackHistoryQuery,
 } from "./admin.validation.js";
+import {
+  listFeedbackHistoryRepo,
+  listReviewersAdminRepo,
+  findReviewerByIdAdminRepo,
+  updateReviewerStatusAdminRepo,
+  findAdminNameByIdRepo,
+  listBookingsAdminRepo,
+  getDashboardStatsAdminRepo,
+  getWeeklyBookingsKpiRepo,
+  getNoShowStatsKpiRepo,
+  getFeedbackTurnaroundRecordsRepo,
+  getActiveReviewersForAnalyticsRepo,
+  getReviewerBookingStatsForAnalyticsRepo,
+  getBookingTopicsForAnalyticsRepo,
+  findAdminProfileByIdRepo,
+  findAdminFullByIdRepo,
+  updateAdminProfileRepo,
+} from "./admin.repository.js";
 
 export const adminService = {
   // GET /api/admin/feedback — Feedback History
   listFeedbackHistory: async (query: Partial<ListFeedbackHistoryQuery> = {}) => {
-    const { search, reviewerId, fromDate, toDate, page = 1, limit = 5 } = query;
-
-    const conditions = [];
-
-    if (search) {
-      conditions.push(
-        or(
-          ilike(reviewers.name, `%${search}%`),
-          ilike(bookings.internName, `%${search}%`),
-          ilike(bookings.advisorName, `%${search}%`),
-          ilike(feedbackForms.name, `%${search}%`)
-        )
-      );
-    }
-
-    if (reviewerId) {
-      conditions.push(eq(feedback.reviewerId, reviewerId));
-    }
-
-    if (fromDate) {
-      conditions.push(gte(feedback.createdAt, dayjs(fromDate).startOf("day").toDate()));
-    }
-
-    if (toDate) {
-      conditions.push(lte(feedback.createdAt, dayjs(toDate).endOf("day").toDate()));
-    }
-
-    const where = conditions.length > 0 ? and(...conditions) : undefined;
-
-    const [rows, totalResult] = await Promise.all([
-      db
-        .select({
-          id: feedback.id,
-          bookingId: feedback.bookingId,
-          reviewerId: feedback.reviewerId,
-          reviewerName: reviewers.name,
-          reviewerDepartment: reviewers.professionalHeadline,
-          internName: bookings.internName,
-          advisorName: bookings.advisorName,
-          formId: feedback.formId,
-          formName: feedbackForms.name,
-          isNoShow: feedback.isNoShow,
-          reviewMark: feedback.reviewMark,
-          taskMark: feedback.taskMark,
-          comments: feedback.comments,
-          understandingLevel: feedback.understandingLevel,
-          customFieldValues: feedback.customFieldValues,
-          submittedAt: feedback.createdAt,
-        })
-        .from(feedback)
-        .leftJoin(bookings, eq(feedback.bookingId, bookings.id))
-        .leftJoin(reviewers, eq(feedback.reviewerId, reviewers.id))
-        .leftJoin(feedbackForms, eq(feedback.formId, feedbackForms.id))
-        .where(where)
-        .orderBy(desc(feedback.createdAt))
-        .limit(limit)
-        .offset((page - 1) * limit),
-      db
-        .select({ total: count() })
-        .from(feedback)
-        .leftJoin(bookings, eq(feedback.bookingId, bookings.id))
-        .leftJoin(reviewers, eq(feedback.reviewerId, reviewers.id))
-        .leftJoin(feedbackForms, eq(feedback.formId, feedbackForms.id))
-        .where(where),
-    ]);
-
-    const total = totalResult[0]?.total ?? 0;
-
-    return {
-      feedback: rows,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.max(1, Math.ceil(total / limit)),
-      },
-    };
+    return listFeedbackHistoryRepo(query);
   },
+
   // Task 7 — GET /api/admin/reviewers
   listReviewers: async (query: ListReviewersQuery) => {
-    const { search, status, page, limit } = query;
-
-    const conditions = [];
-    if (search) {
-      conditions.push(
-        or(ilike(reviewers.name, `%${search}%`), ilike(reviewers.email, `%${search}%`))
-      );
-    }
-    if (status === "active") conditions.push(eq(reviewers.isActive, true));
-    if (status === "inactive") conditions.push(eq(reviewers.isActive, false));
-
-    const where = conditions.length > 0 ? and(...conditions) : undefined;
-
-    const [rows, totalResult] = await Promise.all([
-      db
-        .select({
-          id: reviewers.id,
-          name: reviewers.name,
-          email: reviewers.email,
-          whatsappNumber: reviewers.whatsappNumber,
-          isActive: reviewers.isActive,
-          emailVerified: reviewers.emailVerified,
-          createdAt: reviewers.createdAt,
-        })
-        .from(reviewers)
-        .where(where)
-        .orderBy(desc(reviewers.createdAt))
-        .limit(limit)
-        .offset((page - 1) * limit),
-      db.select({ total: count() }).from(reviewers).where(where),
-    ]);
-
-    const total = totalResult[0]?.total ?? 0;
-
-    return {
-      reviewers: rows,
-      pagination: { page, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) },
-    };
+    return listReviewersAdminRepo(query);
   },
 
   // Task 7 — PATCH /api/admin/reviewers/:id
@@ -146,25 +46,16 @@ export const adminService = {
     input: UpdateReviewerStatusInput,
     actorId: number
   ) => {
-    const [existing] = await db.select().from(reviewers).where(eq(reviewers.id, reviewerId));
+    const existing = await findReviewerByIdAdminRepo(reviewerId);
     if (!existing) {
       throw new AppError("Reviewer not found", 404);
     }
 
-    const [updated] = await db
-      .update(reviewers)
-      .set({ isActive: input.isActive, updatedAt: new Date() })
-      .where(eq(reviewers.id, reviewerId))
-      .returning({
-        id: reviewers.id,
-        name: reviewers.name,
-        email: reviewers.email,
-        isActive: reviewers.isActive,
-      });
+    const updated = await updateReviewerStatusAdminRepo(reviewerId, input.isActive);
 
     // JWT payload only carries { userId, role } — look up the acting
     // admin's name so the audit log entry is readable without a join.
-    const [actorAdmin] = await db.select({ name: admins.name }).from(admins).where(eq(admins.id, actorId));
+    const actorAdmin = await findAdminNameByIdRepo(actorId);
 
     await auditLogService.recordAuditLog({
       actorId,
@@ -181,47 +72,7 @@ export const adminService = {
 
   // Task 8 — GET /api/admin/bookings
   listBookings: async (query: ListBookingsQuery) => {
-    const { status, reviewerId, fromDate, toDate, page, limit } = query;
-
-    const conditions = [];
-    if (status) conditions.push(eq(bookings.status, status));
-    if (reviewerId) conditions.push(eq(bookings.reviewerId, reviewerId));
-    if (fromDate) conditions.push(gte(bookings.startTime, dayjs(fromDate).startOf("day").toDate()));
-    if (toDate) conditions.push(lte(bookings.startTime, dayjs(toDate).endOf("day").toDate()));
-
-    const where = conditions.length > 0 ? and(...conditions) : undefined;
-
-    const [rows, totalResult] = await Promise.all([
-      db
-        .select({
-          id: bookings.id,
-          internName: bookings.internName,
-          batch: bookings.batch,
-          advisorEmail: bookings.advisorEmail,
-          weekStage: bookings.weekStage,
-          startTime: bookings.startTime,
-          endTime: bookings.endTime,
-          status: bookings.status,
-          reviewerId: bookings.reviewerId,
-          reviewerName: reviewers.name,
-          eventTypeName: eventTypes.name,
-        })
-        .from(bookings)
-        .innerJoin(reviewers, eq(bookings.reviewerId, reviewers.id))
-        .innerJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
-        .where(where)
-        .orderBy(desc(bookings.startTime))
-        .limit(limit)
-        .offset((page - 1) * limit),
-      db.select({ total: count() }).from(bookings).where(where),
-    ]);
-
-    const total = totalResult[0]?.total ?? 0;
-
-    return {
-      bookings: rows,
-      pagination: { page, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) },
-    };
+    return listBookingsAdminRepo(query);
   },
 
   // Dashboard Overview stat cards — Total Reviewers, Bookings This Week
@@ -233,37 +84,19 @@ export const adminService = {
     const lastWeekStart = now.subtract(1, "week").startOf("week").toDate();
     const lastWeekEnd = now.subtract(1, "week").endOf("week").toDate();
 
-    const [
-      totalReviewersResult,
-      activeReviewersResult,
-      bookingsThisWeekResult,
-      bookingsLastWeekResult,
-      totalCompletedOrNoShowResult,
-      noShowCountResult,
-    ] = await Promise.all([
-      db.select({ totalReviewers: count() }).from(reviewers),
-      db.select({ activeReviewers: count() }).from(reviewers).where(eq(reviewers.isActive, true)),
-      db
-        .select({ bookingsThisWeek: count() })
-        .from(bookings)
-        .where(and(gte(bookings.startTime, thisWeekStart), lte(bookings.startTime, thisWeekEnd))),
-      db
-        .select({ bookingsLastWeek: count() })
-        .from(bookings)
-        .where(and(gte(bookings.startTime, lastWeekStart), lte(bookings.startTime, lastWeekEnd))),
-      db
-        .select({ totalCompletedOrNoShow: count() })
-        .from(bookings)
-        .where(sql`${bookings.status} IN ('completed', 'no_show')`),
-      db.select({ noShowCount: count() }).from(bookings).where(eq(bookings.status, "no_show")),
-    ]);
-
-    const totalReviewers = totalReviewersResult[0]?.totalReviewers ?? 0;
-    const activeReviewers = activeReviewersResult[0]?.activeReviewers ?? 0;
-    const bookingsThisWeek = bookingsThisWeekResult[0]?.bookingsThisWeek ?? 0;
-    const bookingsLastWeek = bookingsLastWeekResult[0]?.bookingsLastWeek ?? 0;
-    const totalCompletedOrNoShow = totalCompletedOrNoShowResult[0]?.totalCompletedOrNoShow ?? 0;
-    const noShowCount = noShowCountResult[0]?.noShowCount ?? 0;
+    const {
+      totalReviewers,
+      activeReviewers,
+      bookingsThisWeek,
+      bookingsLastWeek,
+      totalCompletedOrNoShow,
+      noShowCount,
+    } = await getDashboardStatsAdminRepo(
+      thisWeekStart,
+      thisWeekEnd,
+      lastWeekStart,
+      lastWeekEnd
+    );
 
     const bookingsWeekChangePct =
       bookingsLastWeek === 0
@@ -293,21 +126,12 @@ export const adminService = {
     const lastWeekEnd = now.subtract(1, "week").endOf("week").toDate();
 
     // 1. KPI 1: Weekly Bookings
-    const [thisWeekRes, lastWeekRes, totalBookingsRes] = await Promise.all([
-      db
-        .select({ count: count() })
-        .from(bookings)
-        .where(and(gte(bookings.startTime, thisWeekStart), lte(bookings.startTime, thisWeekEnd))),
-      db
-        .select({ count: count() })
-        .from(bookings)
-        .where(and(gte(bookings.startTime, lastWeekStart), lte(bookings.startTime, lastWeekEnd))),
-      db.select({ count: count() }).from(bookings),
-    ]);
-
-    const weeklyCurrent = thisWeekRes[0]?.count ?? 0;
-    const weeklyPrevious = lastWeekRes[0]?.count ?? 0;
-    const totalBookingsCount = totalBookingsRes[0]?.count ?? 0;
+    const { weeklyCurrent, weeklyPrevious } = await getWeeklyBookingsKpiRepo(
+      thisWeekStart,
+      thisWeekEnd,
+      lastWeekStart,
+      lastWeekEnd
+    );
 
     const weeklyChangePct =
       weeklyPrevious > 0
@@ -315,44 +139,18 @@ export const adminService = {
         : (weeklyCurrent > 0 ? 100 : 0);
 
     // 2. KPI 2: Overall No-Show Rate
-    const [thisPeriodCompletedNoShow, thisPeriodNoShows, lastPeriodCompletedNoShow, lastPeriodNoShows] =
-      await Promise.all([
-        db
-          .select({ count: count() })
-          .from(bookings)
-          .where(sql`${bookings.status} IN ('completed', 'no_show')`),
-        db.select({ count: count() }).from(bookings).where(eq(bookings.status, "no_show")),
-        db
-          .select({ count: count() })
-          .from(bookings)
-          .where(
-            and(
-              gte(bookings.startTime, lastWeekStart),
-              lte(bookings.startTime, lastWeekEnd),
-              sql`${bookings.status} IN ('completed', 'no_show')`
-            )
-          ),
-        db
-          .select({ count: count() })
-          .from(bookings)
-          .where(
-            and(
-              gte(bookings.startTime, lastWeekStart),
-              lte(bookings.startTime, lastWeekEnd),
-              eq(bookings.status, "no_show")
-            )
-          ),
-      ]);
+    const {
+      totalPastBookings,
+      totalNoShowsCount,
+      lastTotalPast,
+      lastNoShows,
+    } = await getNoShowStatsKpiRepo(lastWeekStart, lastWeekEnd);
 
-    const totalPastBookings = thisPeriodCompletedNoShow[0]?.count ?? 0;
-    const totalNoShowsCount = thisPeriodNoShows[0]?.count ?? 0;
     const currentNoShowRate =
       totalPastBookings > 0
         ? Number(((totalNoShowsCount / totalPastBookings) * 100).toFixed(1))
         : 0;
 
-    const lastTotalPast = lastPeriodCompletedNoShow[0]?.count ?? 0;
-    const lastNoShows = lastPeriodNoShows[0]?.count ?? 0;
     const previousNoShowRate =
       lastTotalPast > 0
         ? Number(((lastNoShows / lastTotalPast) * 100).toFixed(1))
@@ -361,15 +159,7 @@ export const adminService = {
     const noShowChangePct = Number((currentNoShowRate - previousNoShowRate).toFixed(1));
 
     // 3. KPI 3: Avg. Feedback Turnaround (Hours)
-    const feedbackRecords = await db
-      .select({
-        feedbackCreated: feedback.createdAt,
-        bookingEnd: bookings.endTime,
-        bookingStart: bookings.startTime,
-      })
-      .from(feedback)
-      .innerJoin(bookings, eq(feedback.bookingId, bookings.id))
-      .where(eq(feedback.isNoShow, false));
+    const feedbackRecords = await getFeedbackTurnaroundRecordsRepo();
 
     let totalTurnaroundHours = 0;
     let validFeedbackCount = 0;
@@ -391,30 +181,12 @@ export const adminService = {
     const turnaroundChangeHours = Number((avgTurnaroundHours - previousTurnaroundHours).toFixed(1));
 
     // 4. Bookings per Reviewer & No-Show Rate per Reviewer
-    const activeReviewers = await db
-      .select({ id: reviewers.id, name: reviewers.name })
-      .from(reviewers)
-      .where(eq(reviewers.isActive, true));
+    const activeReviewers = await getActiveReviewersForAnalyticsRepo();
 
     const reviewerStats = await Promise.all(
       activeReviewers.map(async (rev) => {
-        const [totalBRes, completedOrNoShowRes, noShowRes] = await Promise.all([
-          db.select({ count: count() }).from(bookings).where(eq(bookings.reviewerId, rev.id)),
-          db
-            .select({ count: count() })
-            .from(bookings)
-            .where(
-              and(eq(bookings.reviewerId, rev.id), sql`${bookings.status} IN ('completed', 'no_show')`)
-            ),
-          db
-            .select({ count: count() })
-            .from(bookings)
-            .where(and(eq(bookings.reviewerId, rev.id), eq(bookings.status, "no_show"))),
-        ]);
-
-        const totalBookings = totalBRes[0]?.count ?? 0;
-        const pastBookings = completedOrNoShowRes[0]?.count ?? 0;
-        const noShowCount = noShowRes[0]?.count ?? 0;
+        const { totalBookings, pastBookings, noShowCount } =
+          await getReviewerBookingStatsForAnalyticsRepo(rev.id);
 
         const ratePct =
           pastBookings > 0 ? Number(((noShowCount / pastBookings) * 100).toFixed(1)) : 0;
@@ -459,14 +231,7 @@ export const adminService = {
     }));
 
     // 5. Most Popular Tech Stacks
-    const bookingTopics = await db
-      .select({
-        id: bookings.id,
-        formData: bookings.formData,
-        eventTypeName: eventTypes.name,
-      })
-      .from(bookings)
-      .leftJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id));
+    const bookingTopics = await getBookingTopicsForAnalyticsRepo();
 
     const stackCounts: Record<"React" | "Python" | "Node.js" | "Other", number> = {
       React: 0,
@@ -477,8 +242,8 @@ export const adminService = {
 
     for (const b of bookingTopics) {
       const topicStr = (
-        (b.formData?.topic as string) ||
-        (b.formData?.techStack as string) ||
+        ((b.formData as Record<string, unknown> | null)?.topic as string) ||
+        ((b.formData as Record<string, unknown> | null)?.techStack as string) ||
         b.eventTypeName ||
         ""
       ).toLowerCase();
@@ -596,17 +361,7 @@ export const adminService = {
 
   // GET /api/admin/me
   getProfile: async (adminId: number) => {
-    const [admin] = await db
-      .select({
-        id: admins.id,
-        name: admins.name,
-        email: admins.email,
-        avatarUrl: admins.avatarUrl,
-        bio: admins.bio,
-        createdAt: admins.createdAt,
-      })
-      .from(admins)
-      .where(eq(admins.id, adminId));
+    const admin = await findAdminProfileByIdRepo(adminId);
 
     if (!admin) {
       throw new AppError("Admin not found", 404);
@@ -617,7 +372,7 @@ export const adminService = {
 
   // PATCH /api/admin/me
   updateProfile: async (adminId: number, input: UpdateAdminProfileInput) => {
-    const [existing] = await db.select().from(admins).where(eq(admins.id, adminId));
+    const existing = await findAdminFullByIdRepo(adminId);
     if (!existing) {
       throw new AppError("Admin not found", 404);
     }
@@ -639,17 +394,7 @@ export const adminService = {
       updates.passwordHash = await bcrypt.hash(input.newPassword, 12);
     }
 
-    const [updated] = await db
-      .update(admins)
-      .set(updates)
-      .where(eq(admins.id, adminId))
-      .returning({
-        id: admins.id,
-        name: admins.name,
-        email: admins.email,
-        avatarUrl: admins.avatarUrl,
-        bio: admins.bio,
-      });
+    const updated = await updateAdminProfileRepo(adminId, updates);
 
     await auditLogService.recordAuditLog({
       actorId: adminId,
@@ -662,4 +407,4 @@ export const adminService = {
 
     return updated;
   },
-};
+};
