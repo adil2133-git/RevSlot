@@ -76,6 +76,8 @@ export async function fetchMyBookings(params: GetMyBookingsParams = {}) {
         status: params.status?.join(","),
         scope: params.scope,
         search: params.search,
+        sortBy: params.sortBy,
+        sortOrder: params.sortOrder,
       },
     }
   );

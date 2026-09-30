@@ -1,12 +1,6 @@
 import bcrypt from "bcryptjs";
 import { OAuth2Client } from "google-auth-library";
 
-import { eq } from "drizzle-orm";
-import { db } from "../../config/db.js";
-
-import { reviewers } from "./reviewers.schema.js";
-import { admins } from "../admin/admins.schema.js";
-
 import { AppError } from "../../core/errors/AppError.js";
 
 import type {
@@ -30,6 +24,21 @@ import { forgotPasswordTemplate, forgotPasswordTemplateData } from "../../emails
 import { verifyEmailTemplate, verifyEmailTemplateData } from "../../emails/templates/verifyEmail.js";
 import { refreshTokenService } from "./refreshToken.service.js";
 import { cloudinary } from "../../config/cloudinary.js";
+import {
+  findReviewerByEmailRepo,
+  findReviewerByGoogleIdRepo,
+  findReviewerByUsernameRepo,
+  insertReviewerRepo,
+  verifyReviewerEmailRepo,
+  linkReviewerGoogleAccountRepo,
+  findAdminByEmailRepo,
+  findUserByIdAndRoleRepo,
+  updateUserProfileRepo,
+  updateUserAvatarRepo,
+  updateUserPasswordRepo,
+  updateReviewerPasswordRepo,
+  updateAdminPasswordRepo,
+} from "./auth.repository.js";
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID as string;
 
@@ -183,11 +192,7 @@ async function generateUniqueUsername(name: string, email: string): Promise<stri
   }
 
   // Check if base is available
-  const [existing] = await db
-    .select({ id: reviewers.id })
-    .from(reviewers)
-    .where(eq(reviewers.username, base))
-    .limit(1);
+  const existing = await findReviewerByUsernameRepo(base);
 
   if (!existing) {
     return base;
@@ -197,11 +202,7 @@ async function generateUniqueUsername(name: string, email: string): Promise<stri
   for (let i = 0; i < 10; i++) {
     const suffix = Math.floor(100 + Math.random() * 900); // 3 digits
     const candidate = `${base.slice(0, 26).replace(/-+$/, "")}-${suffix}`;
-    const [found] = await db
-      .select({ id: reviewers.id })
-      .from(reviewers)
-      .where(eq(reviewers.username, candidate))
-      .limit(1);
+    const found = await findReviewerByUsernameRepo(candidate);
 
     if (!found) {
       return candidate;
@@ -218,13 +219,9 @@ export const authService = {
   // Reviewer Registration — creates the account but does NOT log the
   // user in. They must verify their email via OTP (verifyEmail) first.
   registerReviewer: async (data: RegisterInput) => {
-    const existingReviewer = await db
-      .select()
-      .from(reviewers)
-      .where(eq(reviewers.email, data.email))
-      .limit(1);
+    const existingReviewer = await findReviewerByEmailRepo(data.email);
 
-    if (existingReviewer.length > 0) {
+    if (existingReviewer) {
       throw new AppError("An account with this email already exists. Please log in instead.", 409);
     }
 
@@ -232,16 +229,13 @@ export const authService = {
 
     const username = await generateUniqueUsername(data.name, data.email);
 
-    const [newReviewer] = await db
-      .insert(reviewers)
-      .values({
-        name: data.name,
-        email: data.email,
-        username,
-        passwordHash,
-        whatsappNumber: data.whatsappNumber,
-      })
-      .returning();
+    const newReviewer = await insertReviewerRepo({
+      name: data.name,
+      email: data.email,
+      username,
+      passwordHash,
+      whatsappNumber: data.whatsappNumber,
+    });
 
     if (!newReviewer) {
       throw new AppError("Unable to create your account right now. Please try again.", 500);
@@ -262,11 +256,7 @@ export const authService = {
 
   // Reviewer Login
   loginReviewer: async (data: LoginInput) => {
-    const [reviewer] = await db
-      .select()
-      .from(reviewers)
-      .where(eq(reviewers.email, data.email))
-      .limit(1);
+    const reviewer = await findReviewerByEmailRepo(data.email);
 
     if (!reviewer) {
       throw new AppError("Incorrect email or password. Please try again.", 401);
@@ -281,11 +271,7 @@ export const authService = {
 
   // Admin Login
   loginAdmin: async (data: LoginInput) => {
-    const [admin] = await db
-      .select()
-      .from(admins)
-      .where(eq(admins.email, data.email))
-      .limit(1);
+    const admin = await findAdminByEmailRepo(data.email);
 
     if (!admin) {
       throw new AppError("Incorrect email or password. Please try again.", 401);
@@ -307,13 +293,7 @@ export const authService = {
       throw new AppError("Invalid or expired refresh token", 401);
     }
 
-    const table = payload.role === "admin" ? admins : reviewers;
-
-    const [user] = await db
-      .select()
-      .from(table)
-      .where(eq(table.id, payload.userId))
-      .limit(1);
+    const user = await findUserByIdAndRoleRepo(payload.userId, payload.role);
 
     if (!user || !user.isActive) {
       throw new AppError("Account not found or inactive", 401);
@@ -335,91 +315,85 @@ export const authService = {
 
   // Get current logged-in user
   getMe: async (userId: number, role: "reviewer" | "admin") => {
-    const table = role === "admin" ? admins : reviewers;
-
-    const [user] = await db
-      .select()
-      .from(table)
-      .where(eq(table.id, userId))
-      .limit(1);
+    const user = await findUserByIdAndRoleRepo(userId, role);
 
     if (!user) {
       throw new AppError("User not found", 404);
     }
 
-  return {
-  id: user.id,
-  name: user.name,
-  username: ("username" in user ? user.username : null) ?? null,
-  email: user.email,
-  role,
-  avatarUrl: user.avatarUrl,
-  bio: user.bio,
+    return {
+      id: user.id,
+      name: user.name,
+      username: ("username" in user ? user.username : null) ?? null,
+      email: user.email,
+      role,
+      avatarUrl: user.avatarUrl,
+      bio: user.bio,
 
-  whatsappNumber:
-    "whatsappNumber" in user
-      ? user.whatsappNumber
-      : undefined,
+      whatsappNumber:
+        "whatsappNumber" in user
+          ? user.whatsappNumber
+          : undefined,
 
-  professionalHeadline:
-    "professionalHeadline" in user
-      ? user.professionalHeadline
-      : undefined,
+      professionalHeadline:
+        "professionalHeadline" in user
+          ? user.professionalHeadline
+          : undefined,
 
-  skills:
-    "skills" in user
-      ? user.skills
-      : undefined,
+      skills:
+        "skills" in user
+          ? user.skills
+          : undefined,
 
-  yearsOfExperience:
-    "yearsOfExperience" in user
-      ? user.yearsOfExperience
-      : undefined,
+      yearsOfExperience:
+        "yearsOfExperience" in user
+          ? user.yearsOfExperience
+          : undefined,
 
-  currentRole:
-    "currentRole" in user
-      ? user.currentRole
-      : undefined,
+      currentRole:
+        "currentRole" in user
+          ? user.currentRole
+          : undefined,
 
-  currentCompany:
-    "currentCompany" in user
-      ? user.currentCompany
-      : undefined,
+      currentCompany:
+        "currentCompany" in user
+          ? user.currentCompany
+          : undefined,
 
-  degree:
-    "degree" in user
-      ? user.degree
-      : undefined,
+      degree:
+        "degree" in user
+          ? user.degree
+          : undefined,
 
-  university:
-    "university" in user
-      ? user.university
-      : undefined,
+      university:
+        "university" in user
+          ? user.university
+          : undefined,
 
-  graduationYear:
-    "graduationYear" in user
-      ? user.graduationYear
-      : undefined,
+      graduationYear:
+        "graduationYear" in user
+          ? user.graduationYear
+          : undefined,
 
-  linkedinUrl:
-    "linkedinUrl" in user
-      ? user.linkedinUrl
-      : undefined,
+      linkedinUrl:
+        "linkedinUrl" in user
+          ? user.linkedinUrl
+          : undefined,
 
-  githubUrl:
-    "githubUrl" in user
-      ? user.githubUrl
-      : undefined,
+      githubUrl:
+        "githubUrl" in user
+          ? user.githubUrl
+          : undefined,
 
-  portfolioUrl:
-    "portfolioUrl" in user
-      ? user.portfolioUrl
-      : undefined,
+      portfolioUrl:
+        "portfolioUrl" in user
+          ? user.portfolioUrl
+          : undefined,
 
-  emailVerified: user.emailVerified,
-  hasPassword: Boolean(user.passwordHash),
-  createdAt: user.createdAt,
-};
+      emailVerified: user.emailVerified,
+      hasPassword: Boolean(user.passwordHash),
+      createdAt: user.createdAt,
+    };
   },
 
   // Updates username for a logged-in reviewer
@@ -427,7 +401,7 @@ export const authService = {
     return authService.updateProfile(userId, role, { username: usernameInput });
   },
 
-    // Updates profile fields (name / bio / whatsappNumber / username) for a logged-in
+  // Updates profile fields (name / bio / whatsappNumber / username) for a logged-in
   // user. All fields optional — only what's sent in the request gets touched.
   updateProfile: async (userId: number, role: "reviewer" | "admin", input: UpdateProfileInput) => {
     if (Object.keys(input).length === 0) {
@@ -439,11 +413,7 @@ export const authService = {
         throw new AppError("Only reviewers can set a username", 403);
       }
       const cleanUsername = input.username.toLowerCase().trim();
-      const [existing] = await db
-        .select({ id: reviewers.id })
-        .from(reviewers)
-        .where(eq(reviewers.username, cleanUsername))
-        .limit(1);
+      const existing = await findReviewerByUsernameRepo(cleanUsername);
 
       if (existing && existing.id !== userId) {
         throw new AppError("Username is already taken", 409);
@@ -451,13 +421,7 @@ export const authService = {
       input.username = cleanUsername;
     }
 
-    const table = role === "admin" ? admins : reviewers;
-
-    const [updated] = await db
-      .update(table)
-      .set({ ...input, updatedAt: new Date() })
-      .where(eq(table.id, userId))
-      .returning();
+    const updated = await updateUserProfileRepo(userId, role, input);
 
     if (!updated) {
       throw new AppError("User not found", 404);
@@ -473,68 +437,66 @@ export const authService = {
       bio: updated.bio,
       whatsappNumber: ("whatsappNumber" in updated ? updated.whatsappNumber : null) ?? null,
       professionalHeadline:
-    "professionalHeadline" in updated
-      ? updated.professionalHeadline
-      : undefined,
+        "professionalHeadline" in updated
+          ? updated.professionalHeadline
+          : undefined,
 
-  skills:
-    "skills" in updated
-      ? updated.skills
-      : undefined,
+      skills:
+        "skills" in updated
+          ? updated.skills
+          : undefined,
 
-  yearsOfExperience:
-    "yearsOfExperience" in updated
-      ? updated.yearsOfExperience
-      : undefined,
+      yearsOfExperience:
+        "yearsOfExperience" in updated
+          ? updated.yearsOfExperience
+          : undefined,
 
-  currentRole:
-    "currentRole" in updated
-      ? updated.currentRole
-      : undefined,
+      currentRole:
+        "currentRole" in updated
+          ? updated.currentRole
+          : undefined,
 
-  currentCompany:
-    "currentCompany" in updated
-      ? updated.currentCompany
-      : undefined,
+      currentCompany:
+        "currentCompany" in updated
+          ? updated.currentCompany
+          : undefined,
 
-  degree:
-    "degree" in updated
-      ? updated.degree
-      : undefined,
+      degree:
+        "degree" in updated
+          ? updated.degree
+          : undefined,
 
-  university:
-    "university" in updated
-      ? updated.university
-      : undefined,
+      university:
+        "university" in updated
+          ? updated.university
+          : undefined,
 
-  graduationYear:
-    "graduationYear" in updated
-      ? updated.graduationYear
-      : undefined,
+      graduationYear:
+        "graduationYear" in updated
+          ? updated.graduationYear
+          : undefined,
 
-  linkedinUrl:
-    "linkedinUrl" in updated
-      ? updated.linkedinUrl
-      : undefined,
+      linkedinUrl:
+        "linkedinUrl" in updated
+          ? updated.linkedinUrl
+          : undefined,
 
-  githubUrl:
-    "githubUrl" in updated
-      ? updated.githubUrl
-      : undefined,
+      githubUrl:
+        "githubUrl" in updated
+          ? updated.githubUrl
+          : undefined,
 
-  portfolioUrl:
-    "portfolioUrl" in updated
-      ? updated.portfolioUrl
-      : undefined,
+      portfolioUrl:
+        "portfolioUrl" in updated
+          ? updated.portfolioUrl
+          : undefined,
       emailVerified: updated.emailVerified,
       hasPassword: updated.passwordHash !== null,
       createdAt: updated.createdAt,
     };
   },
 
-     updateAvatar: async (userId: number, role: "reviewer" | "admin", fileBuffer: Buffer) => {
-    const table = role === "admin" ? admins : reviewers;
-
+  updateAvatar: async (userId: number, role: "reviewer" | "admin", fileBuffer: Buffer) => {
     const uploadResult = await new Promise<{ secure_url: string }>((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
         {
@@ -555,11 +517,7 @@ export const authService = {
       stream.end(fileBuffer);
     });
 
-    const [updated] = await db
-      .update(table)
-      .set({ avatarUrl: uploadResult.secure_url, updatedAt: new Date() })
-      .where(eq(table.id, userId))
-      .returning();
+    const updated = await updateUserAvatarRepo(userId, role, uploadResult.secure_url);
 
     if (!updated) {
       throw new AppError("User not found", 404);
@@ -574,13 +532,7 @@ export const authService = {
   // with the new password. Google-only accounts (no passwordHash yet)
   // are rejected here — that would be a "set password" flow, not this one.
   changePassword: async (userId: number, role: "reviewer" | "admin", input: ChangePasswordInput) => {
-    const table = role === "admin" ? admins : reviewers;
-
-    const [user] = await db
-      .select()
-      .from(table)
-      .where(eq(table.id, userId))
-      .limit(1);
+    const user = await findUserByIdAndRoleRepo(userId, role);
 
     if (!user) {
       throw new AppError("User not found", 404);
@@ -598,10 +550,7 @@ export const authService = {
 
     const newPasswordHash = await bcrypt.hash(input.newPassword, 12);
 
-    await db
-      .update(table)
-      .set({ passwordHash: newPasswordHash, updatedAt: new Date() })
-      .where(eq(table.id, userId));
+    await updateUserPasswordRepo(userId, role, newPasswordHash);
 
     // Force re-login everywhere — a session opened with the old password
     // shouldn't silently keep working after the password changes.
@@ -614,18 +563,8 @@ export const authService = {
   // Always returns the same generic message regardless of whether the
   // email exists, so this endpoint can't be used to enumerate accounts.
   forgotPassword: async (data: ForgotPasswordInput) => {
-    const [reviewer] = await db
-      .select()
-      .from(reviewers)
-      .where(eq(reviewers.email, data.email))
-      .limit(1);
-
-    const [admin] = await db
-      .select()
-      .from(admins)
-      .where(eq(admins.email, data.email))
-      .limit(1);
-
+    const reviewer = await findReviewerByEmailRepo(data.email);
+    const admin = reviewer ? null : await findAdminByEmailRepo(data.email);
     const user = reviewer ?? admin;
 
     if (!user) {
@@ -651,31 +590,17 @@ export const authService = {
 
     const passwordHash = await bcrypt.hash(data.newPassword, 12);
 
-    const [reviewer] = await db
-      .select()
-      .from(reviewers)
-      .where(eq(reviewers.email, data.email))
-      .limit(1);
+    const reviewer = await findReviewerByEmailRepo(data.email);
 
     if (reviewer) {
-      await db
-        .update(reviewers)
-        .set({ passwordHash })
-        .where(eq(reviewers.id, reviewer.id));
+      await updateReviewerPasswordRepo(reviewer.id, passwordHash);
       return { message: "Password reset successful" };
     }
 
-    const [admin] = await db
-      .select()
-      .from(admins)
-      .where(eq(admins.email, data.email))
-      .limit(1);
+    const admin = await findAdminByEmailRepo(data.email);
 
     if (admin) {
-      await db
-        .update(admins)
-        .set({ passwordHash })
-        .where(eq(admins.id, admin.id));
+      await updateAdminPasswordRepo(admin.id, passwordHash);
       return { message: "Password reset successful" };
     }
 
@@ -692,21 +617,13 @@ export const authService = {
       throw new AppError("The verification code is invalid or has expired. Please request a new code.", 400);
     }
 
-    const [reviewer] = await db
-      .select()
-      .from(reviewers)
-      .where(eq(reviewers.email, data.email))
-      .limit(1);
+    const reviewer = await findReviewerByEmailRepo(data.email);
 
     if (!reviewer) {
       throw new AppError("Account not found. Please register again.", 404);
     }
 
-    const [updated] = await db
-      .update(reviewers)
-      .set({ emailVerified: true })
-      .where(eq(reviewers.id, reviewer.id))
-      .returning();
+    const updated = await verifyReviewerEmailRepo(reviewer.id);
 
     if (!updated) {
       throw new AppError("Unable to verify your email right now. Please try again.", 500);
@@ -719,11 +636,7 @@ export const authService = {
   // Always returns the same generic message regardless of whether the
   // email exists or is already verified.
   resendVerification: async (data: ResendVerificationInput) => {
-    const [reviewer] = await db
-      .select()
-      .from(reviewers)
-      .where(eq(reviewers.email, data.email))
-      .limit(1);
+    const reviewer = await findReviewerByEmailRepo(data.email);
 
     if (!reviewer) {
       return { message: "If that email is registered and unverified, a new code has been sent." };
@@ -758,42 +671,27 @@ export const authService = {
     const { email, name, sub: googleId, picture } = googlePayload;
 
     // Check if this Google account is already linked
-    let [reviewer] = await db
-      .select()
-      .from(reviewers)
-      .where(eq(reviewers.googleId, googleId))
-      .limit(1);
+    let reviewer = await findReviewerByGoogleIdRepo(googleId);
 
     if (!reviewer) {
       // Check if the email is already registered a different way (password signup)
-      const [existingByEmail] = await db
-        .select()
-        .from(reviewers)
-        .where(eq(reviewers.email, email))
-        .limit(1);
+      const existingByEmail = await findReviewerByEmailRepo(email);
 
       if (existingByEmail) {
         // Link this Google account to their existing password-based account
-        [reviewer] = await db
-          .update(reviewers)
-          .set({ googleId, emailVerified: true })
-          .where(eq(reviewers.id, existingByEmail.id))
-          .returning();
+        reviewer = await linkReviewerGoogleAccountRepo(existingByEmail.id, googleId);
       } else {
         const username = await generateUniqueUsername(name ?? "reviewer", email);
 
-        [reviewer] = await db
-          .insert(reviewers)
-          .values({
-            name: name ?? "Reviewer",
-            email,
-            username,
-            googleId,
-            avatarUrl: picture,
-            whatsappNumber: data.whatsappNumber ?? null,
-            emailVerified: true, // Google already verified this email
-          })
-          .returning();
+        reviewer = await insertReviewerRepo({
+          name: name ?? "Reviewer",
+          email,
+          username,
+          googleId,
+          avatarUrl: picture,
+          whatsappNumber: data.whatsappNumber ?? null,
+          emailVerified: true, // Google already verified this email
+        });
       }
     }
 

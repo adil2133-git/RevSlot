@@ -64,8 +64,8 @@ export const availabilityController = {
   // Handles DELETE /:id — deletes a template
   deleteTemplate: async (req: Request, res: Response) => {
     const templateId = parseTemplateId(req.params.id);
-    await availabilityService.deleteTemplate(req.user!.userId, templateId);
-    res.status(200).json({ success: true, message: "Template deleted" });
+    const result = await availabilityService.deleteTemplate(req.user!.userId, templateId);
+    res.status(200).json({ success: true, message: "Template deleted", data: result });
   },
 
   // Handles PUT /:id/time-blocks — replaces all time blocks for a template
