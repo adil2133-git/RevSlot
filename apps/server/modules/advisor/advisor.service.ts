@@ -1,12 +1,6 @@
-import dayjs from "dayjs";
-import { eq, and, ne, gte, lt, sql, asc } from "drizzle-orm";
+import dayjs from "../../config/dayjs.js";
 import { db } from "../../config/db.js";
-import { bookings } from "../booking/bookings.schema.js";
-import { slots } from "../slot/slots.schema.js";
-import { eventTypes } from "../eventType/eventTypes.schema.js";
-import { reviewers } from "../auth/reviewers.schema.js";
-import { feedback, feedbackPendingQuestions, feedbackForms } from "../feedback/feedback.schema.js";
-import { questions } from "../questionBank/questions.schema.js";
+import { getEventTimezoneRepo } from "../booking/booking.repository.js";
 import { otpService } from "../auth/otp.service.js";
 import { slotService } from "../slot/slot.service.js";
 import { calendarService } from "../calendar/calendar.service.js";
@@ -16,13 +10,25 @@ import { bookingCancelledTemplate, bookingCancelledTemplateData } from "../../em
 import { generateAdvisorToken } from "../../core/utils/jwt.js";
 import { meetingService } from "../meeting/meeting.service.js";
 import { refundService } from "../payment/refund.service.js";
-import { payments } from "../payment/payments.schema.js";
-import { walletTransactions } from "../wallet/wallet.schema.js";
 import { bookingService } from "../booking/booking.service.js";
 import { notificationService } from "../notification/notification.service.js";
-import { bookingDisputes } from "../dispute/disputes.schema.js";
 import { AppError } from "../../core/errors/AppError.js";
-
+import {
+  findAdvisorBookingsRepo,
+  countAdvisorBookingsByScopeRepo,
+  findAdvisorBookingFeedbackHeaderRepo,
+  findFeedbackByBookingIdRepo,
+  findFeedbackPendingQuestionsByFeedbackIdRepo,
+  findFeedbackFormNameByIdRepo,
+  findAdvisorBookingByIdAndEmailRepo,
+  findEventTypeNameByIdRepo,
+  findReviewerContactByIdRepo,
+  cancelBookingWithReasonRepo,
+  releaseSlotByDateTimeRepo,
+  rescheduleBookingRepo,
+  bookSlotByIdRepo,
+  updateEscrowAvailableAtRepo,
+} from "./advisor.repository.js";
 
 export const advisorService = {
   sendOtp: async (email: string) => {
@@ -70,103 +76,11 @@ export const advisorService = {
     options: { scope?: "upcoming" | "past" | "cancelled"; search?: string }
   ) => {
     const { scope = "upcoming", search } = options;
-    const now = new Date();
     const cleanEmail = advisorEmail.trim().toLowerCase();
 
-    const baseConditions = [eq(bookings.advisorEmail, cleanEmail)];
-
-    if (search && search.trim() !== "") {
-      const pattern = `%${search.trim().toLowerCase()}%`;
-      baseConditions.push(
-        sql`(
-          LOWER(${bookings.internName}) LIKE ${pattern} OR
-          LOWER(${bookings.batch}) LIKE ${pattern} OR
-          LOWER(${bookings.weekStage}) LIKE ${pattern} OR
-          LOWER(${reviewers.name}) LIKE ${pattern} OR
-          LOWER(${eventTypes.name}) LIKE ${pattern}
-        )`
-      );
-    }
-
-    const scopeConditions = [...baseConditions];
-
-  if (scope === "upcoming") {
-  scopeConditions.push(gte(bookings.endTime, now));
-  scopeConditions.push(ne(bookings.status, "cancelled"));
-} else if (scope === "past") {
-  scopeConditions.push(lt(bookings.endTime, now));
-  scopeConditions.push(ne(bookings.status, "cancelled"));
-} else if (scope === "cancelled") {
-      scopeConditions.push(eq(bookings.status, "cancelled"));
-    }
-
-    const orderBy = scope === "upcoming"
-      ? sql`${bookings.startTime} ASC`
-      : sql`${bookings.startTime} DESC`;
-
-    const rows = await db
-      .select({
-        id: bookings.id,
-        slotId: bookings.id,
-        eventTypeId: bookings.eventTypeId,
-        internName: bookings.internName,
-        batch: bookings.batch,
-        advisorName: bookings.advisorName,
-        advisorEmail: bookings.advisorEmail,
-        weekStage: bookings.weekStage,
-        startTime: bookings.startTime,
-        endTime: bookings.endTime,
-        status: bookings.status,
-        meetLink: bookings.meetLink,
-        cancelledAt: bookings.cancelledAt,
-        cancelledReason: bookings.cancelledReason,
-        proposedStartTime: bookings.proposedStartTime,
-        proposedEndTime: bookings.proposedEndTime,
-        rescheduleReason: bookings.rescheduleReason,
-        rescheduleToken: bookings.rescheduleToken,
-        rescheduleRequestedBy: bookings.rescheduleRequestedBy,
-        rescheduleCount: bookings.rescheduleCount,
-        eventTypeName: eventTypes.name,
-        bookingWindowDays: eventTypes.bookingWindowDays,
-        price: eventTypes.price,
-        paymentStatus: payments.status,
-        paymentAmount: payments.amount,
-        refundAmount: payments.refundAmount,
-        cancellationFee: payments.cancellationFee,
-        razorpayPaymentId: payments.razorpayPaymentId,
-        reviewerName: reviewers.name,
-        timezone: sql<string>`'IST'`,
-        hasFeedback: sql<boolean>`${feedback.id} is not null`,
-        disputeId: bookingDisputes.id,
-        disputeReason: bookingDisputes.reason,
-        disputeDescription: bookingDisputes.description,
-        disputeStatus: bookingDisputes.status,
-        disputeAdminNotes: bookingDisputes.adminNotes,
-        disputeCreatedAt: bookingDisputes.createdAt,
-        disputeResolvedAt: bookingDisputes.resolvedAt,
-      })
-      .from(bookings)
-      .innerJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
-      .innerJoin(reviewers, eq(bookings.reviewerId, reviewers.id))
-      .leftJoin(payments, eq(payments.bookingId, bookings.id))
-      .leftJoin(feedback, eq(feedback.bookingId, bookings.id))
-      .leftJoin(bookingDisputes, eq(bookingDisputes.bookingId, bookings.id))
-      .where(and(...scopeConditions))
-      .orderBy(orderBy);
-
-    const [upcomingCountRes, pastCountRes, cancelledCountRes] = await Promise.all([
-      db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(bookings)
-        .where(and(eq(bookings.advisorEmail, cleanEmail), gte(bookings.endTime, now), ne(bookings.status, "cancelled"))),
-      db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(bookings)
-        .where(and(eq(bookings.advisorEmail, cleanEmail), lt(bookings.endTime, now), ne(bookings.status, "cancelled"))),
-      db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(bookings)
-        .where(and(eq(bookings.advisorEmail, cleanEmail), eq(bookings.status, "cancelled"))),
+    const [rows, counts] = await Promise.all([
+      findAdvisorBookingsRepo(cleanEmail, { scope, search }),
+      countAdvisorBookingsByScopeRepo(cleanEmail),
     ]);
 
     const bookingsWithMeetingLinks = rows.map((r) => {
@@ -198,74 +112,32 @@ export const advisorService = {
       };
     });
 
-  return {
-    bookings: bookingsWithMeetingLinks,
-    counts: {
-    upcoming: upcomingCountRes[0]?.count ?? 0,
-    past: pastCountRes[0]?.count ?? 0,
-    cancelled: cancelledCountRes[0]?.count ?? 0,
-  },
-};
+    return {
+      bookings: bookingsWithMeetingLinks,
+      counts,
+    };
   },
 
   getAdvisorBookingFeedback: async (advisorEmail: string, bookingId: number) => {
     const cleanEmail = advisorEmail.trim().toLowerCase();
 
-    const [booking] = await db
-      .select({
-        id: bookings.id,
-        advisorEmail: bookings.advisorEmail,
-        internName: bookings.internName,
-        batch: bookings.batch,
-        weekStage: bookings.weekStage,
-        startTime: bookings.startTime,
-        endTime: bookings.endTime,
-        reviewerName: reviewers.name,
-        eventTypeName: eventTypes.name,
-      })
-      .from(bookings)
-      .innerJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
-      .innerJoin(reviewers, eq(bookings.reviewerId, reviewers.id))
-      .where(and(eq(bookings.id, bookingId), eq(bookings.advisorEmail, cleanEmail)))
-      .limit(1);
+    const booking = await findAdvisorBookingFeedbackHeaderRepo(cleanEmail, bookingId);
 
     if (!booking) {
       throw new AppError("Booking not found", 404);
     }
 
-    const [fb] = await db
-      .select()
-      .from(feedback)
-      .where(eq(feedback.bookingId, bookingId))
-      .limit(1);
+    const fb = await findFeedbackByBookingIdRepo(bookingId);
 
     if (!fb) {
       throw new AppError("Feedback not submitted for this session yet", 404);
     }
 
-    const pendingQuestions = await db
-      .select({
-        id: feedbackPendingQuestions.id,
-        questionId: questions.id,
-        questionText: questions.questionText,
-        description: questions.description,
-        status: feedbackPendingQuestions.status,
-        assignedAt: feedbackPendingQuestions.assignedAt,
-        completedAt: feedbackPendingQuestions.completedAt,
-      })
-      .from(feedbackPendingQuestions)
-      .innerJoin(questions, eq(feedbackPendingQuestions.questionId, questions.id))
-      .where(eq(feedbackPendingQuestions.feedbackId, fb.id))
-      .orderBy(asc(feedbackPendingQuestions.id));
+    const pendingQuestions = await findFeedbackPendingQuestionsByFeedbackIdRepo(fb.id);
 
     let formName: string | null = null;
     if (fb.formId) {
-      const [form] = await db
-        .select({ name: feedbackForms.name })
-        .from(feedbackForms)
-        .where(eq(feedbackForms.id, fb.formId))
-        .limit(1);
-      formName = form?.name ?? null;
+      formName = await findFeedbackFormNameByIdRepo(fb.formId);
     }
 
     return {
@@ -298,11 +170,7 @@ export const advisorService = {
   cancelAdvisorBooking: async (advisorEmail: string, bookingId: number, data: { reason?: string | undefined }) => {
     const cleanEmail = advisorEmail.trim().toLowerCase();
 
-    const [booking] = await db
-      .select()
-      .from(bookings)
-      .where(and(eq(bookings.id, bookingId), eq(bookings.advisorEmail, cleanEmail)))
-      .limit(1);
+    const booking = await findAdvisorBookingByIdAndEmailRepo(cleanEmail, bookingId);
 
     if (!booking) {
       throw new AppError("Booking not found", 404);
@@ -317,46 +185,27 @@ export const advisorService = {
       throw new AppError("This session starts in less than 3 hours and can no longer be changed online", 409);
     }
 
-    const [eventType] = await db
-      .select({ name: eventTypes.name })
-      .from(eventTypes)
-      .where(eq(eventTypes.id, booking.eventTypeId))
-      .limit(1);
-
-    const [reviewer] = await db
-      .select({ name: reviewers.name, email: reviewers.email })
-      .from(reviewers)
-      .where(eq(reviewers.id, booking.reviewerId))
-      .limit(1);
+    const eventType = await findEventTypeNameByIdRepo(booking.eventTypeId);
+    const reviewer = await findReviewerContactByIdRepo(booking.reviewerId);
 
     const reasonText = data.reason?.trim() || "Cancelled by advisor";
+    const reviewerTimezone = await getEventTimezoneRepo(booking.eventTypeId);
+    const clientTimezone = (booking.formData as Record<string, string> | null)?.clientTimezone || reviewerTimezone;
 
     const updated = await db.transaction(async (tx) => {
-      const [result] = await tx
-        .update(bookings)
-        .set({
-          status: "cancelled",
-          cancelledAt: new Date(),
-          cancelledReason: reasonText,
-        })
-        .where(eq(bookings.id, bookingId))
-        .returning();
+      const result = await cancelBookingWithReasonRepo(bookingId, reasonText, tx);
 
-      const slotDate = dayjs(booking.startTime).format("YYYY-MM-DD");
-      const startTime = dayjs(booking.startTime).format("HH:mm:ss");
-      const endTime = dayjs(booking.endTime).format("HH:mm:ss");
+      const slotDate = dayjs(booking.startTime).tz(reviewerTimezone).format("YYYY-MM-DD");
+      const startTime = dayjs(booking.startTime).tz(reviewerTimezone).format("HH:mm:ss");
+      const endTime = dayjs(booking.endTime).tz(reviewerTimezone).format("HH:mm:ss");
 
-      await tx
-        .update(slots)
-        .set({ status: "available", holdToken: null, holdExpiresAt: null, updatedAt: new Date() })
-        .where(
-          and(
-            eq(slots.eventTypeId, booking.eventTypeId),
-            eq(slots.slotDate, slotDate),
-            eq(slots.startTime, startTime),
-            eq(slots.endTime, endTime)
-          )
-        );
+      await releaseSlotByDateTimeRepo(
+        booking.eventTypeId,
+        slotDate,
+        startTime,
+        endTime,
+        tx
+      );
 
       return result;
     });
@@ -389,21 +238,22 @@ export const advisorService = {
     }
 
     if (eventType && reviewer) {
-      const formattedDate = dayjs(booking.startTime).format("ddd, MMM D");
-      const formattedTime = `${dayjs(booking.startTime).format("h:mm A")} – ${dayjs(booking.endTime).format("h:mm A")}`;
-
-      const recipients: { email: string; name: string; role: "advisor" | "reviewer" | "intern" }[] = [
-        { email: booking.advisorEmail, name: booking.advisorName, role: "advisor" },
-        { email: reviewer.email, name: reviewer.name, role: "reviewer" },
+      const recipients: { email: string; name: string; role: "advisor" | "reviewer" | "intern"; timezone: string }[] = [
+        { email: booking.advisorEmail, name: booking.advisorName, role: "advisor", timezone: clientTimezone },
+        { email: reviewer.email, name: reviewer.name, role: "reviewer", timezone: reviewerTimezone },
         ...(booking.internEmails ?? []).map((email) => ({
           email,
           name: booking.internName,
           role: "intern" as const,
+          timezone: clientTimezone,
         })),
       ];
 
       await Promise.all(
-        recipients.map(({ email, name, role }) => {
+        recipients.map(({ email, name, role, timezone: recipientTz }) => {
+          const formattedDate = dayjs(booking.startTime).tz(recipientTz).format("ddd, MMM D");
+          const formattedTime = `${dayjs(booking.startTime).tz(recipientTz).format("h:mm A")} – ${dayjs(booking.endTime).tz(recipientTz).format("h:mm A")} (${recipientTz})`;
+
           const { html: fallbackHtml } = bookingCancelledTemplate({
             recipientName: name,
             recipientRole: role,
@@ -436,7 +286,7 @@ export const advisorService = {
         reviewerId: booking.reviewerId,
         type: "booking_cancelled",
         title: "Booking cancelled by advisor",
-        message: `${booking.advisorName} cancelled their session for ${dayjs(booking.startTime).format("ddd, MMM D")}`,
+        message: `${booking.advisorName} cancelled their session for ${dayjs(booking.startTime).tz(reviewerTimezone).format("ddd, MMM D")}`,
         bookingId: booking.id,
       });
     }
@@ -451,11 +301,7 @@ export const advisorService = {
   ) => {
     const cleanEmail = advisorEmail.trim().toLowerCase();
 
-    const [booking] = await db
-      .select()
-      .from(bookings)
-      .where(and(eq(bookings.id, bookingId), eq(bookings.advisorEmail, cleanEmail)))
-      .limit(1);
+    const booking = await findAdvisorBookingByIdAndEmailRepo(cleanEmail, bookingId);
 
     if (!booking) {
       throw new AppError("Booking not found", 404);
@@ -481,53 +327,43 @@ export const advisorService = {
       endTime: data.endTime,
     });
 
-    const newStartTime = dayjs(`${data.date}T${data.startTime}`).toDate();
-    const newEndTime = dayjs(`${data.date}T${data.endTime}`).toDate();
+    const reviewerTimezone = await getEventTimezoneRepo(booking.eventTypeId);
+    const newStartTime = dayjs.tz(`${data.date} ${data.startTime}`, reviewerTimezone).toDate();
+    const newEndTime = dayjs.tz(`${data.date} ${data.endTime}`, reviewerTimezone).toDate();
 
     const updatedBooking = await db.transaction(async (tx) => {
-      const oldSlotDate = dayjs(booking.startTime).format("YYYY-MM-DD");
-      const oldStartTime = dayjs(booking.startTime).format("HH:mm:ss");
-      const oldEndTime = dayjs(booking.endTime).format("HH:mm:ss");
+      const oldSlotDate = dayjs(booking.startTime).tz(reviewerTimezone).format("YYYY-MM-DD");
+      const oldStartTime = dayjs(booking.startTime).tz(reviewerTimezone).format("HH:mm:ss");
+      const oldEndTime = dayjs(booking.endTime).tz(reviewerTimezone).format("HH:mm:ss");
 
-      await tx
-        .update(slots)
-        .set({ status: "available", holdToken: null, holdExpiresAt: null, updatedAt: new Date() })
-        .where(
-          and(
-            eq(slots.eventTypeId, booking.eventTypeId),
-            eq(slots.slotDate, oldSlotDate),
-            eq(slots.startTime, oldStartTime),
-            eq(slots.endTime, oldEndTime)
-          )
-        );
+      await releaseSlotByDateTimeRepo(
+        booking.eventTypeId,
+        oldSlotDate,
+        oldStartTime,
+        oldEndTime,
+        tx
+      );
 
-      const [updated] = await tx
-        .update(bookings)
-        .set({
-          startTime: newStartTime,
-          endTime: newEndTime,
-          status: "rescheduled",
-          rescheduleCount: booking.rescheduleCount + 1,
-          meetLink: null,
-          googleEventId: null,
-        })
-        .where(eq(bookings.id, bookingId))
-        .returning();
+      const updated = await rescheduleBookingRepo(
+        bookingId,
+        newStartTime,
+        newEndTime,
+        booking.rescheduleCount + 1,
+        tx
+      );
 
       if (!updated) {
         throw new AppError("Failed to reschedule booking", 500);
       }
 
-      await tx
-        .update(slots)
-        .set({ status: "booked", holdToken: null, holdExpiresAt: null, updatedAt: new Date() })
-        .where(eq(slots.id, hold.slotId));
+      await bookSlotByIdRepo(hold.slotId, tx);
 
       // Update escrow maturity time to 48 hours after new end time
-      await tx
-        .update(walletTransactions)
-        .set({ availableAt: dayjs(newEndTime).add(48, "hour").toDate() })
-        .where(and(eq(walletTransactions.bookingId, bookingId), eq(walletTransactions.type, "credit_escrow")));
+      await updateEscrowAvailableAtRepo(
+        bookingId,
+        dayjs(newEndTime).add(48, "hour").toDate(),
+        tx
+      );
 
       return updated;
     });
@@ -552,6 +388,7 @@ export const advisorService = {
         weekStage: updatedBooking.weekStage,
         startTime: updatedBooking.startTime,
         endTime: updatedBooking.endTime,
+        formData: updatedBooking.formData,
       }
     );
 
@@ -559,7 +396,7 @@ export const advisorService = {
       reviewerId: updatedBooking.reviewerId,
       type: "booking_rescheduled",
       title: "Booking rescheduled by advisor",
-      message: `${updatedBooking.advisorName} rescheduled their session to ${dayjs(updatedBooking.startTime).format("ddd, MMM D, h:mm A")}`,
+      message: `${updatedBooking.advisorName} rescheduled their session to ${dayjs(updatedBooking.startTime).tz(reviewerTimezone).format("ddd, MMM D, h:mm A")}`,
       bookingId: updatedBooking.id,
     });
 

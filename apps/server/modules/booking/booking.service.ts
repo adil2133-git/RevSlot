@@ -1,14 +1,11 @@
 import crypto from "crypto";
 import dayjs from "../../config/dayjs.js";
 import { z } from "zod";
-import { eq, and, ne, inArray, gte, lte, lt, sql } from "drizzle-orm";
 import { db } from "../../config/db.js";
-import { slots } from "../slot/slots.schema.js";
-import { bookings } from "./bookings.schema.js";
+import type { bookings } from "./bookings.schema.js";
+import type { payments } from "../payment/payments.schema.js";
 import { AppError } from "../../core/errors/AppError.js";
 import type { CreateBookingInput, CancelBookingInput, RescheduleBookingInput, RequestRescheduleInput, RespondRescheduleInput } from "./booking.validation.js";
-import { eventTypes } from "../eventType/eventTypes.schema.js";
-import { reviewers } from "../auth/reviewers.schema.js";
 import { calendarService } from "../calendar/calendar.service.js";
 import { emailService } from "../../services/email.service.js";
 import { bookingConfirmationTemplate, bookingConfirmationTemplateData } from "../../emails/templates/bookingConfirmation.js";
@@ -16,22 +13,54 @@ import { bookingCancelledTemplate, bookingCancelledTemplateData } from "../../em
 import { bookingRescheduledTemplate, bookingRescheduledTemplateData } from "../../emails/templates/bookingRescheduled.js";
 import { bookingRescheduleRequestedTemplate, bookingRescheduleRequestedTemplateData } from "../../emails/templates/bookingRescheduleRequested.js";
 import { slotService } from "../slot/slot.service.js"; 
-import { feedback } from "../feedback/feedback.schema.js";
 import { BOOKING_FIELD_DEFINITIONS } from "./bookingFields.js";
 import { meetingService } from "../meeting/meeting.service.js";
-import { payments } from "../payment/payments.schema.js";
-import { reviewerWallets, walletTransactions } from "../wallet/wallet.schema.js";
 import { refundService } from "../payment/refund.service.js";
-import { bookingDisputes } from "../dispute/disputes.schema.js";
-import { availabilityTemplates } from "../availability/schema/availabilityTemplates.schema.js";
+import {
+  getEventTimezoneRepo,
+  getOwnedBookingOrThrowRepo,
+  releaseBookingSlotRepo,
+  checkCrossEventConflictRepo,
+  findHeldSlotByTokenRepo,
+  findEventTypePriceByIdRepo,
+  findPaymentByOrderIdRepo,
+  findExistingPaymentByPaymentIdExcludingRepo,
+  insertBookingRepo,
+  linkPaymentToBookingRepo,
+  findReviewerWalletRepo,
+  creditReviewerWalletEscrowRepo,
+  createReviewerWalletRepo,
+  insertWalletEscrowTransactionRepo,
+  markSlotBookedRepo,
+  findBookingFinalizeDetailsRepo,
+  updateBookingMeetingDetailsRepo,
+  findMyBookingsRepo,
+  findBookingDetailsByIdRepo,
+  findEventTypeNameByIdRepo,
+  findReviewerContactByIdRepo,
+  cancelBookingInDbRepo,
+  updateBookingRescheduledRepo,
+  bookSlotWithResetHoldRepo,
+  updateEscrowAvailableAtForBookingRepo,
+  updateBookingRescheduleRequestedRepo,
+  findRescheduleRequestByTokenRepo,
+  findRescheduleReviewerRepo,
+  findRescheduleEventTypeRepo,
+  findPaymentByBookingIdRepo,
+  acceptRescheduleRequestRepo,
+  declineRescheduleRequestRepo,
+  findFeedbackByBookingIdExistsRepo,
+  updateBookingOutcomeRepo,
+} from "./booking.repository.js";
 
 export interface GetMyBookingsOptions {
-
   page: number;
   limit: number;
   status?: ("confirmed" | "completed" | "rescheduled" | "cancelled" | "no_show" | "reschedule_requested")[] | undefined;
   scope?: "upcoming" | "past" | "ongoing" | undefined;
   search?: string | undefined;
+  sortBy?: "startTime" | "createdAt" | undefined;
+  sortOrder?: "asc" | "desc" | undefined;
 }
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -39,25 +68,11 @@ type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 const CANCEL_CUTOFF_HOURS = 3;
 
 const getEventTimezone = async (eventTypeId: number): Promise<string> => {
-  const [templateRow] = await db
-    .select({ timezone: availabilityTemplates.timezone })
-    .from(eventTypes)
-    .innerJoin(
-      availabilityTemplates,
-      eq(eventTypes.availabilityTemplateId, availabilityTemplates.id)
-    )
-    .where(eq(eventTypes.id, eventTypeId))
-    .limit(1);
-
-  return templateRow?.timezone || "Asia/Kolkata";
+  return getEventTimezoneRepo(eventTypeId);
 };
 
 const getOwnedBookingOrThrow = async (reviewerId: number, bookingId: number) => {
-  const [booking] = await db
-    .select()
-    .from(bookings)
-    .where(and(eq(bookings.id, bookingId), eq(bookings.reviewerId, reviewerId)))
-    .limit(1);
+  const booking = await getOwnedBookingOrThrowRepo(reviewerId, bookingId);
 
   if (!booking) {
     throw new AppError("Booking not found or access denied", 404);
@@ -83,18 +98,7 @@ const releaseBookingSlot = async (tx: Transaction, booking: typeof bookings.$inf
   const startTime = dayjs(booking.startTime).tz(timezone).format("HH:mm:ss");
   const endTime = dayjs(booking.endTime).tz(timezone).format("HH:mm:ss");
 
-  await tx
-    .update(slots)
-    .set({ status: "available", holdToken: null, holdExpiresAt: null, updatedAt: new Date() })
-    .where(
-      and(
-        eq(slots.eventTypeId, booking.eventTypeId),
-        eq(slots.slotDate, slotDate),
-        eq(slots.startTime, startTime),
-        eq(slots.endTime, endTime),
-        eq(slots.status, "booked")
-      )
-    );
+  await releaseBookingSlotRepo(booking.eventTypeId, slotDate, startTime, endTime, tx);
 };
 
 export const bookingService = {
@@ -106,54 +110,23 @@ export const bookingService = {
     excludeSlotId: number,
     timezone: string = "Asia/Kolkata"
   ) => {
-    // 1. Check slots table
-    const conflicts = await db
-      .select()
-      .from(slots)
-      .where(
-        and(
-          eq(slots.reviewerId, reviewerId),
-          eq(slots.slotDate, slotDate),
-          ne(slots.id, excludeSlotId),
-          sql`(${slots.status} = 'booked' OR (${slots.status} = 'held' AND ${slots.holdExpiresAt} > now()))`,
-          sql`(${slots.startTime}, ${slots.endTime}) OVERLAPS (${startTime}::time, ${endTime}::time)`
-        )
-      );
-
-    if (conflicts.length > 0) return true;
-
-    // 2. Check bookings table
     const targetStart = dayjs.tz(`${slotDate} ${startTime}`, timezone).toDate();
     const targetEnd = dayjs.tz(`${slotDate} ${endTime}`, timezone).toDate();
 
-    const bookingConflicts = await db
-      .select({ id: bookings.id })
-      .from(bookings)
-      .where(
-        and(
-          eq(bookings.reviewerId, reviewerId),
-          sql`${bookings.status} IN ('confirmed', 'rescheduled')`,
-          sql`(${bookings.startTime}, ${bookings.endTime}) OVERLAPS (${targetStart}::timestamptz, ${targetEnd}::timestamptz)`
-        )
-      )
-      .limit(1);
-
-    return bookingConflicts.length > 0;
+    return checkCrossEventConflictRepo(
+      reviewerId,
+      slotDate,
+      startTime,
+      endTime,
+      excludeSlotId,
+      targetStart,
+      targetEnd
+    );
   },
 
   createBooking: async (data: CreateBookingInput) => {
     return db.transaction(async (tx) => {
-      const [slot] = await tx
-        .select()
-        .from(slots)
-        .where(
-          and(
-            eq(slots.holdToken, data.holdToken),
-            eq(slots.status, "held"),
-            sql`${slots.holdExpiresAt} > now()`
-          )
-        )
-        .limit(1);
+      const slot = await findHeldSlotByTokenRepo(data.holdToken, tx);
 
       if (!slot) {
         throw new AppError(
@@ -180,11 +153,7 @@ export const bookingService = {
         );
       }
 
-      const [priceCheckEventType] = await tx
-        .select({ price: eventTypes.price })
-        .from(eventTypes)
-        .where(eq(eventTypes.id, slot.eventTypeId))
-        .limit(1);
+      const priceCheckEventType = await findEventTypePriceByIdRepo(slot.eventTypeId, tx);
 
       let verifiedPayment: typeof payments.$inferSelect | null = null;
 
@@ -205,11 +174,7 @@ export const bookingService = {
         }
 
         // Match order record in database and verify amount
-        const [paymentRecord] = await tx
-          .select()
-          .from(payments)
-          .where(eq(payments.razorpayOrderId, razorpayOrderId))
-          .limit(1);
+        const paymentRecord = await findPaymentByOrderIdRepo(razorpayOrderId, tx);
 
         if (!paymentRecord) {
           throw new AppError("Payment order not found in database", 404);
@@ -224,16 +189,11 @@ export const bookingService = {
         }
 
         // Replay prevention: check if this payment ID was already used for ANOTHER payment record
-        const [existingPayment] = await tx
-          .select({ id: payments.id })
-          .from(payments)
-          .where(
-            and(
-              eq(payments.razorpayPaymentId, razorpayPaymentId),
-              ne(payments.id, paymentRecord.id)
-            )
-          )
-          .limit(1);
+        const existingPayment = await findExistingPaymentByPaymentIdExcludingRepo(
+          razorpayPaymentId,
+          paymentRecord.id,
+          tx
+        );
 
         if (existingPayment) {
           throw new AppError("This payment has already been redeemed", 400);
@@ -251,138 +211,123 @@ export const bookingService = {
         timezone
       ).toDate();
 
+      const allowedKeys = new Set<string>([
+        "fullName",
+        "email",
+        "whatsappNumber",
+        "mainlyFocusedFor",
+        "comments",
+        "clientTimezone",
+        ...Object.keys(BOOKING_FIELD_DEFINITIONS),
+      ]);
 
-  const allowedKeys = new Set<string>([
-  "fullName",
-  "email",
-  "whatsappNumber",
-  "mainlyFocusedFor",
-  "comments",
-  ...Object.keys(BOOKING_FIELD_DEFINITIONS),
-]);
+      const submittedFormData: Record<string, string> =
+        data.formData ?? {};
 
-  const submittedFormData: Record<string, string> =
-  data.formData ?? {};
+      const formData = Object.fromEntries(
+        Object.entries(submittedFormData)
+          .filter(([key]) => allowedKeys.has(key))
+          .map(([key, value]) => [key, value.trim()])
+      );
 
- const formData = Object.fromEntries(
-  Object.entries(submittedFormData)
-    .filter(([key]) => allowedKeys.has(key))
-    .map(([key, value]) => [key, value.trim()])
-);
+      const requiredFields = [
+        "fullName",
+        "email",
+        "whatsappNumber",
+        "mainlyFocusedFor",
+      ] as const;
 
-    const requiredFields = [
-  "fullName",
-  "email",
-  "whatsappNumber",
-  "mainlyFocusedFor",
-] as const;
+      for (const key of requiredFields) {
+        if (!formData[key]) {
+          throw new AppError(`${key} is required`, 400);
+        }
+      }
 
-for (const key of requiredFields) {
-  if (!formData[key]) {
-    throw new AppError(`${key} is required`, 400);
-  }
-}
+      if (!z.string().email().safeParse(formData.email).success) {
+        throw new AppError("Invalid email address", 400);
+      }
 
-if (!z.string().email().safeParse(formData.email).success) {
-  throw new AppError("Invalid email address", 400);
-}
+      if (
+        !formData.whatsappNumber ||
+        !/^\d+$/.test(formData.whatsappNumber)
+      ) {
+        throw new AppError("WhatsApp number must contain digits only", 400);
+      }
 
-if (
-  !formData.whatsappNumber ||
-  !/^\d+$/.test(formData.whatsappNumber)
-) {
-  throw new AppError("WhatsApp number must contain digits only", 400);
-}
+      for (const [key, value] of Object.entries(formData)) {
+        const definition =
+          BOOKING_FIELD_DEFINITIONS[
+            key as keyof typeof BOOKING_FIELD_DEFINITIONS
+          ];
 
-for (const [key, value] of Object.entries(formData)) {
-  const definition =
-    BOOKING_FIELD_DEFINITIONS[
-      key as keyof typeof BOOKING_FIELD_DEFINITIONS
-    ];
+        if (!definition || !value) continue;
 
-  if (!definition || !value) continue;
+        if (
+          definition.type === "email" &&
+          !z.string().email().safeParse(value).success
+        ) {
+          throw new AppError(`Invalid ${definition.label}`, 400);
+        }
 
-  if (
-    definition.type === "email" &&
-    !z.string().email().safeParse(value).success
-  ) {
-    throw new AppError(`Invalid ${definition.label}`, 400);
-  }
+        if (
+          definition.type === "url" &&
+          !z.string().url().safeParse(value).success
+        ) {
+          throw new AppError(`Invalid ${definition.label}`, 400);
+        }
+      }
 
-  if (
-    definition.type === "url" &&
-    !z.string().url().safeParse(value).success
-  ) {
-    throw new AppError(`Invalid ${definition.label}`, 400);
-  }
-}
-
-      const [booking] = await tx
-        .insert(bookings)
-        .values({
-           eventTypeId: slot.eventTypeId,
-           reviewerId: slot.reviewerId,
-           internName: formData.internName || formData.fullName || "",
-           batch: formData.batch || "",
-           advisorName: formData.advisorName || formData.fullName || "",
-           advisorEmail: formData.advisorEmail || formData.email || "",
-           internEmails: formData.internEmail
-            ? [formData.internEmail]
-            : undefined,
-           weekStage: formData.weekStage || "",
-
-          // New dynamic booking form data
-           formData,
-
-           startTime: startTimestamp,
-           endTime: endTimestamp,
-           status: "confirmed",
-           razorpayOrderId: data.razorpayOrderId,
-           razorpayPaymentId: data.razorpayPaymentId,
-       })
-        .returning();
+      const booking = await insertBookingRepo({
+        eventTypeId: slot.eventTypeId,
+        reviewerId: slot.reviewerId,
+        internName: formData.internName || formData.fullName || "",
+        batch: formData.batch || "",
+        advisorName: formData.advisorName || formData.fullName || "",
+        advisorEmail: formData.advisorEmail || formData.email || "",
+        internEmails: formData.internEmail
+          ? [formData.internEmail]
+          : undefined,
+        weekStage: formData.weekStage || "",
+        formData,
+        startTime: startTimestamp,
+        endTime: endTimestamp,
+        status: "confirmed",
+        razorpayOrderId: data.razorpayOrderId,
+        razorpayPaymentId: data.razorpayPaymentId,
+      }, tx);
 
       if (!booking) {
         throw new AppError("Failed to create booking", 500);
       }
 
       if (verifiedPayment) {
-        await tx
-          .update(payments)
-          .set({
-            bookingId: booking.id,
-            razorpayPaymentId: data.razorpayPaymentId,
-            advisorEmail: formData.advisorEmail || formData.email,
-            status: "captured",
-            updatedAt: new Date(),
-          })
-          .where(eq(payments.id, verifiedPayment.id));
+        await linkPaymentToBookingRepo(
+          verifiedPayment.id,
+          booking.id,
+          data.razorpayPaymentId!,
+          (formData.advisorEmail || formData.email || ""),
+          tx
+        );
 
         // Credit reviewer wallet escrow
-        const [wallet] = await tx
-          .select()
-          .from(reviewerWallets)
-          .where(eq(reviewerWallets.reviewerId, slot.reviewerId))
-          .limit(1);
+        const wallet = await findReviewerWalletRepo(slot.reviewerId, tx);
 
         if (wallet) {
-          await tx
-            .update(reviewerWallets)
-            .set({
-              pendingBalance: wallet.pendingBalance + verifiedPayment.amount,
-              updatedAt: new Date(),
-            })
-            .where(eq(reviewerWallets.id, wallet.id));
+          await creditReviewerWalletEscrowRepo(
+            wallet.id,
+            verifiedPayment.amount,
+            wallet.pendingBalance,
+            tx
+          );
         } else {
-          await tx.insert(reviewerWallets).values({
-            reviewerId: slot.reviewerId,
-            pendingBalance: verifiedPayment.amount,
-            availableBalance: 0,
-            withdrawnBalance: 0,
-          });
+          await createReviewerWalletRepo(
+            slot.reviewerId,
+            verifiedPayment.amount,
+            tx
+          );
         }
 
-        await tx.insert(walletTransactions).values({
+        await insertWalletEscrowTransactionRepo({
           reviewerId: slot.reviewerId,
           bookingId: booking.id,
           type: "credit_escrow",
@@ -390,13 +335,10 @@ for (const [key, value] of Object.entries(formData)) {
           status: "completed",
           description: `Booking #${booking.id} confirmed: ₹${(verifiedPayment.amount / 100).toFixed(2)} held in escrow`,
           availableAt: dayjs(endTimestamp).add(48, "hour").toDate(),
-        });
+        }, tx);
       }
 
-      await tx
-        .update(slots)
-        .set({ status: "booked", updatedAt: new Date() })
-        .where(eq(slots.id, slot.id));
+      await markSlotBookedRepo(slot.id, tx);
 
       return booking;
     });
@@ -414,35 +356,19 @@ for (const [key, value] of Object.entries(formData)) {
     startTime: Date;
     endTime: Date;
   }) => {
-    const [eventType] = await db
-      .select({
-        name: eventTypes.name,
-        price: eventTypes.price,
-      })
-      .from(eventTypes)
-      .where(eq(eventTypes.id, booking.eventTypeId))
-      .limit(1);
-
-    const [reviewer] = await db
-      .select({ name: reviewers.name, email: reviewers.email })
-      .from(reviewers)
-      .where(eq(reviewers.id, booking.reviewerId))
-      .limit(1);
-
-    const [bookingPayment] = await db
-      .select({
-        razorpayPaymentId: payments.razorpayPaymentId,
-      })
-      .from(payments)
-      .where(eq(payments.bookingId, booking.id))
-      .limit(1);
+    const { eventType, reviewer, bookingPayment } = await findBookingFinalizeDetailsRepo(
+      booking.eventTypeId,
+      booking.reviewerId,
+      booking.id
+    );
 
     if (!eventType || !reviewer) return { meetLink: null };
 
-    const timezone = "Asia/Kolkata";
+    const reviewerTimezone = await getEventTimezone(booking.eventTypeId);
+    const clientTimezone = (booking as any).formData?.clientTimezone || reviewerTimezone;
 
     const internalMeetingLink =
-       meetingService.getMeetingLink(booking.id);
+      meetingService.getMeetingLink(booking.id);
 
     const meetLink: string | null = internalMeetingLink;
 
@@ -453,7 +379,7 @@ for (const [key, value] of Object.entries(formData)) {
         description: `RevSlot session: ${eventType.name} (${booking.weekStage})`,
         startTime: booking.startTime,
         endTime: booking.endTime,
-        timezone,
+        timezone: reviewerTimezone,
         attendeeEmails: [
           reviewer.email,
           booking.advisorEmail,
@@ -463,13 +389,11 @@ for (const [key, value] of Object.entries(formData)) {
       });
 
       if (meetEvent) {
-      await db
-  .update(bookings)
-  .set({
-    meetLink: internalMeetingLink,
-    googleEventId: meetEvent.googleEventId,
-  })
-  .where(eq(bookings.id, booking.id));
+        await updateBookingMeetingDetailsRepo(
+          booking.id,
+          internalMeetingLink,
+          meetEvent.googleEventId
+        );
       }
     } catch (err) {
       console.error(
@@ -478,43 +402,44 @@ for (const [key, value] of Object.entries(formData)) {
       );
     }
 
-  await db
-  .update(bookings)
-  .set({
-    meetLink: internalMeetingLink,
-  })
-  .where(eq(bookings.id, booking.id));
-
-    const formattedDate = dayjs(booking.startTime).format("ddd, MMM D");
-
-    const formattedTime = `${dayjs(booking.startTime).format(
-      "h:mm A"
-    )} – ${dayjs(booking.endTime).format("h:mm A")} (${timezone})`;
+    await updateBookingMeetingDetailsRepo(
+      booking.id,
+      internalMeetingLink
+    );
 
     const recipients: {
       email: string;
       name: string;
       role: "advisor" | "reviewer" | "intern";
+      timezone: string;
     }[] = [
-        {
-          email: booking.advisorEmail,
-          name: booking.advisorName,
-          role: "advisor",
-        },
-        {
-          email: reviewer.email,
-          name: reviewer.name,
-          role: "reviewer",
-        },
-        ...(booking.internEmails ?? []).map((email) => ({
-          email,
-          name: booking.internName,
-          role: "intern" as const,
-        })),
-      ];
+      {
+        email: booking.advisorEmail,
+        name: booking.advisorName,
+        role: "advisor",
+        timezone: clientTimezone,
+      },
+      {
+        email: reviewer.email,
+        name: reviewer.name,
+        role: "reviewer",
+        timezone: reviewerTimezone,
+      },
+      ...(booking.internEmails ?? []).map((email) => ({
+        email,
+        name: booking.internName,
+        role: "intern" as const,
+        timezone: clientTimezone,
+      })),
+    ];
 
     await Promise.all(
-      recipients.map(({ email, name, role }) => {
+      recipients.map(({ email, name, role, timezone: recipientTz }) => {
+        const formattedDate = dayjs(booking.startTime).tz(recipientTz).format("ddd, MMM D");
+        const formattedTime = `${dayjs(booking.startTime).tz(recipientTz).format(
+          "h:mm A"
+        )} – ${dayjs(booking.endTime).tz(recipientTz).format("h:mm A")} (${recipientTz})`;
+
         const { html: fallbackHtml } = bookingConfirmationTemplate({
           recipientName: name,
           recipientRole: role,
@@ -569,114 +494,8 @@ for (const [key, value] of Object.entries(formData)) {
     reviewerId: number,
     options: GetMyBookingsOptions
   ) => {
-    const { page, limit, status, scope, search } = options;
-    const offset = (page - 1) * limit;
-    const now = new Date();
-
-    const conditions = [eq(bookings.reviewerId, reviewerId)];
-
-    if (status && status.length > 0) {
-      conditions.push(inArray(bookings.status, status));
-    }
-
-    if (scope === "upcoming") {
-      conditions.push(gte(bookings.startTime, now));
-    } else if (scope === "past") {
-      conditions.push(lt(bookings.startTime, now));
-    } else if (scope === "ongoing") {
-      conditions.push(lte(bookings.startTime, now));
-      conditions.push(gte(bookings.endTime, now));
-    }
-
-    if (search && search.trim() !== "") {
-      const pattern = `%${search.trim().toLowerCase()}%`;
-      conditions.push(
-        sql`(
-          LOWER(${bookings.internName}) LIKE ${pattern} OR
-          LOWER(${bookings.batch}) LIKE ${pattern} OR
-          LOWER(${bookings.weekStage}) LIKE ${pattern} OR
-          LOWER(${bookings.advisorName}) LIKE ${pattern} OR
-          LOWER(${eventTypes.name}) LIKE ${pattern}
-        )`
-      );
-    }
-
-    const orderBy = scope === "upcoming" || scope === "ongoing"
-      ? sql`${bookings.startTime} ASC`
-      : sql`${bookings.createdAt} DESC`;
-
-    const reviewerCondition = eq(bookings.reviewerId, reviewerId);
-
-    const [rows, countResult, countsRes] = await Promise.all([
-      db
-        .select({
-          id: bookings.id,
-          eventTypeId: bookings.eventTypeId,
-          internName: bookings.internName,
-          batch: bookings.batch,
-          advisorName: bookings.advisorName,
-          advisorEmail: bookings.advisorEmail,
-          weekStage: bookings.weekStage,
-          formData: bookings.formData,
-          startTime: bookings.startTime,
-          endTime: bookings.endTime,
-          status: bookings.status,
-          meetLink: bookings.meetLink,
-          cancelledAt: bookings.cancelledAt,
-          cancelledReason: bookings.cancelledReason,
-          proposedStartTime: bookings.proposedStartTime,
-          proposedEndTime: bookings.proposedEndTime,
-          rescheduleRequestedBy: bookings.rescheduleRequestedBy,
-          rescheduleReason: bookings.rescheduleReason,
-          rescheduleToken: bookings.rescheduleToken,
-          eventTypeName: eventTypes.name,
-          bookingWindowDays: eventTypes.bookingWindowDays,
-          price: eventTypes.price,
-          paymentStatus: payments.status,
-          paymentAmount: payments.amount,
-          refundAmount: payments.refundAmount,
-          cancellationFee: payments.cancellationFee,
-          razorpayPaymentId: payments.razorpayPaymentId,
-          rescheduleCount: bookings.rescheduleCount,
-          hasFeedback: sql<boolean>`${feedback.id} is not null`,
-          disputeId: bookingDisputes.id,
-          disputeReason: bookingDisputes.reason,
-          disputeDescription: bookingDisputes.description,
-          disputeStatus: bookingDisputes.status,
-          disputeAdminNotes: bookingDisputes.adminNotes,
-          disputeCreatedAt: bookingDisputes.createdAt,
-          disputeResolvedAt: bookingDisputes.resolvedAt,
-        })
-        .from(bookings)
-        .innerJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
-        .leftJoin(payments, eq(payments.bookingId, bookings.id))
-        .leftJoin(feedback, eq(feedback.bookingId, bookings.id))
-        .leftJoin(bookingDisputes, eq(bookingDisputes.bookingId, bookings.id))
-        .where(and(...conditions))
-        .orderBy(orderBy)
-        .limit(limit)
-        .offset(offset),
-      db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(bookings)
-        .where(and(...conditions)),
-      db
-        .select({
-          all: sql<number>`count(*)::int`,
-          ongoing: sql<number>`count(case when ${bookings.startTime} <= ${now} and ${bookings.endTime} >= ${now} and ${bookings.status} != 'cancelled' then 1 end)::int`,
-          upcoming: sql<number>`count(case when ${bookings.startTime} >= ${now} and ${bookings.status} != 'cancelled' then 1 end)::int`,
-          reschedule_requested: sql<number>`count(case when ${bookings.status} = 'reschedule_requested' then 1 end)::int`,
-          completed: sql<number>`count(case when ${bookings.status} = 'completed' then 1 end)::int`,
-          rescheduled: sql<number>`count(case when ${bookings.status} = 'rescheduled' then 1 end)::int`,
-          cancelled: sql<number>`count(case when ${bookings.status} = 'cancelled' then 1 end)::int`,
-          no_show: sql<number>`count(case when ${bookings.status} = 'no_show' then 1 end)::int`,
-        })
-        .from(bookings)
-        .where(reviewerCondition),
-    ]);
-
-    const totalCount = countResult[0]?.count ?? 0;
-    const defaultCounts = { all: 0, ongoing: 0, upcoming: 0, reschedule_requested: 0, completed: 0, rescheduled: 0, cancelled: 0, no_show: 0 };
+    const { page, limit } = options;
+    const { rows, totalCount, counts } = await findMyBookingsRepo(reviewerId, options);
 
     const bookingsWithMeetingLinks = rows.map((r) => {
       const {
@@ -708,58 +527,19 @@ for (const [key, value] of Object.entries(formData)) {
     });
 
     return {
-      bookings:  bookingsWithMeetingLinks,
+      bookings: bookingsWithMeetingLinks,
       pagination: {
         page,
         limit,
         totalCount,
         totalPages: Math.ceil(totalCount / limit),
       },
-      counts: countsRes[0] ?? defaultCounts,
+      counts,
     };
   },
 
   getBookingById: async (reviewerId: number, bookingId: number) => {
-    const [row] = await db
-      .select({
-        id: bookings.id,
-        eventTypeId: bookings.eventTypeId,
-        internName: bookings.internName,
-        batch: bookings.batch,
-        advisorName: bookings.advisorName,
-        advisorEmail: bookings.advisorEmail,
-        internEmails: bookings.internEmails,
-        weekStage: bookings.weekStage,
-        formData: bookings.formData,
-        startTime: bookings.startTime,
-        endTime: bookings.endTime,
-        status: bookings.status,
-        meetLink: bookings.meetLink,
-        cancelledAt: bookings.cancelledAt,
-        cancelledReason: bookings.cancelledReason,
-        rescheduledFromBookingId: bookings.rescheduledFromBookingId,
-        proposedStartTime: bookings.proposedStartTime,
-        proposedEndTime: bookings.proposedEndTime,
-        rescheduleRequestedBy: bookings.rescheduleRequestedBy,
-        rescheduleReason: bookings.rescheduleReason,
-        rescheduleToken: bookings.rescheduleToken,
-        eventTypeName: eventTypes.name,
-        bookingWindowDays: eventTypes.bookingWindowDays,
-        price: eventTypes.price,
-        paymentStatus: payments.status,
-        paymentAmount: payments.amount,
-        refundAmount: payments.refundAmount,
-        cancellationFee: payments.cancellationFee,
-        razorpayPaymentId: payments.razorpayPaymentId,
-        rescheduleCount: bookings.rescheduleCount,
-        hasFeedback: sql<boolean>`${feedback.id} is not null`,
-      })
-      .from(bookings)
-      .innerJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
-      .leftJoin(payments, eq(payments.bookingId, bookings.id))
-      .leftJoin(feedback, eq(feedback.bookingId, bookings.id))
-      .where(and(eq(bookings.id, bookingId), eq(bookings.reviewerId, reviewerId)))
-      .limit(1);
+    const row = await findBookingDetailsByIdRepo(reviewerId, bookingId);
 
     if (!row) {
       throw new AppError("Booking not found", 404);
@@ -777,28 +557,11 @@ for (const [key, value] of Object.entries(formData)) {
 
     assertOutsideCutoff(booking.startTime);
 
-    const [eventType] = await db
-      .select({ name: eventTypes.name })
-      .from(eventTypes)
-      .where(eq(eventTypes.id, booking.eventTypeId))
-      .limit(1);
-
-    const [reviewer] = await db
-      .select({ name: reviewers.name, email: reviewers.email })
-      .from(reviewers)
-      .where(eq(reviewers.id, reviewerId))
-      .limit(1);
+    const eventType = await findEventTypeNameByIdRepo(booking.eventTypeId);
+    const reviewer = await findReviewerContactByIdRepo(reviewerId);
 
     const updated = await db.transaction(async (tx) => {
-      const [result] = await tx
-        .update(bookings)
-        .set({
-          status: "cancelled",
-          cancelledAt: new Date(),
-          cancelledReason: data.reason,
-        })
-        .where(eq(bookings.id, bookingId))
-        .returning();
+      const result = await cancelBookingInDbRepo(bookingId, data.reason, tx);
 
       await releaseBookingSlot(tx, booking);
 
@@ -812,16 +575,17 @@ for (const [key, value] of Object.entries(formData)) {
     }
 
     if (eventType && reviewer) {
-      const formattedDate = dayjs(booking.startTime).format("ddd, MMM D");
-      const formattedTime = `${dayjs(booking.startTime).format("h:mm A")} – ${dayjs(booking.endTime).format("h:mm A")}`;
+      const reviewerTimezone = await getEventTimezone(booking.eventTypeId);
+      const clientTimezone = (booking as any).formData?.clientTimezone || reviewerTimezone;
 
-      const recipients: { email: string; name: string; role: "advisor" | "reviewer" | "intern" }[] = [
-        { email: booking.advisorEmail, name: booking.advisorName, role: "advisor" },
-        { email: reviewer.email, name: reviewer.name, role: "reviewer" },
+      const recipients: { email: string; name: string; role: "advisor" | "reviewer" | "intern"; timezone: string }[] = [
+        { email: booking.advisorEmail, name: booking.advisorName, role: "advisor", timezone: clientTimezone },
+        { email: reviewer.email, name: reviewer.name, role: "reviewer", timezone: reviewerTimezone },
         ...(booking.internEmails ?? []).map((email) => ({
           email,
           name: booking.internName,
           role: "intern" as const,
+          timezone: clientTimezone,
         })),
       ];
 
@@ -840,7 +604,10 @@ for (const [key, value] of Object.entries(formData)) {
         : null;
 
       await Promise.all(
-        recipients.map(({ email, name, role }) => {
+        recipients.map(({ email, name, role, timezone: recipientTz }) => {
+          const formattedDate = dayjs(booking.startTime).tz(recipientTz).format("ddd, MMM D");
+          const formattedTime = `${dayjs(booking.startTime).tz(recipientTz).format("h:mm A")} – ${dayjs(booking.endTime).tz(recipientTz).format("h:mm A")} (${recipientTz})`;
+
           const { html: fallbackHtml } = bookingCancelledTemplate({
             recipientName: name,
             recipientRole: role,
@@ -898,33 +665,26 @@ for (const [key, value] of Object.entries(formData)) {
       await releaseBookingSlot(tx, booking);
 
       // Update existing booking row in place with status 'rescheduled'
-      const [updated] = await tx
-        .update(bookings)
-        .set({
-          startTime: newStartTime,
-          endTime: newEndTime,
-          status: "rescheduled",
-          meetLink: null,
-          googleEventId: null,
-        })
-        .where(eq(bookings.id, bookingId))
-        .returning();
+      const updated = await updateBookingRescheduledRepo(
+        bookingId,
+        newStartTime,
+        newEndTime,
+        tx
+      );
 
       if (!updated) {
         throw new AppError("Failed to reschedule booking", 500);
       }
 
       // Mark the new slot as booked
-      await tx
-        .update(slots)
-        .set({ status: "booked", holdToken: null, holdExpiresAt: null, updatedAt: new Date() })
-        .where(eq(slots.id, hold.slotId));
+      await bookSlotWithResetHoldRepo(hold.slotId, tx);
 
       // Update escrow maturity time to 48 hours after new end time
-      await tx
-        .update(walletTransactions)
-        .set({ availableAt: dayjs(newEndTime).add(48, "hour").toDate() })
-        .where(and(eq(walletTransactions.bookingId, bookingId), eq(walletTransactions.type, "credit_escrow")));
+      await updateEscrowAvailableAtForBookingRepo(
+        bookingId,
+        dayjs(newEndTime).add(48, "hour").toDate(),
+        tx
+      );
 
       return updated;
     });
@@ -961,39 +721,26 @@ for (const [key, value] of Object.entries(formData)) {
     const rescheduleToken = crypto.randomUUID();
     const rescheduleTokenExpiresAt = dayjs().add(48, "hour").toDate();
 
-    const [updated] = await db
-      .update(bookings)
-      .set({
-        status: "reschedule_requested",
-        proposedStartTime,
-        proposedEndTime,
-        rescheduleRequestedBy: "reviewer",
-        rescheduleReason: data.reason || null,
-        rescheduleToken,
-        rescheduleTokenExpiresAt,
-      })
-      .where(eq(bookings.id, bookingId))
-      .returning();
+    const updated = await updateBookingRescheduleRequestedRepo(
+      bookingId,
+      proposedStartTime,
+      proposedEndTime,
+      data.reason || null,
+      rescheduleToken,
+      rescheduleTokenExpiresAt
+    );
 
-    const [eventType] = await db
-      .select({ name: eventTypes.name })
-      .from(eventTypes)
-      .where(eq(eventTypes.id, booking.eventTypeId))
-      .limit(1);
-
-    const [reviewer] = await db
-      .select({ name: reviewers.name, email: reviewers.email })
-      .from(reviewers)
-      .where(eq(reviewers.id, reviewerId))
-      .limit(1);
+    const eventType = await findEventTypeNameByIdRepo(booking.eventTypeId);
+    const reviewer = await findReviewerContactByIdRepo(reviewerId);
 
     if (eventType && reviewer) {
       const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:3000";
       const actionUrl = `${CLIENT_URL}/reschedule-request/${rescheduleToken}`;
-      const currentFormattedDate = dayjs(booking.startTime).format("ddd, MMM D, YYYY");
-      const currentFormattedTime = `${dayjs(booking.startTime).format("h:mm A")} – ${dayjs(booking.endTime).format("h:mm A")}`;
-      const proposedFormattedDate = dayjs(proposedStartTime).format("ddd, MMM D, YYYY");
-      const proposedFormattedTime = `${dayjs(proposedStartTime).format("h:mm A")} – ${dayjs(proposedEndTime).format("h:mm A")}`;
+      const clientTimezone = (booking as any).formData?.clientTimezone || timezone;
+      const currentFormattedDate = dayjs(booking.startTime).tz(clientTimezone).format("ddd, MMM D, YYYY");
+      const currentFormattedTime = `${dayjs(booking.startTime).tz(clientTimezone).format("h:mm A")} – ${dayjs(booking.endTime).tz(clientTimezone).format("h:mm A")} (${clientTimezone})`;
+      const proposedFormattedDate = dayjs(proposedStartTime).tz(clientTimezone).format("ddd, MMM D, YYYY");
+      const proposedFormattedTime = `${dayjs(proposedStartTime).tz(clientTimezone).format("h:mm A")} – ${dayjs(proposedEndTime).tz(clientTimezone).format("h:mm A")} (${clientTimezone})`;
 
       const recipients = [
         { email: booking.advisorEmail, name: booking.advisorName },
@@ -1039,11 +786,7 @@ for (const [key, value] of Object.entries(formData)) {
   },
 
   getRescheduleRequestByToken: async (token: string) => {
-    const [booking] = await db
-      .select()
-      .from(bookings)
-      .where(and(eq(bookings.rescheduleToken, token), eq(bookings.status, "reschedule_requested")))
-      .limit(1);
+    const booking = await findRescheduleRequestByTokenRepo(token);
 
     if (!booking) {
       throw new AppError("Reschedule request not found or link has expired", 404);
@@ -1053,33 +796,9 @@ for (const [key, value] of Object.entries(formData)) {
       throw new AppError("This reschedule request link has expired", 410);
     }
 
-    const [reviewer] = await db
-      .select({ id: reviewers.id, name: reviewers.name, email: reviewers.email })
-      .from(reviewers)
-      .where(eq(reviewers.id, booking.reviewerId))
-      .limit(1);
-
-    const [eventType] = await db
-      .select({
-        id: eventTypes.id,
-        name: eventTypes.name,
-        durationMinutes: eventTypes.durationMinutes,
-        slug: eventTypes.slug,
-        price: eventTypes.price,
-      })
-      .from(eventTypes)
-      .where(eq(eventTypes.id, booking.eventTypeId))
-      .limit(1);
-
-    const [payment] = await db
-      .select({
-        amount: payments.amount,
-        status: payments.status,
-        razorpayPaymentId: payments.razorpayPaymentId,
-      })
-      .from(payments)
-      .where(eq(payments.bookingId, booking.id))
-      .limit(1);
+    const reviewer = await findRescheduleReviewerRepo(booking.reviewerId);
+    const eventType = await findRescheduleEventTypeRepo(booking.eventTypeId);
+    const payment = await findPaymentByBookingIdRepo(booking.id);
 
     return {
       booking: {
@@ -1107,23 +826,12 @@ for (const [key, value] of Object.entries(formData)) {
       const updatedBooking = await db.transaction(async (tx) => {
         await releaseBookingSlot(tx, booking);
 
-        const [updated] = await tx
-          .update(bookings)
-          .set({
-            startTime: newStartTime,
-            endTime: newEndTime,
-            status: "confirmed",
-            proposedStartTime: null,
-            proposedEndTime: null,
-            rescheduleRequestedBy: null,
-            rescheduleReason: null,
-            rescheduleToken: null,
-            rescheduleTokenExpiresAt: null,
-            meetLink: null,
-            googleEventId: null,
-          })
-          .where(eq(bookings.id, booking.id))
-          .returning();
+        const updated = await acceptRescheduleRequestRepo(
+          booking.id,
+          newStartTime,
+          newEndTime,
+          tx
+        );
 
         if (!updated) {
           throw new AppError("Failed to update booking", 500);
@@ -1138,23 +846,23 @@ for (const [key, value] of Object.entries(formData)) {
         });
       }
 
-  await bookingService.finalizeReschedule({
-    startTime: booking.startTime,
-    endTime: booking.endTime,
-  },
-  {
-    id: updatedBooking.id,
-    eventTypeId: updatedBooking.eventTypeId,
-    reviewerId: updatedBooking.reviewerId,
-    internName: updatedBooking.internName,
-    advisorName: updatedBooking.advisorName,
-    advisorEmail: updatedBooking.advisorEmail,
-    internEmails: updatedBooking.internEmails,
-    weekStage: updatedBooking.weekStage,
-    startTime: updatedBooking.startTime,
-    endTime: updatedBooking.endTime,
-  }
-);
+      await bookingService.finalizeReschedule({
+        startTime: booking.startTime,
+        endTime: booking.endTime,
+      },
+      {
+        id: updatedBooking.id,
+        eventTypeId: updatedBooking.eventTypeId,
+        reviewerId: updatedBooking.reviewerId,
+        internName: updatedBooking.internName,
+        advisorName: updatedBooking.advisorName,
+        advisorEmail: updatedBooking.advisorEmail,
+        internEmails: updatedBooking.internEmails,
+        weekStage: updatedBooking.weekStage,
+        startTime: updatedBooking.startTime,
+        endTime: updatedBooking.endTime,
+        formData: updatedBooking.formData,
+      });
 
       return updatedBooking;
 
@@ -1177,32 +885,18 @@ for (const [key, value] of Object.entries(formData)) {
       const updatedBooking = await db.transaction(async (tx) => {
         await releaseBookingSlot(tx, booking);
 
-        const [updated] = await tx
-          .update(bookings)
-          .set({
-            startTime: newStartTime,
-            endTime: newEndTime,
-            status: "confirmed",
-            proposedStartTime: null,
-            proposedEndTime: null,
-            rescheduleRequestedBy: null,
-            rescheduleReason: null,
-            rescheduleToken: null,
-            rescheduleTokenExpiresAt: null,
-            meetLink: null,
-            googleEventId: null,
-          })
-          .where(eq(bookings.id, booking.id))
-          .returning();
+        const updated = await acceptRescheduleRequestRepo(
+          booking.id,
+          newStartTime,
+          newEndTime,
+          tx
+        );
 
         if (!updated) {
           throw new AppError("Failed to update booking", 500);
         }
 
-        await tx
-          .update(slots)
-          .set({ status: "booked", holdToken: null, holdExpiresAt: null, updatedAt: new Date() })
-          .where(eq(slots.id, hold.slotId));
+        await bookSlotWithResetHoldRepo(hold.slotId, tx);
 
         return updated;
       });
@@ -1214,23 +908,24 @@ for (const [key, value] of Object.entries(formData)) {
       }
 
       await bookingService.finalizeReschedule(
-  {
-    startTime: booking.startTime,
-    endTime: booking.endTime,
-  },
-  {
-    id: updatedBooking.id,
-    eventTypeId: updatedBooking.eventTypeId,
-    reviewerId: updatedBooking.reviewerId,
-    internName: updatedBooking.internName,
-    advisorName: updatedBooking.advisorName,
-    advisorEmail: updatedBooking.advisorEmail,
-    internEmails: updatedBooking.internEmails,
-    weekStage: updatedBooking.weekStage,
-    startTime: updatedBooking.startTime,
-    endTime: updatedBooking.endTime,
-  }
-);
+        {
+          startTime: booking.startTime,
+          endTime: booking.endTime,
+        },
+        {
+          id: updatedBooking.id,
+          eventTypeId: updatedBooking.eventTypeId,
+          reviewerId: updatedBooking.reviewerId,
+          internName: updatedBooking.internName,
+          advisorName: updatedBooking.advisorName,
+          advisorEmail: updatedBooking.advisorEmail,
+          internEmails: updatedBooking.internEmails,
+          weekStage: updatedBooking.weekStage,
+          startTime: updatedBooking.startTime,
+          endTime: updatedBooking.endTime,
+          formData: updatedBooking.formData,
+        }
+      );
 
       return updatedBooking;
 
@@ -1240,21 +935,11 @@ for (const [key, value] of Object.entries(formData)) {
       const cancelledBooking = await db.transaction(async (tx) => {
         await releaseBookingSlot(tx, booking);
 
-        const [updated] = await tx
-          .update(bookings)
-          .set({
-            status: "cancelled",
-            cancelledAt: new Date(),
-            cancelledReason: reason,
-            proposedStartTime: null,
-            proposedEndTime: null,
-            rescheduleRequestedBy: null,
-            rescheduleReason: null,
-            rescheduleToken: null,
-            rescheduleTokenExpiresAt: null,
-          })
-          .where(eq(bookings.id, booking.id))
-          .returning();
+        const updated = await declineRescheduleRequestRepo(
+          booking.id,
+          reason,
+          tx
+        );
 
         return updated;
       });
@@ -1280,17 +965,19 @@ for (const [key, value] of Object.entries(formData)) {
         : null;
 
       if (eventType && reviewer) {
-        const formattedDate = dayjs(booking.startTime).format("ddd, MMM D, YYYY");
-        const formattedTime = `${dayjs(booking.startTime).format("h:mm A")} – ${dayjs(booking.endTime).format("h:mm A")}`;
+        const reviewerTimezone = await getEventTimezone(booking.eventTypeId);
+        const clientTimezone = (booking as any).formData?.clientTimezone || reviewerTimezone;
 
         const recipients = [
-          { email: booking.advisorEmail, name: booking.advisorName, role: "advisor" as const },
-          { email: reviewer.email, name: reviewer.name, role: "reviewer" as const },
-          ...(booking.internEmails ?? []).map((email) => ({ email, name: booking.internName, role: "intern" as const })),
+          { email: booking.advisorEmail, name: booking.advisorName, role: "advisor" as const, timezone: clientTimezone },
+          { email: reviewer.email, name: reviewer.name, role: "reviewer" as const, timezone: reviewerTimezone },
+          ...(booking.internEmails ?? []).map((email) => ({ email, name: booking.internName, role: "intern" as const, timezone: clientTimezone })),
         ];
 
         await Promise.all(
-          recipients.map(({ email, name, role }) => {
+          recipients.map(({ email, name, role, timezone: recipientTz }) => {
+            const formattedDate = dayjs(booking.startTime).tz(recipientTz).format("ddd, MMM D, YYYY");
+            const formattedTime = `${dayjs(booking.startTime).tz(recipientTz).format("h:mm A")} – ${dayjs(booking.endTime).tz(recipientTz).format("h:mm A")} (${recipientTz})`;
             const { html: fallbackHtml } = bookingCancelledTemplate({
               recipientName: name,
               recipientRole: role,
@@ -1337,11 +1024,7 @@ for (const [key, value] of Object.entries(formData)) {
         400
       );
     }
-    const [existingFeedback] = await db
-      .select({ id: feedback.id })
-      .from(feedback)
-      .where(eq(feedback.bookingId, bookingId))
-      .limit(1);
+    const existingFeedback = await findFeedbackByBookingIdExistsRepo(bookingId);
 
     if (booking.status === "completed" && existingFeedback) {
       throw new AppError(
@@ -1378,11 +1061,11 @@ for (const [key, value] of Object.entries(formData)) {
       );
     }
 
-    const [updated] = await db
-      .update(bookings)
-      .set({ status: outcome })
-      .where(and(eq(bookings.id, bookingId), eq(bookings.status, booking.status)))
-      .returning();
+    const updated = await updateBookingOutcomeRepo(
+      bookingId,
+      booking.status as NonNullable<typeof bookings.$inferSelect["status"]>,
+      outcome
+    );
 
     if (!updated) {
       throw new AppError(
@@ -1407,26 +1090,21 @@ for (const [key, value] of Object.entries(formData)) {
       weekStage: string;
       startTime: Date;
       endTime: Date;
+      formData?: unknown;
     }
   ) => {
-    const [eventType] = await db
-      .select({ name: eventTypes.name, })
-      .from(eventTypes)
-      .where(eq(eventTypes.id, newBooking.eventTypeId))
-      .limit(1);
-
-    const [reviewer] = await db
-      .select({ name: reviewers.name, email: reviewers.email })
-      .from(reviewers)
-      .where(eq(reviewers.id, newBooking.reviewerId))
-      .limit(1);
+    const eventType = await findEventTypeNameByIdRepo(newBooking.eventTypeId);
+    const reviewer = await findReviewerContactByIdRepo(newBooking.reviewerId);
 
     if (!eventType || !reviewer) return { meetLink: null };
 
-    const timezone = "Asia/Kolkata";
+    const reviewerTimezone = await getEventTimezone(newBooking.eventTypeId);
+    const clientTimezone = (newBooking as any).formData?.clientTimezone ||
+      (oldBooking as any).formData?.clientTimezone ||
+      reviewerTimezone;
 
     const internalMeetingLink =
-    meetingService.getMeetingLink(newBooking.id);
+      meetingService.getMeetingLink(newBooking.id);
     const meetLink: string | null = internalMeetingLink;
 
     try {
@@ -1436,7 +1114,7 @@ for (const [key, value] of Object.entries(formData)) {
         description: `RevSlot session: ${eventType.name} (${newBooking.weekStage})`,
         startTime: newBooking.startTime,
         endTime: newBooking.endTime,
-        timezone,
+        timezone: reviewerTimezone,
         attendeeEmails: [
           reviewer.email,
           newBooking.advisorEmail,
@@ -1446,32 +1124,34 @@ for (const [key, value] of Object.entries(formData)) {
       });
 
       if (meetEvent) {
-        await db
-          .update(bookings)
-          .set({ meetLink: internalMeetingLink, googleEventId: meetEvent.googleEventId })
-          .where(eq(bookings.id, newBooking.id));
+        await updateBookingMeetingDetailsRepo(
+          newBooking.id,
+          internalMeetingLink,
+          meetEvent.googleEventId
+        );
       }
     } catch (err) {
       console.error(`[Booking] Meet event creation failed for rescheduled booking ${newBooking.id}:`, err);
     }
 
-    const oldFormattedDate = dayjs(oldBooking.startTime).format("ddd, MMM D");
-    const oldFormattedTime = `${dayjs(oldBooking.startTime).format("h:mm A")} – ${dayjs(oldBooking.endTime).format("h:mm A")}`;
-    const newFormattedDate = dayjs(newBooking.startTime).format("ddd, MMM D");
-    const newFormattedTime = `${dayjs(newBooking.startTime).format("h:mm A")} – ${dayjs(newBooking.endTime).format("h:mm A")} (${timezone})`;
-
-    const recipients: { email: string; name: string; role: "advisor" | "reviewer" | "intern" }[] = [
-      { email: newBooking.advisorEmail, name: newBooking.advisorName, role: "advisor" },
-      { email: reviewer.email, name: reviewer.name, role: "reviewer" },
+    const recipients: { email: string; name: string; role: "advisor" | "reviewer" | "intern"; timezone: string }[] = [
+      { email: newBooking.advisorEmail, name: newBooking.advisorName, role: "advisor", timezone: clientTimezone },
+      { email: reviewer.email, name: reviewer.name, role: "reviewer", timezone: reviewerTimezone },
       ...(newBooking.internEmails ?? []).map((email) => ({
         email,
         name: newBooking.internName,
         role: "intern" as const,
+        timezone: clientTimezone,
       })),
     ];
 
     await Promise.all(
-      recipients.map(({ email, name, role }) => {
+      recipients.map(({ email, name, role, timezone: recipientTz }) => {
+        const oldFormattedDate = dayjs(oldBooking.startTime).tz(recipientTz).format("ddd, MMM D");
+        const oldFormattedTime = `${dayjs(oldBooking.startTime).tz(recipientTz).format("h:mm A")} – ${dayjs(oldBooking.endTime).tz(recipientTz).format("h:mm A")} (${recipientTz})`;
+        const newFormattedDate = dayjs(newBooking.startTime).tz(recipientTz).format("ddd, MMM D");
+        const newFormattedTime = `${dayjs(newBooking.startTime).tz(recipientTz).format("h:mm A")} – ${dayjs(newBooking.endTime).tz(recipientTz).format("h:mm A")} (${recipientTz})`;
+
         const { html: fallbackHtml } = bookingRescheduledTemplate({
           recipientName: name,
           recipientRole: role,

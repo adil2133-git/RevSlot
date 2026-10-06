@@ -1,21 +1,26 @@
-import { eq, and, desc, sql } from "drizzle-orm";
 import dayjs from "dayjs";
-import { db } from "../../config/db.js";
-import { bookingDisputes } from "./disputes.schema.js";
-import { bookings } from "../booking/bookings.schema.js";
-import { eventTypes } from "../eventType/eventTypes.schema.js";
-import { reviewers } from "../auth/reviewers.schema.js";
-import { payments } from "../payment/payments.schema.js";
-import { walletTransactions, reviewerWallets } from "../wallet/wallet.schema.js";
 import { meetingService } from "../meeting/meeting.service.js";
 import { refundService } from "../payment/refund.service.js";
 import { emailService } from "../../services/email.service.js";
 import { disputeReportedTemplate, disputeReportedTemplateData } from "../../emails/templates/disputeReported.js";
 import { disputeResolvedTemplate, disputeResolvedTemplateData } from "../../emails/templates/disputeResolved.js";
 import { notificationService } from "../notification/notification.service.js";
-import { admins } from "../admin/admins.schema.js";
 import { auditLogService } from "../auditLog/auditLog.service.js";
 import { AppError } from "../../core/errors/AppError.js";
+import {
+  findBookingWithReviewerAndEventForDisputeRepo,
+  findDisputeByBookingIdRepo,
+  insertDisputeRepo,
+  updateEscrowTransactionStatusRepo,
+  findActiveAdminsForDisputeAlertRepo,
+  findDisputeByBookingAndAdvisorEmailRepo,
+  findDisputeByBookingAndReviewerIdRepo,
+  listAdminDisputesWithTotalRepo,
+  findDisputeByIdRepo,
+  findBookingDataForDisputeResolutionRepo,
+  updateDisputeStatusRepo,
+  findAdminNameByIdRepo,
+} from "./dispute.repository.js";
 
 export interface ReportDisputeInput {
   reason: "reviewer_no_show" | "technical_issue" | "inadequate_review" | "other";
@@ -28,24 +33,7 @@ export const disputeService = {
     advisorEmail: string,
     data: ReportDisputeInput
   ) => {
-    const [booking] = await db
-      .select({
-        id: bookings.id,
-        advisorName: bookings.advisorName,
-        advisorEmail: bookings.advisorEmail,
-        reviewerId: bookings.reviewerId,
-        startTime: bookings.startTime,
-        endTime: bookings.endTime,
-        status: bookings.status,
-        reviewerName: reviewers.name,
-        reviewerEmail: reviewers.email,
-        eventTypeName: eventTypes.name,
-      })
-      .from(bookings)
-      .innerJoin(reviewers, eq(bookings.reviewerId, reviewers.id))
-      .innerJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
-      .where(eq(bookings.id, bookingId))
-      .limit(1);
+    const booking = await findBookingWithReviewerAndEventForDisputeRepo(bookingId);
 
     if (!booking) {
       throw new AppError("Booking not found", 404);
@@ -67,11 +55,7 @@ export const disputeService = {
     }
 
     // Check existing
-    const [existing] = await db
-      .select()
-      .from(bookingDisputes)
-      .where(eq(bookingDisputes.bookingId, bookingId))
-      .limit(1);
+    const existing = await findDisputeByBookingIdRepo(bookingId);
 
     if (existing) {
       throw new AppError("A dispute is already registered for this booking", 409);
@@ -80,29 +64,18 @@ export const disputeService = {
     // Attendance verification signals from meeting room
     const attendance = meetingService.getAttendance(bookingId);
 
-    const [dispute] = await db
-      .insert(bookingDisputes)
-      .values({
-        bookingId,
-        advisorEmail,
-        reason: data.reason,
-        description: data.description,
-        status: "under_review",
-        meetingJoinedByReviewer: attendance.reviewerJoined,
-        meetingJoinedByClient: attendance.clientJoined,
-      })
-      .returning();
+    const dispute = await insertDisputeRepo({
+      bookingId,
+      advisorEmail,
+      reason: data.reason,
+      description: data.description,
+      status: "under_review",
+      meetingJoinedByReviewer: attendance.reviewerJoined,
+      meetingJoinedByClient: attendance.clientJoined,
+    });
 
     // FREEZE ESCROW: Mark escrow transaction as 'disputed' so it cannot auto-mature
-    await db
-      .update(walletTransactions)
-      .set({ status: "disputed" })
-      .where(
-        and(
-          eq(walletTransactions.bookingId, bookingId),
-          eq(walletTransactions.type, "credit_escrow")
-        )
-      );
+    await updateEscrowTransactionStatusRepo(bookingId, "disputed");
 
     // 1. In-app notification to Reviewer (Socket.IO live alert)
     await notificationService.createNotification({
@@ -177,9 +150,7 @@ export const disputeService = {
     });
 
     // Admin alert email to active admins
-    db.select({ email: admins.email, name: admins.name })
-      .from(admins)
-      .where(eq(admins.isActive, true))
+    findActiveAdminsForDisputeAlertRepo()
       .then((activeAdmins) => {
         for (const adm of activeAdmins) {
           const adminMail = disputeReportedTemplate({
@@ -219,47 +190,11 @@ export const disputeService = {
     filter: { advisorEmail?: string | undefined; reviewerId?: number | undefined }
   ) => {
     if (filter.advisorEmail) {
-      const [dispute] = await db
-        .select()
-        .from(bookingDisputes)
-        .where(
-          and(
-            eq(bookingDisputes.bookingId, bookingId),
-            eq(bookingDisputes.advisorEmail, filter.advisorEmail.trim().toLowerCase())
-          )
-        )
-        .limit(1);
-
-      return dispute || null;
+      return await findDisputeByBookingAndAdvisorEmailRepo(bookingId, filter.advisorEmail);
     }
 
     if (filter.reviewerId) {
-      const [dispute] = await db
-        .select({
-          id: bookingDisputes.id,
-          bookingId: bookingDisputes.bookingId,
-          advisorEmail: bookingDisputes.advisorEmail,
-          reason: bookingDisputes.reason,
-          description: bookingDisputes.description,
-          status: bookingDisputes.status,
-          meetingJoinedByReviewer: bookingDisputes.meetingJoinedByReviewer,
-          meetingJoinedByClient: bookingDisputes.meetingJoinedByClient,
-          adminNotes: bookingDisputes.adminNotes,
-          resolvedAt: bookingDisputes.resolvedAt,
-          resolvedBy: bookingDisputes.resolvedBy,
-          createdAt: bookingDisputes.createdAt,
-        })
-        .from(bookingDisputes)
-        .innerJoin(bookings, eq(bookings.id, bookingDisputes.bookingId))
-        .where(
-          and(
-            eq(bookingDisputes.bookingId, bookingId),
-            eq(bookings.reviewerId, filter.reviewerId)
-          )
-        )
-        .limit(1);
-
-      return dispute || null;
+      return await findDisputeByBookingAndReviewerIdRepo(bookingId, filter.reviewerId);
     }
 
     return null;
@@ -274,57 +209,16 @@ export const disputeService = {
     const limit = params.limit || 5;
     const offset = (page - 1) * limit;
 
-    const baseQuery = db
-      .select({
-        id: bookingDisputes.id,
-        bookingId: bookingDisputes.bookingId,
-        advisorEmail: bookingDisputes.advisorEmail,
-        reason: bookingDisputes.reason,
-        description: bookingDisputes.description,
-        status: bookingDisputes.status,
-        meetingJoinedByReviewer: bookingDisputes.meetingJoinedByReviewer,
-        meetingJoinedByClient: bookingDisputes.meetingJoinedByClient,
-        adminNotes: bookingDisputes.adminNotes,
-        resolvedAt: bookingDisputes.resolvedAt,
-        resolvedBy: bookingDisputes.resolvedBy,
-        createdAt: bookingDisputes.createdAt,
-        // Booking & Reviewer details
-        internName: bookings.internName,
-        advisorName: bookings.advisorName,
-        startTime: bookings.startTime,
-        endTime: bookings.endTime,
-        reviewerId: bookings.reviewerId,
-        reviewerName: reviewers.name,
-        reviewerEmail: reviewers.email,
-        eventTypeName: eventTypes.name,
-        // Payment info
-        paymentAmount: payments.amount,
-        paymentStatus: payments.status,
-        razorpayPaymentId: payments.razorpayPaymentId,
-      })
-      .from(bookingDisputes)
-      .innerJoin(bookings, eq(bookings.id, bookingDisputes.bookingId))
-      .innerJoin(reviewers, eq(reviewers.id, bookings.reviewerId))
-      .innerJoin(eventTypes, eq(eventTypes.id, bookings.eventTypeId))
-      .leftJoin(payments, eq(payments.bookingId, bookings.id));
-
-    const whereClause = params.status
-      ? eq(bookingDisputes.status, params.status)
-      : undefined;
-
-    const items = await (whereClause ? baseQuery.where(whereClause) : baseQuery)
-      .orderBy(desc(bookingDisputes.createdAt))
-      .limit(limit)
-      .offset(offset);
-
-    const [totalRecord] = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(bookingDisputes)
-      .where(whereClause ? whereClause : sql`true`);
+    const { items, total } = await listAdminDisputesWithTotalRepo({
+      status: params.status,
+      page,
+      limit,
+      offset,
+    });
 
     return {
       items,
-      total: totalRecord?.count || 0,
+      total,
       page,
       limit,
     };
@@ -338,11 +232,7 @@ export const disputeService = {
       adminNotes?: string;
     }
   ) => {
-    const [dispute] = await db
-      .select()
-      .from(bookingDisputes)
-      .where(eq(bookingDisputes.id, disputeId))
-      .limit(1);
+    const dispute = await findDisputeByIdRepo(disputeId);
 
     if (!dispute) {
       throw new AppError("Dispute not found", 404);
@@ -352,21 +242,7 @@ export const disputeService = {
       throw new AppError("This dispute has already been resolved", 400);
     }
 
-    const [bookingData] = await db
-      .select({
-        id: bookings.id,
-        advisorName: bookings.advisorName,
-        advisorEmail: bookings.advisorEmail,
-        reviewerId: bookings.reviewerId,
-        reviewerName: reviewers.name,
-        reviewerEmail: reviewers.email,
-        eventTypeName: eventTypes.name,
-      })
-      .from(bookings)
-      .innerJoin(reviewers, eq(bookings.reviewerId, reviewers.id))
-      .innerJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
-      .where(eq(bookings.id, dispute.bookingId))
-      .limit(1);
+    const bookingData = await findBookingDataForDisputeResolutionRepo(dispute.bookingId);
 
     let updatedResult;
 
@@ -378,40 +254,24 @@ export const disputeService = {
         reason: `Dispute approved: ${dispute.description}`,
       });
 
-      const [updated] = await db
-        .update(bookingDisputes)
-        .set({
-          status: "resolved_refunded",
-          adminNotes: data.adminNotes || "Approved 100% refund for reviewer no-show/issue",
-          resolvedAt: new Date(),
-          resolvedBy: adminId,
-        })
-        .where(eq(bookingDisputes.id, disputeId))
-        .returning();
+      const updated = await updateDisputeStatusRepo(disputeId, {
+        status: "resolved_refunded",
+        adminNotes: data.adminNotes || "Approved 100% refund for reviewer no-show/issue",
+        resolvedAt: new Date(),
+        resolvedBy: adminId,
+      });
 
       updatedResult = updated;
     } else {
       // Dismiss false/fraudulent dispute: unfreeze escrow so funds mature normally
-      await db
-        .update(walletTransactions)
-        .set({ status: "completed" })
-        .where(
-          and(
-            eq(walletTransactions.bookingId, dispute.bookingId),
-            eq(walletTransactions.type, "credit_escrow")
-          )
-        );
+      await updateEscrowTransactionStatusRepo(dispute.bookingId, "completed");
 
-      const [updated] = await db
-        .update(bookingDisputes)
-        .set({
-          status: "resolved_dismissed",
-          adminNotes: data.adminNotes || "Dispute dismissed; meeting attendance verified.",
-          resolvedAt: new Date(),
-          resolvedBy: adminId,
-        })
-        .where(eq(bookingDisputes.id, disputeId))
-        .returning();
+      const updated = await updateDisputeStatusRepo(disputeId, {
+        status: "resolved_dismissed",
+        adminNotes: data.adminNotes || "Dispute dismissed; meeting attendance verified.",
+        resolvedAt: new Date(),
+        resolvedBy: adminId,
+      });
 
       updatedResult = updated;
     }
@@ -475,7 +335,7 @@ export const disputeService = {
 
     // Record Audit Log for Dispute Resolution
     try {
-      const [actorAdmin] = await db.select({ name: admins.name }).from(admins).where(eq(admins.id, adminId));
+      const actorAdmin = await findAdminNameByIdRepo(adminId);
       await auditLogService.recordAuditLog({
         actorId: adminId,
         actorRole: "admin",

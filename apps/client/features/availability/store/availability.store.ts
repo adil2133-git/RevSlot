@@ -1,13 +1,14 @@
 import { create } from "zustand";
 import { fetchTemplates, deleteTemplateRequest } from "../api/availability.api";
-import type { AvailabilityTemplate } from "../types";
+import type { AvailabilityTemplate, DeleteTemplateResult } from "../types";
 
 interface AvailabilityState {
   templates: AvailabilityTemplate[];
   isLoading: boolean;
   error: string | null;
   loadTemplates: () => Promise<void>;
-  removeTemplate: (id: number) => Promise<void>;
+  removeTemplate: (id: number) => Promise<DeleteTemplateResult>;
+  clearError: () => void;
 }
 
 export const useAvailabilityStore = create<AvailabilityState>((set, get) => ({
@@ -15,14 +16,19 @@ export const useAvailabilityStore = create<AvailabilityState>((set, get) => ({
   isLoading: false,
   error: null,
 
+  clearError: () => set({ error: null }),
+
   loadTemplates: async () => {
     set({ isLoading: true, error: null });
     try {
       const templates = await fetchTemplates();
       set({ templates, isLoading: false });
-    } catch (err) {
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.message ||
+        (err instanceof Error ? err.message : "Failed to load availability");
       set({
-        error: err instanceof Error ? err.message : "Failed to load availability",
+        error: message,
         isLoading: false,
       });
     }
@@ -30,15 +36,20 @@ export const useAvailabilityStore = create<AvailabilityState>((set, get) => ({
 
   removeTemplate: async (id: number) => {
     const previous = get().templates;
-    set({ templates: previous.filter((t) => t.id !== id) });
+    set({ templates: previous.filter((t) => t.id !== id), error: null });
     try {
-      await deleteTemplateRequest(id);
+      const result = await deleteTemplateRequest(id);
       await get().loadTemplates();
-    } catch (err) {
+      return result;
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.message ||
+        (err instanceof Error ? err.message : "Failed to delete template");
       set({
         templates: previous, // roll back on failure
-        error: err instanceof Error ? err.message : "Failed to delete template",
+        error: message,
       });
+      throw new Error(message);
     }
   },
 }));

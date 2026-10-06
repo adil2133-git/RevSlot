@@ -62,6 +62,7 @@ export type SlotItem = {
   date: string;
   startTime: string;
   endTime: string;
+  originalSlot?: SlotItem;
 };
 
 export type HoldResult = {
@@ -154,6 +155,8 @@ export type GetMyBookingsParams = {
   status?: ("confirmed" | "completed" | "rescheduled" | "cancelled" | "no_show" | "reschedule_requested")[];
   scope?: "upcoming" | "past" | "ongoing";
   search?: string;
+  sortBy?: "startTime" | "createdAt";
+  sortOrder?: "asc" | "desc";
 };
 
 export type BookingDetail = MyBooking & {

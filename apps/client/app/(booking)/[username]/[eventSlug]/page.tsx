@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import dayjs from "dayjs";
+import dayjs from "@/lib/dayjs";
 
 import { useBookingPageInfo } from "@/features/booking/hooks/useBookingPageInfo";
 import { useAvailableSlots } from "@/features/booking/hooks/useAvailableSlots";
 import { useSlotHold } from "@/features/booking/hooks/useSlotHold";
 import { useBookingForm } from "@/features/booking/hooks/useBookingForm";
+import TimezoneSelect from "@/features/availability/components/TimezoneSelect";
+import { convertSlotsToTimezone } from "@/features/booking/utils";
 
 import LoadingSkeleton from "@/features/booking/components/LoadingSkeleton";
 import ErrorState from "@/features/booking/components/ErrorState";
@@ -31,15 +33,36 @@ export default function PublicBookingPage() {
     eventSlug
   );
 
+  const [clientTimezone, setClientTimezone] = useState<string>(() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Kolkata";
+    } catch {
+      return "Asia/Kolkata";
+    }
+  });
+
   const {
     visibleMonth,
     setVisibleMonth,
     slots,
     slotsLoading,
     calendarDays,
-    availableCountByDate,
     loadSlots,
   } = useAvailableSlots(pageInfo?.eventType.id);
+
+  const reviewerTimezone = pageInfo?.eventType.timezone || "Asia/Kolkata";
+
+  const displaySlots = useMemo(() => {
+    return convertSlotsToTimezone(slots, reviewerTimezone, clientTimezone);
+  }, [slots, reviewerTimezone, clientTimezone]);
+
+  const displayAvailableCountByDate = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const s of displaySlots) {
+      counts[s.date] = (counts[s.date] ?? 0) + 1;
+    }
+    return counts;
+  }, [displaySlots]);
 
   const [selectedDate, setSelectedDate] = useState(dayjs().format("YYYY-MM-DD"));
   const [use12Hour, setUse12Hour] = useState(true);
@@ -73,10 +96,13 @@ export default function PublicBookingPage() {
     price: pageInfo?.eventType.price ?? 0,
     eventTypeName: pageInfo?.eventType.name ?? "",
     reviewerName: pageInfo?.reviewer.name ?? "",
+    clientTimezone,
   });
   
   const currentStep = bookingDone ? 3 : showDetailsForm ? 2 : 1;
-  const slotsForSelectedDate = slots.filter((s) => s.date === selectedDate);
+  const slotsForSelectedDate = useMemo(() => {
+    return displaySlots.filter((s) => s.date === selectedDate);
+  }, [displaySlots, selectedDate]);
 
   if (pageLoading) return <LoadingSkeleton />;
   if (pageError || !pageInfo) return <ErrorState message={pageError} />;
@@ -89,6 +115,7 @@ export default function PublicBookingPage() {
         advisorEmail={advisorEmail}
         use12Hour={use12Hour}
         meetLink={meetLink}
+        clientTimezone={clientTimezone}
       />
     );
   }
@@ -119,9 +146,24 @@ export default function PublicBookingPage() {
                     calendarDays={calendarDays}
                     selectedDate={selectedDate}
                     setSelectedDate={setSelectedDate}
-                    availableCountByDate={availableCountByDate}
+                    availableCountByDate={displayAvailableCountByDate}
                     bookingWindowDays={pageInfo.eventType.bookingWindowDays}
                   />
+
+                  <div className="my-5 border-t border-b border-slate-100 py-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+                        <svg className="h-4 w-4 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9 9 0 100-18 9 9 0 000 18zm0 0c-2.485 0-4.5-4.03-4.5-9s2.015-9 4.5-9 4.5 4.03 4.5 9-2.015 9-4.5 9zM3.5 12h17" />
+                        </svg>
+                        <span>Time zone</span>
+                      </div>
+                      <div className="w-full sm:w-72">
+                        <TimezoneSelect value={clientTimezone} onChange={setClientTimezone} />
+                      </div>
+                    </div>
+                  </div>
+
                   <SlotPicker
                     selectedDate={selectedDate}
                     use12Hour={use12Hour}

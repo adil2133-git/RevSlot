@@ -13,31 +13,52 @@ import { fetchMyBookings, markBookingOutcome, fetchBookingById } from "@/feature
 import type { MyBooking, BookingTabCounts } from "@/features/booking/type";
 import FeedbackDetailsModal from "@/features/feedback/components/FeedbackDetailsModal";
 
-type BookingFilterTab = "all" | "ongoing" | "upcoming" | "reschedule_requested" | "completed" | "rescheduled" | "cancelled" | "no_show";
+type BookingFilterTab = "upcoming" | "ongoing" | "reschedule_requested" | "completed" | "cancelled" | "no_show" | "all";
 
 const FILTER_TABS: { id: BookingFilterTab; label: string }[] = [
-  { id: "all", label: "All Bookings" },
-  { id: "ongoing", label: "Ongoing" },
   { id: "upcoming", label: "Upcoming" },
+  { id: "ongoing", label: "Ongoing" },
   { id: "reschedule_requested", label: "Reschedule Requests" },
   { id: "completed", label: "Completed" },
-  { id: "rescheduled", label: "Rescheduled" },
   { id: "cancelled", label: "Cancelled" },
   { id: "no_show", label: "No-show" },
+  { id: "all", label: "All Bookings" },
+];
+
+type SortOption = "meeting_desc" | "meeting_asc" | "booked_desc";
+
+const SORT_OPTIONS: { id: SortOption; label: string; sortBy: "startTime" | "createdAt"; sortOrder: "asc" | "desc" }[] = [
+  { id: "meeting_desc", label: "Meeting Date (Newest first)", sortBy: "startTime", sortOrder: "desc" },
+  { id: "meeting_asc", label: "Meeting Date (Oldest first)", sortBy: "startTime", sortOrder: "asc" },
+  { id: "booked_desc", label: "Recently Booked", sortBy: "createdAt", sortOrder: "desc" },
 ];
 
 function BookingsContent() {
   const searchParams = useSearchParams();
   const tabFromUrl = searchParams.get("tab") as BookingFilterTab | null;
-  const [activeTab, setActiveTab] = useState<BookingFilterTab>(tabFromUrl || "all");
+  const [activeTab, setActiveTab] = useState<BookingFilterTab>(
+    tabFromUrl && FILTER_TABS.some((t) => t.id === tabFromUrl) ? tabFromUrl : "upcoming"
+  );
 
   useEffect(() => {
     if (tabFromUrl && FILTER_TABS.some((t) => t.id === tabFromUrl)) {
       setActiveTab(tabFromUrl);
     }
   }, [tabFromUrl]);
+
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [sortOption, setSortOption] = useState<SortOption>("meeting_desc");
   const [page, setPage] = useState(1);
+
+  // Debounce search input by 300ms to avoid flooding the server
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const [bookings, setBookings] = useState<MyBooking[]>([]);
   const [tabCounts, setTabCounts] = useState<BookingTabCounts | null>(null);
@@ -68,7 +89,7 @@ function BookingsContent() {
         statusParam = ["reschedule_requested"];
       } else if (activeTab === "completed") {
         statusParam = ["completed"];
-      } else if (activeTab === "rescheduled") {
+      } else if ((activeTab as string) === "rescheduled") {
         statusParam = ["rescheduled"];
       } else if (activeTab === "cancelled") {
         statusParam = ["cancelled"];
@@ -76,12 +97,16 @@ function BookingsContent() {
         statusParam = ["no_show"];
       }
 
+      const selectedSort = SORT_OPTIONS.find((s) => s.id === sortOption) || SORT_OPTIONS[0];
+
       const result = await fetchMyBookings({
         page,
         limit: 10,
         status: statusParam,
         scope: scopeParam,
-        search: search.trim() || undefined,
+        search: debouncedSearch.trim() || undefined,
+        sortBy: selectedSort.sortBy,
+        sortOrder: selectedSort.sortOrder,
       });
 
       setBookings(result.bookings);
@@ -95,7 +120,7 @@ function BookingsContent() {
     } finally {
       setLoading(false);
     }
-  }, [page, activeTab, search]);
+  }, [page, activeTab, debouncedSearch, sortOption]);
 
   const bookingIdFromUrl = searchParams.get("bookingId");
   const actionFromUrl = searchParams.get("action");
@@ -159,6 +184,11 @@ function BookingsContent() {
   const handleTabChange = (tab: BookingFilterTab) => {
     setActiveTab(tab);
     setPage(1);
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      params.set("tab", tab);
+      window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
+    }
   };
 
   const handleMarkOutcome = async (booking: MyBooking, outcome: "completed" | "no_show") => {
@@ -204,24 +234,52 @@ function BookingsContent() {
 </div>
       </div>
 
-      {/* Live Search Bar */}
-      <div className="relative mb-4">
-        <div className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
+      {/* Search and Sort Toolbar */}
+      <div className="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        <div className="relative flex-1">
+          <div className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+          </div>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by intern name, batch, stage, advisor..."
+            className="w-full rounded-xl border border-slate-200 bg-surface-card pl-10 pr-4 py-2.5 text-xs font-medium text-on-surface placeholder:text-slate-400 shadow-2xs focus:border-primary focus:outline-none"
+          />
         </div>
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
-          placeholder="Search by intern name, batch, stage, advisor..."
-          className="w-full rounded-xl border border-slate-200 bg-surface-card pl-10 pr-4 py-2.5 text-xs font-medium text-on-surface placeholder:text-slate-400 shadow-2xs focus:border-primary focus:outline-none"
-        />  
+
+        {/* Sort Dropdown */}
+        <div className="flex items-center gap-2 shrink-0">
+          <label htmlFor="booking-sort" className="text-xs font-semibold text-slate-500 whitespace-nowrap">
+            Sort by:
+          </label>
+          <div className="relative">
+            <select
+              id="booking-sort"
+              value={sortOption}
+              onChange={(e) => {
+                setSortOption(e.target.value as SortOption);
+                setPage(1);
+              }}
+              className="rounded-xl border border-slate-200 bg-surface-card py-2.5 pl-3 pr-8 text-xs font-semibold text-on-surface shadow-2xs focus:border-primary focus:outline-none cursor-pointer appearance-none"
+            >
+              {SORT_OPTIONS.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Clean Filter Tabs Bar */}
@@ -306,8 +364,8 @@ function BookingsContent() {
               ? "You have no upcoming review bookings."
               : activeTab === "completed"
               ? "No completed bookings found."
-              : activeTab === "rescheduled"
-              ? "No rescheduled bookings found."
+              : activeTab === "reschedule_requested"
+              ? "No pending reschedule requests found."
               : activeTab === "cancelled"
               ? "No cancelled bookings found."
               : activeTab === "no_show"

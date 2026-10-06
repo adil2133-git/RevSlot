@@ -1,38 +1,25 @@
 import dayjs from "dayjs";
-import { eq, and, sql } from "drizzle-orm";
-import { db } from "../../config/db.js";
-import { slots } from "../slot/slots.schema.js";
-import { eventTypes } from "../eventType/eventTypes.schema.js";
-import { payments } from "./payments.schema.js";
 import { razorpay } from "../../config/razorpay.js";
 import { AppError } from "../../core/errors/AppError.js";
+import {
+  findHeldSlotByTokenWithActiveExpiryRepo,
+  findEventTypePriceByIdRepo,
+  extendSlotHoldRepo,
+  insertPaymentOrderRepo,
+} from "./payment.repository.js";
 
 export const paymentService = {
   // Called right before opening Razorpay Checkout on the booking page.
   // Extends the hold by 10 minutes to eliminate checkout timeouts (zombie payments)
   // and records the pending order in the payments table.
   createOrder: async (holdToken: string) => {
-    const [slot] = await db
-      .select()
-      .from(slots)
-      .where(
-        and(
-          eq(slots.holdToken, holdToken),
-          eq(slots.status, "held"),
-          sql`${slots.holdExpiresAt} > now()`
-        )
-      )
-      .limit(1);
+    const slot = await findHeldSlotByTokenWithActiveExpiryRepo(holdToken);
 
     if (!slot) {
       throw new AppError("Hold expired or invalid — please select the slot again", 410);
     }
 
-    const [eventType] = await db
-      .select({ price: eventTypes.price })
-      .from(eventTypes)
-      .where(eq(eventTypes.id, slot.eventTypeId))
-      .limit(1);
+    const eventType = await findEventTypePriceByIdRepo(slot.eventTypeId);
 
     if (!eventType || eventType.price <= 0) {
       throw new AppError("This session is free — no payment needed", 400);
@@ -40,10 +27,7 @@ export const paymentService = {
 
     // Extend hold by 10 minutes so user has ample time to complete UPI/OTP
     const extendedHoldExpiresAt = dayjs().add(10, "minute").toDate();
-    await db
-      .update(slots)
-      .set({ holdExpiresAt: extendedHoldExpiresAt, updatedAt: new Date() })
-      .where(eq(slots.id, slot.id));
+    await extendSlotHoldRepo(slot.id, extendedHoldExpiresAt);
 
     const order = await razorpay.orders.create({
       amount: eventType.price * 100, // rupees -> paise
@@ -52,7 +36,7 @@ export const paymentService = {
     });
 
     // Record order in payments table
-    await db.insert(payments).values({
+    await insertPaymentOrderRepo({
       holdToken,
       reviewerId: slot.reviewerId,
       amount: Number(order.amount),
@@ -68,4 +52,4 @@ export const paymentService = {
       keyId: process.env.RAZORPAY_KEY_ID as string,
     };
   },
-};
+};
