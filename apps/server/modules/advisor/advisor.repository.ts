@@ -9,6 +9,7 @@ import { questions } from "../questionBank/questions.schema.js";
 import { payments } from "../payment/payments.schema.js";
 import { walletTransactions } from "../wallet/wallet.schema.js";
 import { bookingDisputes } from "../dispute/disputes.schema.js";
+import { availabilityTemplates } from "../availability/schema/availabilityTemplates.schema.js";
 
 type DbOrTx = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -82,7 +83,7 @@ export const findAdvisorBookingsRepo = async (
       cancellationFee: payments.cancellationFee,
       razorpayPaymentId: payments.razorpayPaymentId,
       reviewerName: reviewers.name,
-      timezone: sql<string>`'IST'`,
+      timezone: sql<string>`coalesce(${availabilityTemplates.timezone}, 'Asia/Kolkata')`,
       hasFeedback: sql<boolean>`${feedback.id} is not null`,
       disputeId: bookingDisputes.id,
       disputeReason: bookingDisputes.reason,
@@ -95,6 +96,7 @@ export const findAdvisorBookingsRepo = async (
     .from(bookings)
     .innerJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
     .innerJoin(reviewers, eq(bookings.reviewerId, reviewers.id))
+    .leftJoin(availabilityTemplates, eq(eventTypes.availabilityTemplateId, availabilityTemplates.id))
     .leftJoin(payments, eq(payments.bookingId, bookings.id))
     .leftJoin(feedback, eq(feedback.bookingId, bookings.id))
     .leftJoin(bookingDisputes, eq(bookingDisputes.bookingId, bookings.id))

@@ -90,12 +90,13 @@ useEffect(() => {
     setHoldError(null);
     setHolding(true);
     try {
+      const slotToHold = slot.originalSlot ?? slot;
       const result = await holdSlot({
-  eventTypeId: slot.eventTypeId,
-  date: slot.date,
-  startTime: slot.startTime,
-  endTime: slot.endTime,
-});
+        eventTypeId: slotToHold.eventTypeId,
+        date: slotToHold.date,
+        startTime: slotToHold.startTime,
+        endTime: slotToHold.endTime,
+      });
       setHoldResult(result);
       setHeldSlot(slot);
     } catch (err) {

@@ -217,6 +217,7 @@ export const bookingService = {
         "whatsappNumber",
         "mainlyFocusedFor",
         "comments",
+        "clientTimezone",
         ...Object.keys(BOOKING_FIELD_DEFINITIONS),
       ]);
 
@@ -363,7 +364,8 @@ export const bookingService = {
 
     if (!eventType || !reviewer) return { meetLink: null };
 
-    const timezone = "Asia/Kolkata";
+    const reviewerTimezone = await getEventTimezone(booking.eventTypeId);
+    const clientTimezone = (booking as any).formData?.clientTimezone || reviewerTimezone;
 
     const internalMeetingLink =
       meetingService.getMeetingLink(booking.id);
@@ -377,7 +379,7 @@ export const bookingService = {
         description: `RevSlot session: ${eventType.name} (${booking.weekStage})`,
         startTime: booking.startTime,
         endTime: booking.endTime,
-        timezone,
+        timezone: reviewerTimezone,
         attendeeEmails: [
           reviewer.email,
           booking.advisorEmail,
@@ -405,36 +407,39 @@ export const bookingService = {
       internalMeetingLink
     );
 
-    const formattedDate = dayjs(booking.startTime).format("ddd, MMM D");
-
-    const formattedTime = `${dayjs(booking.startTime).format(
-      "h:mm A"
-    )} – ${dayjs(booking.endTime).format("h:mm A")} (${timezone})`;
-
     const recipients: {
       email: string;
       name: string;
       role: "advisor" | "reviewer" | "intern";
+      timezone: string;
     }[] = [
       {
         email: booking.advisorEmail,
         name: booking.advisorName,
         role: "advisor",
+        timezone: clientTimezone,
       },
       {
         email: reviewer.email,
         name: reviewer.name,
         role: "reviewer",
+        timezone: reviewerTimezone,
       },
       ...(booking.internEmails ?? []).map((email) => ({
         email,
         name: booking.internName,
         role: "intern" as const,
+        timezone: clientTimezone,
       })),
     ];
 
     await Promise.all(
-      recipients.map(({ email, name, role }) => {
+      recipients.map(({ email, name, role, timezone: recipientTz }) => {
+        const formattedDate = dayjs(booking.startTime).tz(recipientTz).format("ddd, MMM D");
+        const formattedTime = `${dayjs(booking.startTime).tz(recipientTz).format(
+          "h:mm A"
+        )} – ${dayjs(booking.endTime).tz(recipientTz).format("h:mm A")} (${recipientTz})`;
+
         const { html: fallbackHtml } = bookingConfirmationTemplate({
           recipientName: name,
           recipientRole: role,
@@ -570,16 +575,17 @@ export const bookingService = {
     }
 
     if (eventType && reviewer) {
-      const formattedDate = dayjs(booking.startTime).format("ddd, MMM D");
-      const formattedTime = `${dayjs(booking.startTime).format("h:mm A")} – ${dayjs(booking.endTime).format("h:mm A")}`;
+      const reviewerTimezone = await getEventTimezone(booking.eventTypeId);
+      const clientTimezone = (booking as any).formData?.clientTimezone || reviewerTimezone;
 
-      const recipients: { email: string; name: string; role: "advisor" | "reviewer" | "intern" }[] = [
-        { email: booking.advisorEmail, name: booking.advisorName, role: "advisor" },
-        { email: reviewer.email, name: reviewer.name, role: "reviewer" },
+      const recipients: { email: string; name: string; role: "advisor" | "reviewer" | "intern"; timezone: string }[] = [
+        { email: booking.advisorEmail, name: booking.advisorName, role: "advisor", timezone: clientTimezone },
+        { email: reviewer.email, name: reviewer.name, role: "reviewer", timezone: reviewerTimezone },
         ...(booking.internEmails ?? []).map((email) => ({
           email,
           name: booking.internName,
           role: "intern" as const,
+          timezone: clientTimezone,
         })),
       ];
 
@@ -598,7 +604,10 @@ export const bookingService = {
         : null;
 
       await Promise.all(
-        recipients.map(({ email, name, role }) => {
+        recipients.map(({ email, name, role, timezone: recipientTz }) => {
+          const formattedDate = dayjs(booking.startTime).tz(recipientTz).format("ddd, MMM D");
+          const formattedTime = `${dayjs(booking.startTime).tz(recipientTz).format("h:mm A")} – ${dayjs(booking.endTime).tz(recipientTz).format("h:mm A")} (${recipientTz})`;
+
           const { html: fallbackHtml } = bookingCancelledTemplate({
             recipientName: name,
             recipientRole: role,
@@ -727,10 +736,11 @@ export const bookingService = {
     if (eventType && reviewer) {
       const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:3000";
       const actionUrl = `${CLIENT_URL}/reschedule-request/${rescheduleToken}`;
-      const currentFormattedDate = dayjs(booking.startTime).format("ddd, MMM D, YYYY");
-      const currentFormattedTime = `${dayjs(booking.startTime).format("h:mm A")} – ${dayjs(booking.endTime).format("h:mm A")}`;
-      const proposedFormattedDate = dayjs(proposedStartTime).format("ddd, MMM D, YYYY");
-      const proposedFormattedTime = `${dayjs(proposedStartTime).format("h:mm A")} – ${dayjs(proposedEndTime).format("h:mm A")}`;
+      const clientTimezone = (booking as any).formData?.clientTimezone || timezone;
+      const currentFormattedDate = dayjs(booking.startTime).tz(clientTimezone).format("ddd, MMM D, YYYY");
+      const currentFormattedTime = `${dayjs(booking.startTime).tz(clientTimezone).format("h:mm A")} – ${dayjs(booking.endTime).tz(clientTimezone).format("h:mm A")} (${clientTimezone})`;
+      const proposedFormattedDate = dayjs(proposedStartTime).tz(clientTimezone).format("ddd, MMM D, YYYY");
+      const proposedFormattedTime = `${dayjs(proposedStartTime).tz(clientTimezone).format("h:mm A")} – ${dayjs(proposedEndTime).tz(clientTimezone).format("h:mm A")} (${clientTimezone})`;
 
       const recipients = [
         { email: booking.advisorEmail, name: booking.advisorName },
@@ -851,6 +861,7 @@ export const bookingService = {
         weekStage: updatedBooking.weekStage,
         startTime: updatedBooking.startTime,
         endTime: updatedBooking.endTime,
+        formData: updatedBooking.formData,
       });
 
       return updatedBooking;
@@ -912,6 +923,7 @@ export const bookingService = {
           weekStage: updatedBooking.weekStage,
           startTime: updatedBooking.startTime,
           endTime: updatedBooking.endTime,
+          formData: updatedBooking.formData,
         }
       );
 
@@ -953,17 +965,19 @@ export const bookingService = {
         : null;
 
       if (eventType && reviewer) {
-        const formattedDate = dayjs(booking.startTime).format("ddd, MMM D, YYYY");
-        const formattedTime = `${dayjs(booking.startTime).format("h:mm A")} – ${dayjs(booking.endTime).format("h:mm A")}`;
+        const reviewerTimezone = await getEventTimezone(booking.eventTypeId);
+        const clientTimezone = (booking as any).formData?.clientTimezone || reviewerTimezone;
 
         const recipients = [
-          { email: booking.advisorEmail, name: booking.advisorName, role: "advisor" as const },
-          { email: reviewer.email, name: reviewer.name, role: "reviewer" as const },
-          ...(booking.internEmails ?? []).map((email) => ({ email, name: booking.internName, role: "intern" as const })),
+          { email: booking.advisorEmail, name: booking.advisorName, role: "advisor" as const, timezone: clientTimezone },
+          { email: reviewer.email, name: reviewer.name, role: "reviewer" as const, timezone: reviewerTimezone },
+          ...(booking.internEmails ?? []).map((email) => ({ email, name: booking.internName, role: "intern" as const, timezone: clientTimezone })),
         ];
 
         await Promise.all(
-          recipients.map(({ email, name, role }) => {
+          recipients.map(({ email, name, role, timezone: recipientTz }) => {
+            const formattedDate = dayjs(booking.startTime).tz(recipientTz).format("ddd, MMM D, YYYY");
+            const formattedTime = `${dayjs(booking.startTime).tz(recipientTz).format("h:mm A")} – ${dayjs(booking.endTime).tz(recipientTz).format("h:mm A")} (${recipientTz})`;
             const { html: fallbackHtml } = bookingCancelledTemplate({
               recipientName: name,
               recipientRole: role,
@@ -1076,6 +1090,7 @@ export const bookingService = {
       weekStage: string;
       startTime: Date;
       endTime: Date;
+      formData?: unknown;
     }
   ) => {
     const eventType = await findEventTypeNameByIdRepo(newBooking.eventTypeId);
@@ -1083,7 +1098,10 @@ export const bookingService = {
 
     if (!eventType || !reviewer) return { meetLink: null };
 
-    const timezone = "Asia/Kolkata";
+    const reviewerTimezone = await getEventTimezone(newBooking.eventTypeId);
+    const clientTimezone = (newBooking as any).formData?.clientTimezone ||
+      (oldBooking as any).formData?.clientTimezone ||
+      reviewerTimezone;
 
     const internalMeetingLink =
       meetingService.getMeetingLink(newBooking.id);
@@ -1096,7 +1114,7 @@ export const bookingService = {
         description: `RevSlot session: ${eventType.name} (${newBooking.weekStage})`,
         startTime: newBooking.startTime,
         endTime: newBooking.endTime,
-        timezone,
+        timezone: reviewerTimezone,
         attendeeEmails: [
           reviewer.email,
           newBooking.advisorEmail,
@@ -1116,23 +1134,24 @@ export const bookingService = {
       console.error(`[Booking] Meet event creation failed for rescheduled booking ${newBooking.id}:`, err);
     }
 
-    const oldFormattedDate = dayjs(oldBooking.startTime).format("ddd, MMM D");
-    const oldFormattedTime = `${dayjs(oldBooking.startTime).format("h:mm A")} – ${dayjs(oldBooking.endTime).format("h:mm A")}`;
-    const newFormattedDate = dayjs(newBooking.startTime).format("ddd, MMM D");
-    const newFormattedTime = `${dayjs(newBooking.startTime).format("h:mm A")} – ${dayjs(newBooking.endTime).format("h:mm A")} (${timezone})`;
-
-    const recipients: { email: string; name: string; role: "advisor" | "reviewer" | "intern" }[] = [
-      { email: newBooking.advisorEmail, name: newBooking.advisorName, role: "advisor" },
-      { email: reviewer.email, name: reviewer.name, role: "reviewer" },
+    const recipients: { email: string; name: string; role: "advisor" | "reviewer" | "intern"; timezone: string }[] = [
+      { email: newBooking.advisorEmail, name: newBooking.advisorName, role: "advisor", timezone: clientTimezone },
+      { email: reviewer.email, name: reviewer.name, role: "reviewer", timezone: reviewerTimezone },
       ...(newBooking.internEmails ?? []).map((email) => ({
         email,
         name: newBooking.internName,
         role: "intern" as const,
+        timezone: clientTimezone,
       })),
     ];
 
     await Promise.all(
-      recipients.map(({ email, name, role }) => {
+      recipients.map(({ email, name, role, timezone: recipientTz }) => {
+        const oldFormattedDate = dayjs(oldBooking.startTime).tz(recipientTz).format("ddd, MMM D");
+        const oldFormattedTime = `${dayjs(oldBooking.startTime).tz(recipientTz).format("h:mm A")} – ${dayjs(oldBooking.endTime).tz(recipientTz).format("h:mm A")} (${recipientTz})`;
+        const newFormattedDate = dayjs(newBooking.startTime).tz(recipientTz).format("ddd, MMM D");
+        const newFormattedTime = `${dayjs(newBooking.startTime).tz(recipientTz).format("h:mm A")} – ${dayjs(newBooking.endTime).tz(recipientTz).format("h:mm A")} (${recipientTz})`;
+
         const { html: fallbackHtml } = bookingRescheduledTemplate({
           recipientName: name,
           recipientRole: role,

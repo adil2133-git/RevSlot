@@ -1,5 +1,6 @@
-import dayjs from "dayjs";
+import dayjs from "../../config/dayjs.js";
 import { db } from "../../config/db.js";
+import { getEventTimezoneRepo } from "../booking/booking.repository.js";
 import { otpService } from "../auth/otp.service.js";
 import { slotService } from "../slot/slot.service.js";
 import { calendarService } from "../calendar/calendar.service.js";
@@ -188,13 +189,15 @@ export const advisorService = {
     const reviewer = await findReviewerContactByIdRepo(booking.reviewerId);
 
     const reasonText = data.reason?.trim() || "Cancelled by advisor";
+    const reviewerTimezone = await getEventTimezoneRepo(booking.eventTypeId);
+    const clientTimezone = (booking.formData as Record<string, string> | null)?.clientTimezone || reviewerTimezone;
 
     const updated = await db.transaction(async (tx) => {
       const result = await cancelBookingWithReasonRepo(bookingId, reasonText, tx);
 
-      const slotDate = dayjs(booking.startTime).format("YYYY-MM-DD");
-      const startTime = dayjs(booking.startTime).format("HH:mm:ss");
-      const endTime = dayjs(booking.endTime).format("HH:mm:ss");
+      const slotDate = dayjs(booking.startTime).tz(reviewerTimezone).format("YYYY-MM-DD");
+      const startTime = dayjs(booking.startTime).tz(reviewerTimezone).format("HH:mm:ss");
+      const endTime = dayjs(booking.endTime).tz(reviewerTimezone).format("HH:mm:ss");
 
       await releaseSlotByDateTimeRepo(
         booking.eventTypeId,
@@ -235,21 +238,22 @@ export const advisorService = {
     }
 
     if (eventType && reviewer) {
-      const formattedDate = dayjs(booking.startTime).format("ddd, MMM D");
-      const formattedTime = `${dayjs(booking.startTime).format("h:mm A")} – ${dayjs(booking.endTime).format("h:mm A")}`;
-
-      const recipients: { email: string; name: string; role: "advisor" | "reviewer" | "intern" }[] = [
-        { email: booking.advisorEmail, name: booking.advisorName, role: "advisor" },
-        { email: reviewer.email, name: reviewer.name, role: "reviewer" },
+      const recipients: { email: string; name: string; role: "advisor" | "reviewer" | "intern"; timezone: string }[] = [
+        { email: booking.advisorEmail, name: booking.advisorName, role: "advisor", timezone: clientTimezone },
+        { email: reviewer.email, name: reviewer.name, role: "reviewer", timezone: reviewerTimezone },
         ...(booking.internEmails ?? []).map((email) => ({
           email,
           name: booking.internName,
           role: "intern" as const,
+          timezone: clientTimezone,
         })),
       ];
 
       await Promise.all(
-        recipients.map(({ email, name, role }) => {
+        recipients.map(({ email, name, role, timezone: recipientTz }) => {
+          const formattedDate = dayjs(booking.startTime).tz(recipientTz).format("ddd, MMM D");
+          const formattedTime = `${dayjs(booking.startTime).tz(recipientTz).format("h:mm A")} – ${dayjs(booking.endTime).tz(recipientTz).format("h:mm A")} (${recipientTz})`;
+
           const { html: fallbackHtml } = bookingCancelledTemplate({
             recipientName: name,
             recipientRole: role,
@@ -282,7 +286,7 @@ export const advisorService = {
         reviewerId: booking.reviewerId,
         type: "booking_cancelled",
         title: "Booking cancelled by advisor",
-        message: `${booking.advisorName} cancelled their session for ${dayjs(booking.startTime).format("ddd, MMM D")}`,
+        message: `${booking.advisorName} cancelled their session for ${dayjs(booking.startTime).tz(reviewerTimezone).format("ddd, MMM D")}`,
         bookingId: booking.id,
       });
     }
@@ -323,13 +327,14 @@ export const advisorService = {
       endTime: data.endTime,
     });
 
-    const newStartTime = dayjs(`${data.date}T${data.startTime}`).toDate();
-    const newEndTime = dayjs(`${data.date}T${data.endTime}`).toDate();
+    const reviewerTimezone = await getEventTimezoneRepo(booking.eventTypeId);
+    const newStartTime = dayjs.tz(`${data.date} ${data.startTime}`, reviewerTimezone).toDate();
+    const newEndTime = dayjs.tz(`${data.date} ${data.endTime}`, reviewerTimezone).toDate();
 
     const updatedBooking = await db.transaction(async (tx) => {
-      const oldSlotDate = dayjs(booking.startTime).format("YYYY-MM-DD");
-      const oldStartTime = dayjs(booking.startTime).format("HH:mm:ss");
-      const oldEndTime = dayjs(booking.endTime).format("HH:mm:ss");
+      const oldSlotDate = dayjs(booking.startTime).tz(reviewerTimezone).format("YYYY-MM-DD");
+      const oldStartTime = dayjs(booking.startTime).tz(reviewerTimezone).format("HH:mm:ss");
+      const oldEndTime = dayjs(booking.endTime).tz(reviewerTimezone).format("HH:mm:ss");
 
       await releaseSlotByDateTimeRepo(
         booking.eventTypeId,
@@ -383,6 +388,7 @@ export const advisorService = {
         weekStage: updatedBooking.weekStage,
         startTime: updatedBooking.startTime,
         endTime: updatedBooking.endTime,
+        formData: updatedBooking.formData,
       }
     );
 
@@ -390,7 +396,7 @@ export const advisorService = {
       reviewerId: updatedBooking.reviewerId,
       type: "booking_rescheduled",
       title: "Booking rescheduled by advisor",
-      message: `${updatedBooking.advisorName} rescheduled their session to ${dayjs(updatedBooking.startTime).format("ddd, MMM D, h:mm A")}`,
+      message: `${updatedBooking.advisorName} rescheduled their session to ${dayjs(updatedBooking.startTime).tz(reviewerTimezone).format("ddd, MMM D, h:mm A")}`,
       bookingId: updatedBooking.id,
     });
 
