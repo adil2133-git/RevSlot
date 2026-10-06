@@ -776,15 +776,18 @@ export const findUpcomingBookingsNeedingRemindersRepo = async (
       advisorName: bookings.advisorName,
       advisorEmail: bookings.advisorEmail,
       internEmails: bookings.internEmails,
+      formData: bookings.formData,
       startTime: bookings.startTime,
       endTime: bookings.endTime,
       meetLink: bookings.meetLink,
       eventTypeName: eventTypes.name,
       reviewerName: reviewers.name,
       reviewerEmail: reviewers.email,
+      timezone: availabilityTemplates.timezone,
     })
     .from(bookings)
     .innerJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
+    .innerJoin(availabilityTemplates, eq(eventTypes.availabilityTemplateId, availabilityTemplates.id))
     .innerJoin(reviewers, eq(bookings.reviewerId, reviewers.id))
     .where(
       and(

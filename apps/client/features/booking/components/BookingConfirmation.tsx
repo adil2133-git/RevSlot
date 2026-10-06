@@ -12,6 +12,7 @@ type BookingConfirmationProps = {
   advisorEmail: string;
   use12Hour: boolean;
   meetLink?: string | null;
+  clientTimezone?: string;
 };
 
 export default function BookingConfirmation({
@@ -20,6 +21,7 @@ export default function BookingConfirmation({
   advisorEmail,
   use12Hour,
   meetLink,
+  clientTimezone,
 }: BookingConfirmationProps) {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-surface px-4">
@@ -32,7 +34,7 @@ export default function BookingConfirmation({
             {dayjs(heldSlot.date).format("ddd, MMM D")} ·{" "}
             {formatSlotTime(heldSlot.startTime, use12Hour)}–
             {formatSlotTime(heldSlot.endTime, use12Hour)}{" "}
-            ({pageInfo.eventType.timezone})
+            ({clientTimezone || pageInfo.eventType.timezone})
           </p>
         )}
         <p className="mt-1 text-sm text-slate-600">
