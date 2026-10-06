@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
-import dayjs from "dayjs";
+import dayjs from "../../config/dayjs.js";
 import { bookingService } from "./booking.service.js";
+import { getEventTimezoneRepo } from "./booking.repository.js";
 import { notificationService } from "../notification/notification.service.js";
 import { AppError } from "../../core/errors/AppError.js";
 import {
@@ -22,11 +23,12 @@ export const bookingController = {
     const result = await bookingService.createBooking(req.body);
     const { meetLink } = await bookingService.finalizeBooking(result);
 
+    const reviewerTimezone = await getEventTimezoneRepo(result.eventTypeId);
     await notificationService.createNotification({
       reviewerId: result.reviewerId,
       type: "booking_created",
       title: "New booking",
-      message: `${result.advisorName} booked a session for ${dayjs(result.startTime).format("ddd, MMM D, h:mm A")}`,
+      message: `${result.advisorName} booked a session for ${dayjs(result.startTime).tz(reviewerTimezone).format("ddd, MMM D, h:mm A")}`,
       bookingId: result.id,
     });
 

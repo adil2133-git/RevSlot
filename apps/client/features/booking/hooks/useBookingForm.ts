@@ -22,7 +22,7 @@ export type { BookingFormValues };
 
 export function useBookingForm(
   holdResult: HoldResult | null,
-  bookingContext: { price: number; eventTypeName: string; reviewerName: string },
+  bookingContext: { price: number; eventTypeName: string; reviewerName: string; clientTimezone?: string },
 ) {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -122,6 +122,10 @@ export function useBookingForm(
     const formData = Object.fromEntries(
       Object.entries(values).map(([key, value]) => [key, String(value ?? "")])
     );
+
+    if (bookingContext.clientTimezone) {
+      formData.clientTimezone = bookingContext.clientTimezone;
+    }
 
     // Free event type — untouched, existing flow.
     if (bookingContext.price <= 0) {

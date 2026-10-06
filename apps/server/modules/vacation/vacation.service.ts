@@ -1,4 +1,4 @@
-import dayjs from "dayjs";
+import dayjs from "../../config/dayjs.js";
 import { db } from "../../config/db.js";
 
 import { emailService } from "../../services/email.service.js";
@@ -40,35 +40,43 @@ const sendVacationCancellationEmails = async (
     endTime: Date;
     eventTypeName: string;
     reviewerName: string;
+    timezone?: string | null;
+    formData?: unknown;
   }>,
   reason: string
 ) => {
   await Promise.all(
     affectedBookings.flatMap((booking) => {
-      const formattedDate = dayjs(booking.startTime).format("ddd, MMM D");
-
-      const formattedTime =
-        `${dayjs(booking.startTime).format("h:mm A")} – ` +
-        `${dayjs(booking.endTime).format("h:mm A")}`;
+      const reviewerTz = booking.timezone || "Asia/Kolkata";
+      const clientTz = (booking.formData as Record<string, string> | null)?.clientTimezone || reviewerTz;
 
       const recipients: {
         email: string;
         name: string;
         role: "advisor" | "intern";
+        timezone: string;
       }[] = [
         {
           email: booking.advisorEmail,
           name: booking.advisorName,
           role: "advisor",
+          timezone: clientTz,
         },
         ...(booking.internEmails ?? []).map((email) => ({
           email,
           name: booking.internName,
           role: "intern" as const,
+          timezone: clientTz,
         })),
       ];
 
-      return recipients.map(({ email, name, role }) => {
+      return recipients.map(({ email, name, role, timezone: recipientTz }) => {
+        const formattedDate = dayjs(booking.startTime).tz(recipientTz).format("ddd, MMM D");
+
+        const formattedTime =
+          `${dayjs(booking.startTime).tz(recipientTz).format("h:mm A")} – ` +
+          `${dayjs(booking.endTime).tz(recipientTz).format("h:mm A")} (${recipientTz})`;
+
         const { html: fallbackHtml } = bookingCancelledTemplate({
           recipientName: name,
           recipientRole: role,
@@ -171,11 +179,12 @@ export const vacationService = {
       );
 
       for (const booking of affectedBookings) {
+        const reviewerTz = booking.timezone || "Asia/Kolkata";
         notificationService.createNotification({
           reviewerId,
           type: "booking_cancelled",
           title: "Booking cancelled (Vacation)",
-          message: `Session with ${booking.advisorName} on ${dayjs(booking.startTime).format("ddd, MMM D")} was cancelled due to vacation`,
+          message: `Session with ${booking.advisorName} on ${dayjs(booking.startTime).tz(reviewerTz).format("ddd, MMM D")} was cancelled due to vacation`,
           bookingId: booking.id,
         }).catch((err) => console.error("[Vacation] Notification error:", err));
       }

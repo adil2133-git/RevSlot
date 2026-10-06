@@ -62,6 +62,7 @@ export type SlotItem = {
   date: string;
   startTime: string;
   endTime: string;
+  originalSlot?: SlotItem;
 };
 
 export type HoldResult = {

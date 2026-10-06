@@ -4,6 +4,7 @@ import { vacationBlocks } from "./vacation.schema.js";
 import { bookings } from "../booking/bookings.schema.js";
 import { eventTypes } from "../eventType/eventTypes.schema.js";
 import { reviewers } from "../auth/reviewers.schema.js";
+import { availabilityTemplates } from "../availability/schema/availabilityTemplates.schema.js";
 
 export type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 export type DbOrTx = typeof db | Transaction;
@@ -72,12 +73,15 @@ export const findAffectedBookingsRepo = async (
       advisorName: bookings.advisorName,
       startTime: bookings.startTime,
       endTime: bookings.endTime,
+      formData: bookings.formData,
+      timezone: availabilityTemplates.timezone,
       eventTypeName: eventTypes.name,
       reviewerName: reviewers.name,
     })
     .from(bookings)
     .innerJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
     .innerJoin(reviewers, eq(bookings.reviewerId, reviewers.id))
+    .leftJoin(availabilityTemplates, eq(eventTypes.availabilityTemplateId, availabilityTemplates.id))
     .where(
       and(
         eq(bookings.reviewerId, reviewerId),
