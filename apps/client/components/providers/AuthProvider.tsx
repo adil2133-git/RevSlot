@@ -12,7 +12,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   const hydrate = useAuthStore((state) => state.hydrate);
   const logoutLocal = useAuthStore((state) => state.logoutLocal);
   const isHydrated = useAuthStore((state) => state.isHydrated);
-  
+
   useEffect(() => {
     pathnameRef.current = pathname;
   }, [pathname]);
@@ -23,16 +23,16 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     onSessionExpired(() => {
       logoutLocal();
       if (pathnameRef.current.startsWith("/admin")) {
-        router.push("/admin/login");
+        window.location.replace("/admin/login");
       } else if (pathnameRef.current.startsWith("/dashboard")) {
-        router.push("/reviewer/login");
+        window.location.replace("/reviewer/login");
       }
     });
-      if (!hasHydrated.current) {
-    hasHydrated.current = true;
-    hydrate();
-  }
- }, []);
+    if (!hasHydrated.current) {
+      hasHydrated.current = true;
+      hydrate();
+    }
+  }, []);
 
   if (!isHydrated) {
     return (

@@ -34,6 +34,7 @@ export default function HeroSection() {
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-5">
           <Link
             href="/register"
+            prefetch={false}
             className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-8 py-3.5 text-sm font-bold text-white shadow-lg shadow-primary/20 hover:bg-primary/95 transition-all hover:scale-105 active:scale-95"
           >
             <span>Create your booking link</span>

@@ -91,13 +91,13 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
   const router = useRouter();
   const { user, logout } = useAuthStore();
   const pendingFeedbackCount =
-  useFeedbackStore(
-    (state) => state.pendingFeedback.length
-  );
-const fetchPendingFeedback =
-  useFeedbackStore(
-    (state) => state.fetchPendingFeedback
-  );
+    useFeedbackStore(
+      (state) => state.pendingFeedback.length
+    );
+  const fetchPendingFeedback =
+    useFeedbackStore(
+      (state) => state.fetchPendingFeedback
+    );
   const [popoverOpen, setPopoverOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -127,12 +127,12 @@ const fetchPendingFeedback =
   }, []);
 
   useEffect(() => {
-  void fetchPendingFeedback();
-}, [fetchPendingFeedback, pathname]);
+    void fetchPendingFeedback();
+  }, [fetchPendingFeedback, pathname]);
 
   const handleLogout = async () => {
     await logout();
-    router.push("/reviewer/login");
+    window.location.replace("/reviewer/login");
   };
 
   const displayName = user?.name || "Reviewer";
@@ -169,11 +169,10 @@ const fetchPendingFeedback =
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`group relative flex h-11 w-11 items-center justify-center rounded-xl transition-all ${
-                    active
+                  className={`group relative flex h-11 w-11 items-center justify-center rounded-xl transition-all ${active
                       ? "bg-primary text-white shadow-sm"
                       : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-                  }`}
+                    }`}
                 >
                   <Icon className="h-5 w-5" />
 
@@ -252,39 +251,36 @@ const fetchPendingFeedback =
               <Link
                 key={item.href}
                 href={item.href}
-                className={`group flex items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
-                  active
+                className={`group flex items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold transition-all ${active
                     ? "bg-primary text-white shadow-sm font-bold"
                     : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                }`}
+                  }`}
               >
                 <div className="flex min-w-0 items-center gap-3">
-         <Icon
-          className={`h-4 w-4 shrink-0 ${
-             active
-              ? "text-white"
-              : "text-slate-400 group-hover:text-primary"
-            }`}
-          />
+                  <Icon
+                    className={`h-4 w-4 shrink-0 ${active
+                        ? "text-white"
+                        : "text-slate-400 group-hover:text-primary"
+                      }`}
+                  />
 
-       <span>{item.label}</span>
-    </div>
-      {item.label === "Feedback & Forms" &&
-          pendingFeedbackCount > 0 && (
-       <span
-          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-500 text-[11px] font-bold leading-none text-white shadow-sm"
-          title="Pending feedback available"
-       >
-      !
-    </span>
-  )}
+                  <span>{item.label}</span>
+                </div>
+                {item.label === "Feedback & Forms" &&
+                  pendingFeedbackCount > 0 && (
+                    <span
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-500 text-[11px] font-bold leading-none text-white shadow-sm"
+                      title="Pending feedback available"
+                    >
+                      !
+                    </span>
+                  )}
 
                 {/* Right Badges / Indicators */}
                 {item.hasDot && !item.badge && (
                   <span
-                    className={`h-1.5 w-1.5 rounded-full ${
-                      active ? "bg-white" : "bg-slate-300"
-                    }`}
+                    className={`h-1.5 w-1.5 rounded-full ${active ? "bg-white" : "bg-slate-300"
+                      }`}
                   />
                 )}
               </Link>
@@ -347,11 +343,10 @@ const fetchPendingFeedback =
         <button
           ref={triggerRef}
           onClick={() => setPopoverOpen(!popoverOpen)}
-          className={`flex w-full items-center justify-between rounded-xl p-2 transition-all cursor-pointer ${
-            popoverOpen
+          className={`flex w-full items-center justify-between rounded-xl p-2 transition-all cursor-pointer ${popoverOpen
               ? "bg-blue-50/90 border border-blue-200/80 shadow-xs"
               : "hover:bg-slate-50 border border-transparent"
-          }`}
+            }`}
         >
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary text-white text-xs font-bold">

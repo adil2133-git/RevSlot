@@ -11,7 +11,8 @@ import type { NextRequest } from "next/server";
 // API call.
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const hasSession = request.cookies.has("refreshToken");
+  const rawRefreshToken = request.cookies.get("refreshToken")?.value;
+  const hasSession = Boolean(rawRefreshToken && rawRefreshToken.trim().length > 0);
 
   const isDashboardRoute = pathname.startsWith("/dashboard");
   const isAdminRoute = pathname.startsWith("/admin") && !pathname.startsWith("/admin/login");
@@ -42,5 +43,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/admin/:path*", "/reviewer/login", "/register"],
+  matcher: ["/dashboard/:path*", "/admin/:path*", "/reviewer/login", "/register", "/register/:path*"],
 };

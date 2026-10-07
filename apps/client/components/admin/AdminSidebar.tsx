@@ -48,7 +48,7 @@ export default function AdminSidebar() {
 
   const handleLogout = async () => {
     await logout();
-    router.push("/admin/login");
+    window.location.replace("/admin/login");
   };
 
   const displayName = user?.name || "Admin Executive";
@@ -83,16 +83,14 @@ export default function AdminSidebar() {
             <Link
               key={item.href}
               href={item.href}
-              className={`group flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all ${
-                active
+              className={`group flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all ${active
                   ? "bg-[#002b49] text-white shadow-xs"
                   : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              }`}
+                }`}
             >
               <Icon
-                className={`h-4 w-4 shrink-0 transition-colors ${
-                  active ? "text-white" : "text-slate-400 group-hover:text-slate-700"
-                }`}
+                className={`h-4 w-4 shrink-0 transition-colors ${active ? "text-white" : "text-slate-400 group-hover:text-slate-700"
+                  }`}
               />
               <span>{item.label}</span>
             </Link>
