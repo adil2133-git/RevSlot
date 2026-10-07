@@ -1,9 +1,9 @@
+import 'dotenv/config';
 import express from 'express';
 import { createServer } from "node:http";
 import { Server } from "socket.io";
 import helmet from "helmet"
 import cors from 'cors';
-import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
 
 import authRoutes from "./modules/auth/auth.routes.js";
@@ -32,8 +32,6 @@ import { startEmailWorker } from "./queues/email.worker.js";
 
 import { notFound, errorMiddleware } from './core/middlewares/error.middleware.js';
 import { pool } from "./config/db.js";
-
-dotenv.config();
 
 const app = express();
 const httpServer = createServer(app);
