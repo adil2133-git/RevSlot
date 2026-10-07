@@ -46,10 +46,15 @@ export const ResendVerificationSchema = z.object({
   email: z.email().trim().toLowerCase(),
 });
 
-export const GoogleAuthSchema = z.object({
-  idToken: z.string().min(1, "ID token is required"),
-  whatsappNumber: z.string().trim().regex(/^\+?[0-9]{10,15}$/, "Invalid WhatsApp number").optional(),
-});
+export const GoogleAuthSchema = z
+  .object({
+    code: z.string().min(1).optional(),
+    idToken: z.string().min(1).optional(),
+    whatsappNumber: z.string().trim().regex(/^\+?[0-9]{10,15}$/, "Invalid WhatsApp number").optional(),
+  })
+  .refine((d) => !!d.code || !!d.idToken, {
+    message: "Google authorization code or ID token is required",
+  });
 
 export const UpdateUsernameSchema = z.object({
   username: usernameSchema,

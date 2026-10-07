@@ -10,7 +10,6 @@ import {
 import {
   fetchCalendarStatus,
   getGoogleConnectUrl,
-  disconnectGoogleCalendar,
 } from "../api/calendarApi";
 
 const CalendarIcon = () => (
@@ -78,18 +77,18 @@ export default function GoogleCalendarCard() {
     }
   };
 
-  const handleDisconnect = async () => {
-    setBusy(true);
+  // const handleDisconnect = async () => {
+  //   setBusy(true);
 
-    try {
-      await disconnectGoogleCalendar();
+  //   try {
+  //     await disconnectGoogleCalendar();
 
-      setConnected(false);
-      setEmail(null);
-    } finally {
-      setBusy(false);
-    }
-  };
+  //     setConnected(false);
+  //     setEmail(null);
+  //   } finally {
+  //     setBusy(false);
+  //   }
+  // };
 
   return (
     <div className="mb-5 flex items-center justify-between rounded-xl border border-slate-100 bg-surface-card p-5 shadow-surface">
@@ -118,11 +117,17 @@ export default function GoogleCalendarCard() {
 
       {!loading && (
         <button
-          onClick={
-            connected
-              ? handleDisconnect
-              : handleConnect
-          }
+          onClick={() => {
+            if (
+              connected &&
+              !window.confirm(
+                "New bookings will use the new Google account. Existing bookings keep their current Meet links. Continue?"
+              )
+            ) {
+              return;
+            }
+            void handleConnect();
+          }}
           disabled={busy}
           className={
             connected
@@ -130,7 +135,7 @@ export default function GoogleCalendarCard() {
               : "shrink-0 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary shadow-surface disabled:opacity-60"
           }
         >
-          {connected ? "Disconnect" : "Connect"}
+          {connected ? "Change account" : "Connect"}
         </button>
       )}
 

@@ -14,7 +14,6 @@ import { bookingRescheduledTemplate, bookingRescheduledTemplateData } from "../.
 import { bookingRescheduleRequestedTemplate, bookingRescheduleRequestedTemplateData } from "../../emails/templates/bookingRescheduleRequested.js";
 import { slotService } from "../slot/slot.service.js"; 
 import { BOOKING_FIELD_DEFINITIONS } from "./bookingFields.js";
-import { meetingService } from "../meeting/meeting.service.js";
 import { refundService } from "../payment/refund.service.js";
 import {
   getEventTimezoneRepo,
@@ -367,10 +366,7 @@ export const bookingService = {
     const reviewerTimezone = await getEventTimezone(booking.eventTypeId);
     const clientTimezone = (booking as any).formData?.clientTimezone || reviewerTimezone;
 
-    const internalMeetingLink =
-      meetingService.getMeetingLink(booking.id);
-
-    const meetLink: string | null = internalMeetingLink;
+    let meetLink: string | null = eventType.meetingLink ?? null;
 
     try {
       const meetEvent = await calendarService.createMeetEvent({
@@ -385,13 +381,13 @@ export const bookingService = {
           booking.advisorEmail,
           ...(booking.internEmails ?? []),
         ],
-        meetingLink: internalMeetingLink,
       });
 
       if (meetEvent) {
+        meetLink = meetEvent.meetLink ?? meetLink;
         await updateBookingMeetingDetailsRepo(
           booking.id,
-          internalMeetingLink,
+          meetLink,
           meetEvent.googleEventId
         );
       }
@@ -404,7 +400,7 @@ export const bookingService = {
 
     await updateBookingMeetingDetailsRepo(
       booking.id,
-      internalMeetingLink
+      meetLink
     );
 
     const recipients: {
@@ -511,7 +507,6 @@ export const bookingService = {
 
       return {
         ...booking,
-        meetLink: meetingService.getMeetingLink(booking.id),
         dispute: disputeId
           ? {
               id: disputeId,
@@ -1103,9 +1098,7 @@ export const bookingService = {
       (oldBooking as any).formData?.clientTimezone ||
       reviewerTimezone;
 
-    const internalMeetingLink =
-      meetingService.getMeetingLink(newBooking.id);
-    const meetLink: string | null = internalMeetingLink;
+    let meetLink: string | null = eventType.meetingLink ?? null;
 
     try {
       const meetEvent = await calendarService.createMeetEvent({
@@ -1120,18 +1113,22 @@ export const bookingService = {
           newBooking.advisorEmail,
           ...(newBooking.internEmails ?? []),
         ],
-        meetingLink: internalMeetingLink,
       });
 
       if (meetEvent) {
+        meetLink = meetEvent.meetLink ?? meetLink;
         await updateBookingMeetingDetailsRepo(
           newBooking.id,
-          internalMeetingLink,
+          meetLink,
           meetEvent.googleEventId
         );
       }
     } catch (err) {
       console.error(`[Booking] Meet event creation failed for rescheduled booking ${newBooking.id}:`, err);
+    }
+
+    if (meetLink) {
+      await updateBookingMeetingDetailsRepo(newBooking.id, meetLink);
     }
 
     const recipients: { email: string; name: string; role: "advisor" | "reviewer" | "intern"; timezone: string }[] = [

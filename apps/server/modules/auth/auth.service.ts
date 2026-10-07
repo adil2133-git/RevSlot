@@ -39,6 +39,7 @@ import {
   updateReviewerPasswordRepo,
   updateAdminPasswordRepo,
 } from "./auth.repository.js";
+import { connectGoogleCalendarRepo } from "../calendar/calendar.repository.js";
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID as string;
 
@@ -47,7 +48,7 @@ if (!GOOGLE_CLIENT_ID) {
 }
 
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
-
+const GOOGLE_CALENDAR_EVENTS_SCOPE = "https://www.googleapis.com/auth/calendar.events";
 
 // Common fields required for authentication
 type AuthUser = {
@@ -654,12 +655,39 @@ export const authService = {
     return { message: "If that email is registered and unverified, a new code has been sent." };
   },
 
-  // Sign in or sign up a reviewer using a Google-issued ID token.
-  // Google-verified emails are trusted immediately — no OTP step needed.
-  googleAuth: async (data: GoogleAuthInput) => {
+   googleAuth: async (data: GoogleAuthInput) => {
+    let idToken = data.idToken;
+    let calendarRefreshToken: string | null = null;
+
+    if (data.code) {
+      const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+      if (!GOOGLE_CLIENT_SECRET) {
+        throw new AppError("Google sign-in is not configured on the server.", 500);
+      }
+
+      // "postmessage" = Google popup code flow ku required redirect_uri
+      const codeClient = new OAuth2Client(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, "postmessage");
+
+      const { tokens } = await codeClient.getToken(data.code).catch(() => {
+        throw new AppError("Google sign-in could not be completed. Please try again.", 401);
+      });
+
+      idToken = tokens.id_token ?? undefined;
+
+      // User Calendar checkbox ah untick pannirukkalaam, so granted scope check pannu
+      const calendarGranted = tokens.scope?.includes(GOOGLE_CALENDAR_EVENTS_SCOPE) ?? false;
+      if (calendarGranted && tokens.refresh_token) {
+        calendarRefreshToken = tokens.refresh_token;
+      }
+    }
+
+    if (!idToken) {
+      throw new AppError("Google sign-in was canceled or could not be completed. Please try again.", 401);
+    }
+
     // Verify the token actually came from Google and is meant for our app
     const ticket = await googleClient.verifyIdToken({
-      idToken: data.idToken,
+      idToken,
       audience: GOOGLE_CLIENT_ID,
     });
 
@@ -701,6 +729,11 @@ export const authService = {
 
     if (!reviewer.isActive) {
       throw new AppError("Your account has been deactivated. Please contact support.", 403);
+    }
+
+    // Google Calendar auto-connect (refresh token first consent la mattum varum)
+    if (calendarRefreshToken) {
+      await connectGoogleCalendarRepo(reviewer.id, calendarRefreshToken, email ?? null);
     }
 
     return await issueSession("reviewer", reviewer);
