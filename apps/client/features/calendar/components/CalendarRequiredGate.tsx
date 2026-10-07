@@ -12,6 +12,7 @@ import {
 // Pages a reviewer can't use until Google Calendar is connected.
 const GATED_PREFIXES = ["/availability", "/dashboard/event-types"];
 
+
 export default function CalendarRequiredGate({
   children,
 }: {
@@ -27,7 +28,7 @@ export default function CalendarRequiredGate({
   const [connected, setConnected] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
 
   useEffect(() => {
     if (!isGated) return;
