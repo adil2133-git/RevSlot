@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Switch from "@/components/common/Switch";
@@ -170,24 +171,22 @@ export default function EventTypeForm({ mode, eventTypeId }: EventTypeFormProps)
               : "Update the details of this session type."}
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-3">
-          <button
-            type="button"
-            onClick={() => router.push("/dashboard/event-types")}
-            className="rounded-full border border-slate-200 px-5 py-2 text-sm font-medium text-on-surface hover:bg-surface-hover"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="rounded-full bg-primary px-5 py-2 text-sm font-semibold text-on-primary shadow-surface disabled:opacity-60"
-          >
-            {saving ? "Saving…" : "Save Event Type"}
-          </button>
-        </div>
       </div>
+
+  {!loading && templates.length === 0 && (
+  <div className="mb-4 flex items-center justify-between gap-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+    <p className="text-sm text-amber-800">
+      You don't have any availability templates yet. Create one before setting up this event type.
+    </p>
+    <button
+      type="button"
+      onClick={() => router.push("/availability")}
+      className="shrink-0 rounded-full bg-amber-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-amber-700"
+    >
+      Create Availability Template
+    </button>
+  </div>
+)}
 
       {error && (
         <p className="mb-4 rounded-lg bg-error-container px-4 py-2 text-sm text-error">{error}</p>
@@ -297,31 +296,29 @@ export default function EventTypeForm({ mode, eventTypeId }: EventTypeFormProps)
             </p>
           </div>
         </div>
-
         <div>
           <label className="mb-1.5 block text-sm font-medium text-on-surface">
             Availability Template *
           </label>
-          <select
-            value={availabilityTemplateId}
-            onChange={(e) => setAvailabilityTemplateId(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-primary"
-          >
-            <option value="">Select availability template</option>
-            {templates.map((template) => (
-              <option key={template.id} value={template.id}>
-                {template.name}
-              </option>
-            ))}
-          </select>
+           <div className="relative">
+            <select
+              value={availabilityTemplateId}
+              onChange={(e) => setAvailabilityTemplateId(e.target.value)}
+              className="w-full appearance-none rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-primary pr-8"
+            >
+              <option value="">Select availability template</option>
+              {templates.map((template) => (
+                <option key={template.id} value={template.id}>
+                  {template.name}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          </div>
           <p className="mt-1.5 text-xs text-slate-400">
             Select a weekly availability template that will be used for this event type.
           </p>
-          {templates.length === 0 && (
-            <p className="mt-1.5 text-xs text-error">
-              You dont have any availability templates yet — create one first.
-            </p>
-          )}
+
         </div>
 
         {mode === "edit" && (
@@ -335,6 +332,25 @@ export default function EventTypeForm({ mode, eventTypeId }: EventTypeFormProps)
             </div>
           </div>
         )}
+
+      <div className="mt-6 flex items-center justify-end gap-3">
+        <button
+          type="button"
+          onClick={() => router.push("/dashboard/event-types")}
+          className="rounded-full border border-slate-200 px-5 py-2 text-sm font-medium text-on-surface hover:bg-surface-hover"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving || templates.length === 0}
+          className="rounded-full bg-primary px-5 py-2 text-sm font-semibold text-on-primary shadow-surface disabled:opacity-60"
+        >
+          {saving ? "Saving…" : "Save Event Type"}
+        </button>
+      </div>
+
       </div>
 
       <WhatsappRequiredModal

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useAuthStore } from "@/features/auth/store/authStore";
 import type { EventType } from "../types";
 
@@ -62,9 +62,25 @@ interface EventTypeCardProps {
 export default function EventTypeCard({ eventType, index, onEdit, onToggleActive, onTogglePublic }: EventTypeCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const lastTapRef = useRef<number>(0);
+  const menuRef = useRef<HTMLDivElement>(null);
   const iconClass = ICON_BG[index % ICON_BG.length];
   const [copied, setCopied] = useState(false);
   const username = useAuthStore((state) => state.user?.username);
+
+  useEffect(() => {
+  if (!menuOpen) return;
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+    if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+      setMenuOpen(false);
+    }
+  };
+  document.addEventListener("mousedown", handleClickOutside);
+  document.addEventListener("touchstart", handleClickOutside);
+  return () => {
+    document.removeEventListener("mousedown", handleClickOutside);
+    document.removeEventListener("touchstart", handleClickOutside);
+  };
+}, [menuOpen]);
 
   const handleTouchEnd = (e: React.TouchEvent) => {
     const target = e.target as HTMLElement;
@@ -174,7 +190,7 @@ export default function EventTypeCard({ eventType, index, onEdit, onToggleActive
         >
           Edit
         </button>
-        <div className="relative">
+        <div className="relative" ref={menuRef}>
           <button
             onClick={() => setMenuOpen((v) => !v)}
             className="rounded-md p-1.5 text-slate-400 hover:bg-surface-hover hover:text-on-surface"
@@ -182,11 +198,10 @@ export default function EventTypeCard({ eventType, index, onEdit, onToggleActive
           >
             <DotsIcon />
           </button>
-          {menuOpen && (
-            <div
-              onMouseLeave={() => setMenuOpen(false)}
-              className="absolute right-0 top-9 z-10 w-40 overflow-hidden rounded-lg border border-slate-100 bg-surface-card shadow-raised"
-            >
+             {menuOpen && (
+               <div
+                  className="absolute right-0 top-9 z-10 w-40 overflow-hidden rounded-lg border border-slate-100 bg-surface-card shadow-raised"
+             >
               <button
                 onClick={() => {
                   setMenuOpen(false);

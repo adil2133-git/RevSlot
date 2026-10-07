@@ -8,7 +8,6 @@ import { emailService } from "../../services/email.service.js";
 import { advisorOtpTemplate, advisorOtpTemplateData } from "../../emails/templates/advisorOtp.js";
 import { bookingCancelledTemplate, bookingCancelledTemplateData } from "../../emails/templates/bookingCancelled.js";
 import { generateAdvisorToken } from "../../core/utils/jwt.js";
-import { meetingService } from "../meeting/meeting.service.js";
 import { refundService } from "../payment/refund.service.js";
 import { bookingService } from "../booking/booking.service.js";
 import { notificationService } from "../notification/notification.service.js";
@@ -97,7 +96,6 @@ export const advisorService = {
 
       return {
         ...booking,
-        meetLink: meetingService.getMeetingLink(booking.id),
         dispute: disputeId
           ? {
               id: disputeId,

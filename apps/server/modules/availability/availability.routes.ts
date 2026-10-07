@@ -11,12 +11,13 @@ import {
   CreateDateOverrideSchema
 } from "./availability.validation.js";
 import { availabilityController } from "./availability.controller.js";
+import { requireCalendarConnected } from "../calendar/calendar.middleware.js";
 
 const router = Router();
 
 router.use(requireReviewer);
 
-router.post("/", validate(CreateTemplateSchema), catchAsync(availabilityController.createTemplate));
+router.post("/", catchAsync(requireCalendarConnected), validate(CreateTemplateSchema), catchAsync(availabilityController.createTemplate));
 router.get("/", catchAsync(availabilityController.listTemplates));
 router.get("/meta/timezones", catchAsync(availabilityController.getTimezoneOptions));
 router.get("/meta/time-options", catchAsync(availabilityController.getTimeOptions));

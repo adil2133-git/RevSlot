@@ -90,11 +90,9 @@ export type ResendVerificationPayload = {
   email: string;
 };
 
-// whatsappNumber is only required the first time a brand-new Google user
-// signs up (backend returns 422 GoogleWhatsappRequiredError if omitted
-// and no matching account exists yet).
 export type GoogleAuthPayload = {
-  idToken: string;
+  code?: string;      // OAuth code (popup flow: login + Calendar)
+  idToken?: string;   // legacy
   whatsappNumber?: string;
 };
 
