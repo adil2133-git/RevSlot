@@ -21,11 +21,10 @@ export default function NavbarLanding() {
 
   return (
     <header
-      className={`sticky top-0 z-40 w-full transition-all duration-200 ${
-        isScrolled
+      className={`sticky top-0 z-40 w-full transition-all duration-200 ${isScrolled
           ? "bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs"
           : "bg-white border-b border-slate-100"
-      }`}
+        }`}
     >
       <div className="container-page flex h-16 items-center justify-between">
         {/* Brand Logo */}
@@ -79,12 +78,14 @@ export default function NavbarLanding() {
             <>
               <Link
                 href="/register"
+                prefetch={false}
                 className="inline-flex items-center gap-2 rounded-xl bg-primary px-4.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-primary/95 transition-all"
               >
                 <span>Create your booking link</span>
               </Link>
               <Link
                 href="/reviewer/login"
+                prefetch={false}
                 title="Reviewer Login"
                 className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-primary transition-colors"
               >
@@ -143,6 +144,7 @@ export default function NavbarLanding() {
               <>
                 <Link
                   href="/register"
+                  prefetch={false}
                   onClick={() => setMobileMenuOpen(false)}
                   className="w-full text-center rounded-xl bg-primary py-2.5 text-xs font-bold text-white shadow-xs"
                 >
@@ -150,6 +152,7 @@ export default function NavbarLanding() {
                 </Link>
                 <Link
                   href="/reviewer/login"
+                  prefetch={false}
                   onClick={() => setMobileMenuOpen(false)}
                   className="w-full text-center rounded-xl border border-slate-200 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                 >

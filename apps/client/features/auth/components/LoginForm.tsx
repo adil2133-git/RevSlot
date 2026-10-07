@@ -157,7 +157,7 @@ export default function LoginForm({ role }: LoginFormProps) {
         {role === "reviewer" && (
           <p className="text-center text-sm text-slate-400 pt-1">
             Don&apos;t have an account?{" "}
-            <Link href="/register" className="font-semibold text-primary transition-colors hover:text-primary/80 hover:underline">
+            <Link href="/register" prefetch={false} className="font-semibold text-primary transition-colors hover:text-primary/80 hover:underline">
               Register
             </Link>
           </p>

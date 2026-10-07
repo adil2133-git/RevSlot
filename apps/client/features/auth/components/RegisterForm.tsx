@@ -202,7 +202,7 @@ export default function RegisterForm() {
 
         <p className="pt-1 text-center text-xs text-slate-400">
           Already have an account?{" "}
-          <Link href="/reviewer/login" className="font-semibold text-primary transition-colors hover:text-primary/80 hover:underline">
+          <Link href="/reviewer/login" prefetch={false} className="font-semibold text-primary transition-colors hover:text-primary/80 hover:underline">
             Log in
           </Link>
         </p>

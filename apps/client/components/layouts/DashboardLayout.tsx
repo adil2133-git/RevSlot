@@ -47,7 +47,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const handleLogout = async () => {
     await logout();
-    router.push("/reviewer/login");
+    window.location.replace("/reviewer/login");
   };
 
   return (
