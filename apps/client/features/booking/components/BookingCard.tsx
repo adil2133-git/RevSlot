@@ -247,23 +247,28 @@ export default function BookingCard({
     )
   )}
 
-{isJoinAvailable && (
+{isJoinAvailable && booking.meetLink && (
   <a
-    href={
-    booking.meetLink
-    ? `${booking.meetLink}${
-        booking.meetLink.includes("?")
-          ? "&"
-          : "?"
-      }source=reviewer`
-    : `/meeting/${booking.id}?source=reviewer`
-}
+    href={`${booking.meetLink}${
+      booking.meetLink.includes("?") ? "&" : "?"
+    }source=reviewer`}
     target="_blank"
     rel="noopener noreferrer"
     className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-on-primary shadow-2xs hover:shadow-surface transition-shadow"
   >
     Join Meet
   </a>
+)}
+
+{isJoinAvailable && !booking.meetLink && (
+  <button
+    type="button"
+    disabled
+    title="No Meet link was generated for this booking. Check your Google Calendar connection in Settings."
+    className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-400 cursor-not-allowed"
+  >
+    Meet link unavailable
+  </button>
 )}
 
 {isBeforeJoinWindow && (

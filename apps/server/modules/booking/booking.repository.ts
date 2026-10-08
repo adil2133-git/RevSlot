@@ -280,6 +280,7 @@ export const findBookingFinalizeDetailsRepo = async (
     .select({
       name: eventTypes.name,
       price: eventTypes.price,
+      meetingLink: eventTypes.meetingLink,
     })
     .from(eventTypes)
     .where(eq(eventTypes.id, eventTypeId))
@@ -308,7 +309,7 @@ export const findBookingFinalizeDetailsRepo = async (
 
 export const updateBookingMeetingDetailsRepo = async (
   bookingId: number,
-  meetLink: string,
+  meetLink: string | null,
   googleEventId?: string | null | undefined,
   tx: DbOrTx = db
 ) => {
@@ -510,7 +511,7 @@ export const findEventTypeNameByIdRepo = async (
   tx: DbOrTx = db
 ) => {
   const [eventType] = await tx
-    .select({ name: eventTypes.name })
+    .select({ name: eventTypes.name, meetingLink: eventTypes.meetingLink })
     .from(eventTypes)
     .where(eq(eventTypes.id, eventTypeId))
     .limit(1);

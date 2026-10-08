@@ -1,4 +1,5 @@
 import { google } from "googleapis";
+import crypto from "crypto";
 import { AppError } from "../../core/errors/AppError.js";
 import { signCalendarState, verifyCalendarState } from "../../core/utils/jwt.js";
 import {
@@ -86,9 +87,12 @@ export const calendarService = {
     return { reviewerId };
   },
 
-  disconnect: async (reviewerId: number) => {
-    await disconnectGoogleCalendarRepo(reviewerId);
-  },
+   disconnect: async (_reviewerId: number) => {
+     throw new AppError(
+       "Google Calendar can't be disconnected because it's required to create Meet links for bookings.",
+       403
+     );
+   },
 
   getStatus: async (reviewerId: number) => {
     const reviewer = await getGoogleCalendarStatusRepo(reviewerId);
@@ -111,8 +115,7 @@ export const calendarService = {
     endTime: Date;
     timezone: string;
     attendeeEmails: string[];
-    meetingLink: string;
-  }): Promise<{ meetLink: string; googleEventId: string } | null> => {
+    }): Promise<{ meetLink: string | null; googleEventId: string } | null> => {
     const reviewer = await getReviewerGoogleCalendarAuthRepo(params.reviewerId);
 
     if (!reviewer?.connected || !reviewer.refreshToken) {
@@ -134,16 +137,12 @@ export const calendarService = {
       const { data: event } = await calendar.events.insert(
         {
           calendarId: "primary",
+          conferenceDataVersion: 1,
           sendUpdates: "all",
           requestBody: {
             summary: params.summary,
 
-            description: [
-              params.description,
-              `Join RevSlot meeting: ${params.meetingLink}`,
-            ]
-              .filter(Boolean)
-              .join("\n\n"),
+            description: params.description ?? null,
 
             start: {
               dateTime: params.startTime.toISOString(),
@@ -158,24 +157,45 @@ export const calendarService = {
             attendees: params.attendeeEmails
               .filter(Boolean)
               .map((email) => ({ email })),
+
+            conferenceData: {
+              createRequest: {
+                requestId: crypto.randomUUID(),
+                conferenceSolutionKey: { type: "hangoutsMeet" },
+              },
+            },
           },
-        },
-        {}
-      );
+        });
 
       if (!event.id) {
         return null;
       }
 
-      return {
-        meetLink: params.meetingLink,
-        googleEventId: event.id,
-      };
+      const meetUrl =
+        event.hangoutLink ??
+        event.conferenceData?.entryPoints?.find((e) => e.entryPointType === "video")?.uri ??
+        null;
+
+      if (!meetUrl) {
+        console.error(
+          `[Calendar Service] Event ${event.id} created but Google returned no Meet link`
+        );
+      }
+
+      return { meetLink: meetUrl, googleEventId: event.id };
     } catch (err: any) {
       console.error(
         `[Calendar Service] Failed to create Meet event for reviewer ${params.reviewerId}:`,
         err.message || err
       );
+
+      const isInvalidGrant =
+        err?.response?.data?.error === "invalid_grant" ||
+        String(err?.message ?? "").includes("invalid_grant");
+
+      if (isInvalidGrant) {
+        await disconnectGoogleCalendarRepo(params.reviewerId).catch(() => {});
+      }
 
       return null;
     }

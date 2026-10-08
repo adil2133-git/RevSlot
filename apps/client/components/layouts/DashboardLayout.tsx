@@ -7,6 +7,7 @@ import Sidebar from "@/components/common/Sidebar";
 import NotificationBell from "@/features/notifications/components/NotificationBell";
 import { Home, ChevronDown, Settings, LogOut, User } from "lucide-react";
 import { useAuthStore } from "@/features/auth/store/authStore";
+import CalendarRequiredGate from "@/features/calendar/components/CalendarRequiredGate";
 
 function getInitials(name: string) {
   return name
@@ -46,7 +47,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const handleLogout = async () => {
     await logout();
-    router.push("/reviewer/login");
+    window.location.replace("/reviewer/login");
   };
 
   return (
@@ -128,7 +129,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Scrollable Page Body */}
         <main className="flex-1 overflow-y-auto px-6 py-8 sm:px-8 lg:px-10">
-          <div className="mx-auto max-w-5xl">{children}</div>
+          <div className="mx-auto max-w-5xl">
+            <CalendarRequiredGate>{children}</CalendarRequiredGate>
+          </div>
         </main>
       </div>
     </div>

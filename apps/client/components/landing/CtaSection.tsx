@@ -22,6 +22,7 @@ export default function CtaSection() {
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
           <Link
             href="/register"
+            prefetch={false}
             className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-white px-8 py-3.5 text-sm font-bold text-primary shadow-xl hover:bg-blue-50 transition-all hover:scale-105 active:scale-95"
           >
             <span>Create your booking link</span>
