@@ -112,7 +112,7 @@ export const bookingService = {
     const targetStart = dayjs.tz(`${slotDate} ${startTime}`, timezone).toDate();
     const targetEnd = dayjs.tz(`${slotDate} ${endTime}`, timezone).toDate();
 
-    return checkCrossEventConflictRepo(
+    const hasDbConflict = await checkCrossEventConflictRepo(
       reviewerId,
       slotDate,
       startTime,
@@ -121,6 +121,24 @@ export const bookingService = {
       targetStart,
       targetEnd
     );
+
+    if (hasDbConflict) {
+      return true;
+    }
+
+    const googleRanges = await calendarService.getGoogleBusyIntervals(
+      reviewerId,
+      targetStart,
+      targetEnd,
+      timezone
+    );
+
+    const hasGoogleConflict = googleRanges.some((g) => {
+      if (g.slotDate !== slotDate) return false;
+      return startTime < g.endTime && g.startTime < endTime;
+    });
+
+    return hasGoogleConflict;
   },
 
   createBooking: async (data: CreateBookingInput) => {
