@@ -1,5 +1,7 @@
 import { google } from "googleapis";
 import crypto from "crypto";
+import dayjs from "../../config/dayjs.js";
+import { redis } from "../../config/redis.js";
 import { AppError } from "../../core/errors/AppError.js";
 import { signCalendarState, verifyCalendarState } from "../../core/utils/jwt.js";
 import {
@@ -228,6 +230,101 @@ export const calendarService = {
         `[Calendar Service] Failed to delete event ${googleEventId} for reviewer ${reviewerId}:`,
         err.message || err
       );
+    }
+  },
+
+  // Queries Google Calendar's FreeBusy API to find any times when the reviewer
+  // is busy on their primary calendar (scheduled outside RevSlot or otherwise).
+  // Results are cached in Redis with a short TTL (60s) to keep slot lookups
+  // fast and prevent hitting Google API quotas.
+  getGoogleBusyIntervals: async (
+    reviewerId: number,
+    startTimeUtc: Date,
+    endTimeUtc: Date,
+    timezone: string = "Asia/Kolkata"
+  ): Promise<{ slotDate: string; startTime: string; endTime: string }[]> => {
+    const reviewer = await getReviewerGoogleCalendarAuthRepo(reviewerId);
+
+    if (!reviewer?.connected || !reviewer.refreshToken) {
+      return [];
+    }
+
+    const startIso = startTimeUtc.toISOString();
+    const endIso = endTimeUtc.toISOString();
+    const cacheKey = `gcal:busy:${reviewerId}:${startIso}:${endIso}:${timezone}`;
+
+    try {
+      const cached = await redis.get(cacheKey);
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    } catch (cacheErr) {
+      console.warn(`[Calendar Service] Redis cache read failed for reviewer ${reviewerId}:`, cacheErr);
+    }
+
+    const client = createOAuthClient();
+    client.setCredentials({ refresh_token: reviewer.refreshToken });
+    const calendar = google.calendar({ version: "v3", auth: client });
+
+    try {
+      const { data } = await calendar.freebusy.query({
+        requestBody: {
+          timeMin: startIso,
+          timeMax: endIso,
+          timeZone: timezone,
+          items: [{ id: "primary" }],
+        },
+      });
+
+      const busyItems = data.calendars?.primary?.busy || [];
+      const ranges: { slotDate: string; startTime: string; endTime: string }[] = [];
+
+      for (const item of busyItems) {
+        if (!item.start || !item.end) continue;
+
+        const itemStart = dayjs(item.start).tz(timezone);
+        const itemEnd = dayjs(item.end).tz(timezone);
+
+        if (!itemStart.isBefore(itemEnd)) continue;
+
+        let curr = itemStart;
+        while (curr.isBefore(itemEnd)) {
+          const dateStr = curr.format("YYYY-MM-DD");
+          const endOfDay = curr.endOf("day");
+          const segmentEnd = itemEnd.isBefore(endOfDay) ? itemEnd : endOfDay;
+
+          ranges.push({
+            slotDate: dateStr,
+            startTime: curr.format("HH:mm:ss"),
+            endTime: segmentEnd.format("HH:mm:ss"),
+          });
+
+          curr = curr.add(1, "day").startOf("day");
+        }
+      }
+
+      try {
+        await redis.set(cacheKey, JSON.stringify(ranges), "EX", 60);
+      } catch (cacheErr) {
+        console.warn(`[Calendar Service] Redis cache write failed for reviewer ${reviewerId}:`, cacheErr);
+      }
+
+      return ranges;
+    } catch (err: any) {
+      console.error(
+        `[Calendar Service] Failed to query FreeBusy for reviewer ${reviewerId}:`,
+        err.message || err
+      );
+
+      const isInvalidGrant =
+        err?.response?.data?.error === "invalid_grant" ||
+        String(err?.message ?? "").includes("invalid_grant");
+
+      if (isInvalidGrant) {
+        await disconnectGoogleCalendarRepo(reviewerId).catch(() => {});
+      }
+
+      return [];
     }
   },
 };

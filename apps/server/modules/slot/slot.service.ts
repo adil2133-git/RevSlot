@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import { db } from "../../config/db.js";
 import { AppError } from "../../core/errors/AppError.js";
 import type { HoldSlotInput, ReleaseSlotInput } from "./slot.validation.js";
+import { calendarService } from "../calendar/calendar.service.js";
 import {
   findEventTypeWithTemplateTimezoneRepo,
   findTemplateTimeBlocksForSlotRepo,
@@ -93,7 +94,15 @@ async function loadReservedRanges(reviewerId: number, dateFrom: string, dateTo: 
     };
   });
 
-  return [...slotRows, ...bookingRanges];
+  // Also query Google Calendar busy intervals (scheduled outside RevSlot or otherwise)
+  const googleRanges = await calendarService.getGoogleBusyIntervals(
+    reviewerId,
+    rangeStartUtc,
+    rangeEndUtc,
+    timezone
+  );
+
+  return [...slotRows, ...bookingRanges, ...googleRanges];
 }
 
 function timeRangesOverlap(aStart: string, aEnd: string, bStart: string, bEnd: string) {
