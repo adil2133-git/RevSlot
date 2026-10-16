@@ -94,6 +94,14 @@ export default function PrivacyPolicyPage() {
               </div>
               <div className="bg-white p-3.5 rounded-lg border border-slate-200 text-sm">
                 <code className="text-xs font-mono font-semibold text-primary bg-blue-50 px-2 py-0.5 rounded">
+                  https://www.googleapis.com/auth/calendar.freebusy
+                </code>
+                <p className="mt-1 text-slate-600">
+                  Used solely to check busy intervals on your primary calendar so that conflicting RevSlot slots are automatically hidden.
+                </p>
+              </div>
+              <div className="bg-white p-3.5 rounded-lg border border-slate-200 text-sm">
+                <code className="text-xs font-mono font-semibold text-primary bg-blue-50 px-2 py-0.5 rounded">
                   userinfo.email & userinfo.profile
                 </code>
                 <p className="mt-1 text-slate-600">
