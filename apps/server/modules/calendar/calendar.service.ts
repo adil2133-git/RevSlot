@@ -47,6 +47,7 @@ export const calendarService = {
       prompt: "consent",
       scope: [
         "https://www.googleapis.com/auth/calendar.events",
+        "https://www.googleapis.com/auth/calendar.freebusy",
         "https://www.googleapis.com/auth/userinfo.email",
         "https://www.googleapis.com/auth/userinfo.profile",
       ],
@@ -276,6 +277,13 @@ export const calendarService = {
         },
       });
 
+      if (data.calendars?.primary?.errors && data.calendars.primary.errors.length > 0) {
+        console.error(
+          `[Calendar Service] FreeBusy query errors for reviewer ${reviewerId}:`,
+          JSON.stringify(data.calendars.primary.errors)
+        );
+      }
+
       const busyItems = data.calendars?.primary?.busy || [];
       const ranges: { slotDate: string; startTime: string; endTime: string }[] = [];
 
@@ -313,7 +321,7 @@ export const calendarService = {
     } catch (err: any) {
       console.error(
         `[Calendar Service] Failed to query FreeBusy for reviewer ${reviewerId}:`,
-        err.message || err
+        err?.response?.data || err.message || err
       );
 
       const isInvalidGrant =

@@ -151,7 +151,10 @@ const GOOGLE_SCOPES = [
     "email",
     "profile",
     ...(process.env.NEXT_PUBLIC_GOOGLE_LOGIN_CALENDAR === "true"
-        ? ["https://www.googleapis.com/auth/calendar.events"]
+        ? [
+            "https://www.googleapis.com/auth/calendar.events",
+            "https://www.googleapis.com/auth/calendar.freebusy",
+          ]
         : []),
 ].join(" ");
 
