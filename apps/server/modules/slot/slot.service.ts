@@ -38,13 +38,15 @@ async function loadAvailabilityInputs(eventTypeId: number, dateFrom: string, dat
   const windowEnd = dayjs().tz(timezone).add(eventType.bookingWindowDays, "day").format("YYYY-MM-DD");
   const effectiveDateTo = dateTo < windowEnd ? dateTo : windowEnd;
 
-  const timeBlocks = await findTemplateTimeBlocksForSlotRepo(eventType.availabilityTemplateId);
-
-  const overrides = await findTemplateDateOverridesInRangeRepo(
-    eventType.availabilityTemplateId,
-    dateFrom,
-    dateTo
-  );
+  const [timeBlocks, overrides, vacations] = await Promise.all([
+    findTemplateTimeBlocksForSlotRepo(eventType.availabilityTemplateId),
+    findTemplateDateOverridesInRangeRepo(
+      eventType.availabilityTemplateId,
+      dateFrom,
+      dateTo
+    ),
+    findActiveVacationBlocksRepo(eventType.reviewerId),
+  ]);
 
   const overrideBlocksByOverrideId = new Map<number, TimeBlockLike[]>();
   if (overrides.length > 0) {
@@ -66,8 +68,6 @@ async function loadAvailabilityInputs(eventTypeId: number, dateFrom: string, dat
     });
   }
 
-  const vacations = await findActiveVacationBlocksRepo(eventType.reviewerId);
-
   return { eventType: { ...eventType, timezone }, timeBlocks, overridesByDate, vacations, effectiveDateTo, timezone };
 }
 
@@ -76,13 +76,20 @@ async function loadAvailabilityInputs(eventTypeId: number, dateFrom: string, dat
 // reviewer share the same calendar" (booking.service.ts checkCrossEventConflict).
 // A `held` row only counts if its hold hasn't expired yet.
 async function loadReservedRanges(reviewerId: number, dateFrom: string, dateTo: string, timezone: string = "Asia/Kolkata") {
-  const slotRows = await findReservedSlotRangesRepo(reviewerId, dateFrom, dateTo);
-
   // Also block times for confirmed/rescheduled bookings in bookings table
   const rangeStartUtc = dayjs.tz(`${dateFrom} 00:00:00`, timezone).toDate();
   const rangeEndUtc = dayjs.tz(`${dateTo} 23:59:59`, timezone).toDate();
 
-  const bookingRows = await findReservedBookingRangesRepo(reviewerId, rangeStartUtc, rangeEndUtc);
+  const [slotRows, bookingRows, googleRanges] = await Promise.all([
+    findReservedSlotRangesRepo(reviewerId, dateFrom, dateTo),
+    findReservedBookingRangesRepo(reviewerId, rangeStartUtc, rangeEndUtc),
+    calendarService.getGoogleBusyIntervals(
+      reviewerId,
+      rangeStartUtc,
+      rangeEndUtc,
+      timezone
+    ),
+  ]);
 
   const bookingRanges = bookingRows.map((b) => {
     const startTz = dayjs(b.startTime).tz(timezone);
@@ -93,14 +100,6 @@ async function loadReservedRanges(reviewerId: number, dateFrom: string, dateTo: 
       endTime: endTz.format("HH:mm:ss"),
     };
   });
-
-  // Also query Google Calendar busy intervals (scheduled outside RevSlot or otherwise)
-  const googleRanges = await calendarService.getGoogleBusyIntervals(
-    reviewerId,
-    rangeStartUtc,
-    rangeEndUtc,
-    timezone
-  );
 
   return [...slotRows, ...bookingRanges, ...googleRanges];
 }
@@ -199,13 +198,16 @@ export const slotService = {
       return [];
     }
 
+    // Trigger reserved ranges loading in parallel with candidate slot computation
+    const reservedPromise = loadReservedRanges(eventType.reviewerId, dateFrom, effectiveDateTo, timezone);
+
     const candidates = computeCandidates(dateFrom, effectiveDateTo, eventType, timeBlocks, overridesByDate, vacations, timezone);
 
     if (candidates.length === 0) {
       return [];
     }
 
-    const reserved = await loadReservedRanges(eventType.reviewerId, dateFrom, effectiveDateTo, timezone);
+    const reserved = await reservedPromise;
 
     const available = candidates.filter(
       (c) =>
@@ -249,6 +251,8 @@ export const slotService = {
       throw new AppError(`Bookings must be scheduled at least ${MINIMUM_BOOKING_NOTICE_HOURS} hours in advance`, 400);
     }
 
+    const reservedPromise = loadReservedRanges(eventType.reviewerId, data.date, data.date, timezone);
+
     const candidates = computeCandidates(data.date, data.date, eventType, timeBlocks, overridesByDate, vacations, timezone);
 
     const isValid = candidates.some((c) => c.startTime === data.startTime && c.endTime === data.endTime);
@@ -257,7 +261,7 @@ export const slotService = {
       throw new AppError("This slot is not part of the reviewer's current availability", 400);
     }
 
-    const reserved = await loadReservedRanges(eventType.reviewerId, data.date, data.date, timezone);
+    const reserved = await reservedPromise;
     const alreadyTaken = reserved.some(
       (r) => r.slotDate === data.date && timeRangesOverlap(data.startTime, data.endTime, r.startTime, r.endTime)
     );
