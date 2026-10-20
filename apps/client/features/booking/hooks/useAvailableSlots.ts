@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import dayjs, { type Dayjs } from "dayjs";
 import { fetchAvailableSlots } from "../api/bookingApi";
 import type { SlotItem } from "../type";
@@ -9,6 +9,7 @@ export function useAvailableSlots(eventTypeId: number | undefined) {
   const [visibleMonth, setVisibleMonth] = useState<Dayjs>(dayjs().startOf("month"));
   const [slots, setSlots] = useState<SlotItem[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
+  const cacheRef = useRef<Map<string, SlotItem[]>>(new Map());
 
   // Sun-Sat grid covering the full visible month (leading/trailing days
   // from adjacent months included so the grid is always complete weeks)
@@ -24,16 +25,29 @@ export function useAvailableSlots(eventTypeId: number | undefined) {
     return days;
   }, [visibleMonth]);
 
-  const loadSlots = () => {
+  const loadSlots = (force = false) => {
     if (!eventTypeId) return;
-    setSlotsLoading(true);
+    const monthKey = `${eventTypeId}:${visibleMonth.format("YYYY-MM")}`;
+    const cached = cacheRef.current.get(monthKey);
+
+    if (cached && !force) {
+      setSlots(cached);
+    } else {
+      setSlotsLoading(true);
+    }
+
     fetchAvailableSlots(
       eventTypeId,
       visibleMonth.startOf("month").format("YYYY-MM-DD"),
       visibleMonth.endOf("month").format("YYYY-MM-DD")
     )
-      .then(setSlots)
-      .catch(() => setSlots([]))
+      .then((data) => {
+        cacheRef.current.set(monthKey, data);
+        setSlots(data);
+      })
+      .catch(() => {
+        if (!cached) setSlots([]);
+      })
       .finally(() => setSlotsLoading(false));
   };
 

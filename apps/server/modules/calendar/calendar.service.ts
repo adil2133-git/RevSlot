@@ -236,7 +236,7 @@ export const calendarService = {
 
   // Queries Google Calendar's FreeBusy API to find any times when the reviewer
   // is busy on their primary calendar (scheduled outside RevSlot or otherwise).
-  // Results are cached in Redis with a short TTL (60s) to keep slot lookups
+  // Results are cached in Redis with a TTL (120s) to keep slot lookups
   // fast and prevent hitting Google API quotas.
   getGoogleBusyIntervals: async (
     reviewerId: number,
@@ -312,7 +312,7 @@ export const calendarService = {
       }
 
       try {
-        await redis.set(cacheKey, JSON.stringify(ranges), "EX", 60);
+        await redis.set(cacheKey, JSON.stringify(ranges), "EX", 120);
       } catch (cacheErr) {
         console.warn(`[Calendar Service] Redis cache write failed for reviewer ${reviewerId}:`, cacheErr);
       }
