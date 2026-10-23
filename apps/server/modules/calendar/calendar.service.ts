@@ -167,6 +167,17 @@ export const calendarService = {
                 conferenceSolutionKey: { type: "hangoutsMeet" },
               },
             },
+
+            // Option 1: Disable Google's automated email reminders to prevent duplicate emails.
+            // RevSlot sends branded reminder emails via bookingReminderService.
+            // Setting useDefault: false with a popup override ensures attendees still get
+            // device/browser popup notifications 10 minutes prior, but NO email from Google.
+            reminders: {
+              useDefault: false,
+              overrides: [
+                { method: "popup", minutes: 10 },
+              ],
+            },
           },
         });
 
