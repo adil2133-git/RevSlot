@@ -564,6 +564,7 @@ export const updateBookingRescheduledRepo = async (
       status: "rescheduled",
       meetLink: null,
       googleEventId: null,
+      reminderSentAt: null,
     })
     .where(eq(bookings.id, bookingId))
     .returning();
@@ -700,6 +701,7 @@ export const acceptRescheduleRequestRepo = async (
       rescheduleTokenExpiresAt: null,
       meetLink: null,
       googleEventId: null,
+      reminderSentAt: null,
     })
     .where(eq(bookings.id, bookingId))
     .returning();
